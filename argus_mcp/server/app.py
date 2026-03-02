@@ -44,6 +44,7 @@ class _MCPSlashMiddleware:
             return
         await self.app(scope, receive, send)
 
+
 # Module-level MCP server instance
 mcp_server = McpServer(SERVER_NAME)
 mcp_server.manager: Optional[object] = None  # type: ignore[assignment]
