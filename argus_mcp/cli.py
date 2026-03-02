@@ -36,7 +36,9 @@ _CONFIG_SEARCH_ORDER = ("config.yaml", "config.yml")
 
 # Legacy PID file location (kept for backward-compat cleanup)
 _PID_FILE = os.path.join(
-    os.path.expanduser("~"), ".argus", "argus-mcp.pid",
+    os.path.expanduser("~"),
+    ".argus",
+    "argus-mcp.pid",
 )
 
 
