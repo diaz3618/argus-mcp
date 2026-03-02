@@ -1,7 +1,7 @@
 """Shared constants for Argus MCP."""
 
 SERVER_NAME = "Argus MCP"
-SERVER_VERSION = "0.6.0"
+SERVER_VERSION = "0.6.1"
 
 # Network defaults
 DEFAULT_HOST = "127.0.0.1"

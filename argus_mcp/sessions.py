@@ -1,9 +1,10 @@
 """Named session management for detached Argus MCP servers.
 
-Stores session metadata as JSON files under ``.argus/sessions/`` in
-the project root.  Each file contains the PID, port, host, config path,
-and start time so that ``argus-mcp status`` can list all running
-instances and ``argus-mcp stop <name>`` can target a specific one.
+Stores session metadata as JSON files under ``~/.argus/sessions/``
+(or ``$ARGUS_STATE_DIR/sessions/`` if the env-var is set).  Each file
+contains the PID, port, host, config path, and start time so that
+``argus-mcp status`` can list all running instances and
+``argus-mcp stop <name>`` can target a specific one.
 """
 
 from __future__ import annotations
@@ -22,11 +23,21 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────
 
-_SESSION_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    ".argus",
-    "sessions",
-)
+
+def _state_base() -> str:
+    """Return a writable base directory for Argus runtime state.
+
+    Resolution order:
+    1. ``ARGUS_STATE_DIR`` environment variable (explicit override)
+    2. ``~/.argus`` (works in Docker, venvs, and local dev alike)
+    """
+    env = os.environ.get("ARGUS_STATE_DIR")
+    if env:
+        return env
+    return os.path.join(os.path.expanduser("~"), ".argus")
+
+
+_SESSION_DIR = os.path.join(_state_base(), "sessions")
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{0,31}$")
 

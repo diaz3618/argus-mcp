@@ -80,8 +80,8 @@ WORKDIR /app
 COPY example_config.yaml ./example_config.yaml
 COPY example_config.yaml ./config.yaml
 
-# Create directories for logs and PID files (owned by argus user)
-RUN mkdir -p /app/logs /app/pids && chown -R argus:argus /app
+# Create directories for logs, PID files, and session state (owned by argus user)
+RUN mkdir -p /app/logs /app/pids /app/.argus/sessions && chown -R argus:argus /app
 
 # Switch to non-root user
 USER argus

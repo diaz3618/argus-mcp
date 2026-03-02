@@ -36,8 +36,7 @@ _CONFIG_SEARCH_ORDER = ("config.yaml", "config.yml")
 
 # Legacy PID file location (kept for backward-compat cleanup)
 _PID_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "argus-mcp.pid",
+    os.path.expanduser("~"), ".argus", "argus-mcp.pid",
 )
 
 
@@ -233,7 +232,7 @@ def _detach_server(args: argparse.Namespace) -> None:
     # Open the log directory for stdout/stderr redirection
     from argus_mcp.constants import LOG_DIR
 
-    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), LOG_DIR)
+    log_dir = os.path.join(os.path.expanduser("~"), ".argus", LOG_DIR)
     os.makedirs(log_dir, exist_ok=True)
     out_path = os.path.join(log_dir, f"detached-{session_name}.log")
     out_fd = open(out_path, "a")
