@@ -9,7 +9,7 @@ by the management API (Phase 0.2).
 """
 
 import logging
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
 from starlette.applications import Starlette
@@ -324,6 +324,20 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         # ── Monkey-patch bridge components onto mcp_server ───────────
         _attach_to_mcp_server(mcp_server, service)
 
+        # ── Create & start the SDK streamable-HTTP session manager ───
+        # This must happen *after* handlers are attached so that
+        # mcp_server.run() (called internally per session) can serve
+        # tools/resources/prompts.
+        # Uses AsyncExitStack for robust cleanup (pattern from mcp-context-forge).
+        import argus_mcp.server.app as app_module
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+        sm_http = StreamableHTTPSessionManager(app=mcp_server)
+        app_module.streamable_session_manager = sm_http
+        _exit_stack = AsyncExitStack()
+        await _exit_stack.enter_async_context(sm_http.run())
+        logger.info("SDK StreamableHTTPSessionManager started.")
+
         logger.info("Lifespan startup phase completed successfully.")
         startup_ok = True
 
@@ -401,7 +415,26 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         log_file_status(status_info_shutdown, log_lvl=logging.WARNING)
 
         # ── Delegate shutdown to ArgusService ─────────────────────
-        # Stop session manager before stopping backends
+        # Stop SDK streamable-HTTP session manager first (closes all
+        # active MCP sessions and their task groups).
+        if "_exit_stack" in dir() and _exit_stack is not None:
+            try:
+                await _exit_stack.aclose()
+                logger.info("SDK StreamableHTTPSessionManager stopped.")
+            except Exception:
+                logger.debug(
+                    "Error stopping StreamableHTTPSessionManager",
+                    exc_info=True,
+                )
+            # Clear the module-level reference
+            try:
+                import argus_mcp.server.app as app_module
+
+                app_module.streamable_session_manager = None
+            except Exception:
+                pass
+
+        # Stop Argus session manager before stopping backends
         sm = getattr(mcp_server, "session_manager", None)
         if sm is not None:
             await sm.stop()
