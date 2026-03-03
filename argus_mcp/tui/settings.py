@@ -55,7 +55,7 @@ _SETTINGS_DIR = os.path.realpath(
         "argus-mcp",
     )
 )
-_SETTINGS_FILE = os.path.join(_SETTINGS_DIR, "settings.json")
+_SETTINGS_FILE = os.path.realpath(os.path.join(_SETTINGS_DIR, "settings.json"))
 
 
 def _default_settings() -> Dict[str, Any]:

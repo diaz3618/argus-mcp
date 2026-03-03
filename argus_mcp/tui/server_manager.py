@@ -61,7 +61,7 @@ class ServerManager:
     """
 
     def __init__(self, config_path: Optional[str] = None) -> None:
-        self._config_path = config_path or _SERVERS_FILE
+        self._config_path = os.path.realpath(config_path or _SERVERS_FILE)
         self._servers: Dict[str, ServerEntry] = {}
         self._active_name: Optional[str] = None
 

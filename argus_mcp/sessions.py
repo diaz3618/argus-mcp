@@ -33,8 +33,8 @@ def _state_base() -> str:
     """
     env = os.environ.get("ARGUS_STATE_DIR")
     if env:
-        return env
-    return os.path.join(os.path.expanduser("~"), ".argus")
+        return os.path.realpath(env)
+    return os.path.realpath(os.path.join(os.path.expanduser("~"), ".argus"))
 
 
 _SESSION_DIR = os.path.join(_state_base(), "sessions")
@@ -99,7 +99,11 @@ def auto_name(port: int, default_port: int) -> str:
 
 def session_path(name: str) -> str:
     """Return the file path for a session metadata file."""
-    return os.path.join(_SESSION_DIR, f"{name}.json")
+    resolved_dir = os.path.realpath(_SESSION_DIR)
+    target = os.path.realpath(os.path.join(resolved_dir, f"{name}.json"))
+    if not target.startswith(resolved_dir + os.sep):
+        raise ValueError(f"Session path escapes sessions directory: {name}")
+    return target
 
 
 def save_session(info: SessionInfo) -> str:

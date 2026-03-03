@@ -18,10 +18,12 @@ from argus_mcp.registry.models import ServerEntry
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CACHE_DIR = os.path.join(
-    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
-    "argus-mcp",
-    "registry",
+_DEFAULT_CACHE_DIR = os.path.realpath(
+    os.path.join(
+        os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+        "argus-mcp",
+        "registry",
+    )
 )
 
 
@@ -45,7 +47,7 @@ class RegistryCache:
         cache_dir: str = _DEFAULT_CACHE_DIR,
         ttl: float = 300.0,
     ) -> None:
-        self._cache_dir = cache_dir
+        self._cache_dir = os.path.realpath(cache_dir)
         self._ttl = ttl
 
     # ── public interface ────────────────────────────────────────────
@@ -91,9 +93,13 @@ class RegistryCache:
             if os.path.exists(path):
                 os.unlink(path)
         else:
-            if os.path.isdir(self._cache_dir):
-                for fname in os.listdir(self._cache_dir):
-                    fp = os.path.join(self._cache_dir, fname)
+            resolved_dir = os.path.realpath(self._cache_dir)
+            if os.path.isdir(resolved_dir):
+                for fname in os.listdir(resolved_dir):
+                    fp = os.path.realpath(os.path.join(resolved_dir, fname))
+                    # Guard against symlinks escaping cache directory
+                    if not fp.startswith(resolved_dir + os.sep):
+                        continue
                     if os.path.isfile(fp) and fp.endswith(".json"):
                         os.unlink(fp)
 
