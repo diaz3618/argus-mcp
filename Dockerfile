@@ -31,8 +31,7 @@ COPY pyproject.toml ./
 COPY argus_mcp/ ./argus_mcp/
 
 # Install the package and all runtime dependencies into a virtual env
-# nosemgrep: docker-pip-no-cache (uv uses --no-cache, not --no-cache-dir)
-# nosemgrep: dependency-docker-no-unpinned-pip-install
+# nosemgrep: docker-pip-no-cache, dependency-docker-no-unpinned-pip-install
 RUN uv venv /opt/venv && \
     UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python . && \
     find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
