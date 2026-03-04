@@ -199,26 +199,21 @@ rules:
         - docs/security/README.md
         - docs/tui/README.md
 
-  - id: architecture-no-legacy-forwarder-import
+  - id: architecture-no-legacy-sandbox-import
     message: >
-      Avoid new imports of legacy `bridge.forwarder` outside bridge internals.
-      Request routing should go through middleware routing and capability registry paths.
+      The legacy `bridge.sandbox` module has been removed. Container
+      isolation is handled by `bridge.container` (wrapper.py).
     languages: [python]
-    severity: WARNING
+    severity: ERROR
     paths:
       include:
-        - /argus_mcp/server/**/*.py
-        - /argus_mcp/runtime/**/*.py
-        - /argus_mcp/tui/**/*.py
+        - /argus_mcp/**/*.py
     pattern-either:
-      - pattern: import argus_mcp.bridge.forwarder
-      - pattern: from argus_mcp.bridge.forwarder import $X
+      - pattern: import argus_mcp.bridge.sandbox
+      - pattern: from argus_mcp.bridge.sandbox import $X
     metadata:
       category: architecture
       technology: [python, argus-mcp]
-      references:
-        - docs/architecture/02-bridge.md
-        - docs/middleware.md
   - id: asyncio-dangling-task
     message: >
       A task was created but its reference was not stored.

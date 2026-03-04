@@ -3,9 +3,10 @@
 Filters are applied **per-server** during capability discovery, after
 conflict resolution name transforms but before aggregation.
 
-Design note: Denied tools are removed from the *advertised* list (what
-clients see in ``list_tools``) but remain in the route map so that
-composite workflows (Phase 5) can still invoke them internally.
+Denied capabilities are removed from **both** the advertised list
+(what clients see in ``list_tools``) **and** the route map —
+``CapabilityRegistry.register()`` uses ``continue`` to skip
+filtered items entirely (see ``capability_registry.py``).
 """
 
 from __future__ import annotations

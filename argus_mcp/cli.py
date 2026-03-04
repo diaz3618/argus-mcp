@@ -280,11 +280,21 @@ def _cmd_server(args: argparse.Namespace) -> None:
     _force_exit_count = 0
 
     def _sigint_handler(sig: int, _frame: object) -> None:
+        """Pre-uvicorn SIGINT handler (active only until uvicorn starts).
+
+        Once uvicorn calls ``Server.capture_signals()`` this handler is
+        replaced by uvicorn's ``handle_exit()``.  During the lifespan,
+        a *different* temporary override (in ``lifespan.py``) takes
+        over so that Ctrl+C can cancel in-flight startup tasks.
+
+        This handler remains useful for the brief window between
+        ``signal.signal(...)`` here and the ``await uvicorn_svr.serve()``
+        call (e.g. config loading, port probe).
+        """
         nonlocal _force_exit_count
         _force_exit_count += 1
         if _force_exit_count >= 2:
             module_logger.info("Force exit requested (double Ctrl+C).")
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
             os._exit(1)
         module_logger.info("Ctrl+C received — shutting down…")
         print("\n[Ctrl+C] Shutting down gracefully… (press again to force)")
@@ -292,6 +302,7 @@ def _cmd_server(args: argparse.Namespace) -> None:
             uvicorn_svr_inst.should_exit = True
 
     def _sigterm_handler(sig: int, _frame: object) -> None:
+        """Pre-uvicorn SIGTERM handler (see _sigint_handler docstring)."""
         module_logger.info("SIGTERM received — shutting down gracefully…")
         if uvicorn_svr_inst is not None:
             uvicorn_svr_inst.should_exit = True

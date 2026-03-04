@@ -1,7 +1,7 @@
 """Network isolation configuration widget — per-server network policy controls.
 
 Displays allowed outbound hosts, environment restrictions,
-and network mode picker for sandboxed MCP server execution.
+and network mode picker for container-isolated MCP server execution.
 """
 
 from __future__ import annotations

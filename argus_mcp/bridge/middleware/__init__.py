@@ -11,7 +11,7 @@ Public API
 - :func:`build_chain` — Compose a list of middleware into a single handler
 - :class:`RecoveryMiddleware` — Exception safety net
 - :class:`AuditMiddleware` — Basic audit logging
-- :class:`RoutingMiddleware` — Wraps the existing forwarder
+- :class:`RoutingMiddleware` — Routes requests to backend sessions
 """
 
 from argus_mcp.bridge.middleware.audit import AuditMiddleware

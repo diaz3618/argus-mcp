@@ -4,7 +4,7 @@ Renames are applied *per-server* during capability discovery, after
 filtering but before conflict resolution, so that conflict strategies
 see the post-rename names.
 
-The route map stores the **original** backend name so that the forwarder
+The route map stores the **original** backend name so that the router
 can reverse-map renamed capabilities back to what the backend expects.
 """
 

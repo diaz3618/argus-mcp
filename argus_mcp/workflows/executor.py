@@ -43,7 +43,7 @@ class WorkflowExecutor:
     ----------
     invoke_tool:
         Async callback ``(tool_name, args) -> result`` to call tools.
-        In production, this delegates to the bridge forwarder.
+        In production, this delegates to the bridge routing middleware.
     """
 
     def __init__(self, invoke_tool: ToolInvoker) -> None:

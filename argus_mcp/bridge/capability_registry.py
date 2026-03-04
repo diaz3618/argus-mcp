@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 from mcp import ClientSession
 from mcp import types as mcp_types
+from mcp.shared.exceptions import McpError
 
 from argus_mcp.bridge.conflict import (
     ConflictAction,
@@ -240,13 +241,13 @@ class CapabilityRegistry:
                 list_method_name,
                 CAP_FETCH_TIMEOUT,
             )
-        except mcp_types.Error as mcp_e:
+        except McpError as mcp_e:
             logger.error(
-                "[%s] MCP error during %s(): Type=%s, Msg='%s'",
+                "[%s] MCP error during %s(): Code=%s, Msg='%s'",
                 svr_name,
                 list_method_name,
-                mcp_e.type,
-                mcp_e.message,
+                mcp_e.error.code,
+                mcp_e.error.message,
                 exc_info=False,
             )
         except Exception:

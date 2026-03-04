@@ -1,4 +1,4 @@
-"""Routing middleware — wraps the existing forwarder as a middleware layer.
+"""Routing middleware — routes requests to the correct backend session.
 
 This is the innermost middleware and the only one that actually talks to
 backend servers. It resolves capability names via the registry and calls
