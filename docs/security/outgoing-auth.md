@@ -65,6 +65,54 @@ If token acquisition fails:
 - The backend request proceeds without authentication
 - The backend may reject the request (depends on backend's auth requirements)
 
+## OAuth 2.0 Authorization Code + PKCE
+
+For MCP servers that require interactive browser-based login (e.g. Semgrep,
+GitHub Copilot), use the PKCE auth type. On first use Argus opens a browser
+for the user to authenticate and then caches and refreshes the token
+automatically.
+
+```yaml
+backends:
+  semgrep:
+    type: streamable-http
+    url: "https://mcp.semgrep.ai/mcp"
+    auth:
+      type: pkce
+      authorization_endpoint: "https://auth.semgrep.dev/authorize"
+      token_endpoint: "https://auth.semgrep.dev/oauth/token"
+      client_id: "${SEMGREP_CLIENT_ID}"
+      scopes:
+        - openid
+        - profile
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `authorization_endpoint` | Yes | OAuth 2.0 authorization URL |
+| `token_endpoint` | Yes | OAuth 2.0 token endpoint URL |
+| `client_id` | Yes | Client identifier (supports `${ENV_VAR}`) |
+| `client_secret` | No | Client secret (empty for public clients) |
+| `scopes` | No | Requested OAuth scopes (default: empty) |
+
+### PKCE Token Flow
+
+1. **Cache check** — in-memory first, then disk (`~/.config/argus-mcp/tokens/`)
+2. **Refresh** — if a `refresh_token` is on disk but the access token expired,
+   Argus refreshes silently without user interaction.
+3. **Browser flow** — if no valid token exists, Argus starts a local HTTP
+   callback server on `127.0.0.1` (ephemeral port), opens the browser, and
+   waits up to 120 seconds for the user to complete login.
+4. **Persistence** — the new token set is written to disk with `0600`
+   permissions and cached in memory.
+
+### Security
+
+- PKCE S256 challenge protects against authorization code interception
+- State parameter prevents CSRF attacks
+- Token files use restricted `0600` permissions (owner-only read/write)
+- Callback server binds only to `127.0.0.1` (localhost)
+
 ## No Auth
 
 If no `auth` block is specified, no authentication headers are added to backend

@@ -140,6 +140,44 @@ backends:
 | `filters` | object | defaults | Capability filters |
 | `tool_overrides` | map | `{}` | Per-tool name/description overrides |
 
+### Automatic Container Isolation
+
+Argus automatically wraps every stdio backend in an isolated container
+(Docker or Podman) when a supported runtime is detected on the host.
+**No configuration is needed** — container isolation is transparent and
+applied by default with secure settings:
+
+- **Network**: `--network none` (fully offline by default)
+- **Filesystem**: `--read-only` root filesystem
+- **Privileges**: `--cap-drop ALL`
+- **Resources**: `--memory 512m --cpus 1`
+
+Argus auto-resolves the container image from the backend command:
+
+| Command | Default Image |
+|---------|---------------|
+| `npx`, `node`, `tsx` | `node:22-slim` |
+| `python`, `python3`, `uvx`, `uv` | `python:3.13-slim` |
+| `bun` | `oven/bun:slim` |
+| `deno` | `denoland/deno:latest` |
+
+If no container runtime is available, or the command has no known image
+mapping, Argus falls back to running the backend as a bare subprocess
+(with a log warning).
+
+To **disable** container isolation, set the environment variable:
+
+```bash
+ARGUS_CONTAINER_ISOLATION=false
+```
+
+Or set the feature flag in your config:
+
+```yaml
+feature_flags:
+  container_isolation: false
+```
+
 ### SSE Backend
 
 Connects to a remote MCP server via Server-Sent Events.
@@ -187,6 +225,21 @@ backends:
       client_id: "argus"
       client_secret: "${OAUTH_SECRET}"
       scopes: ["mcp:read", "mcp:write"]
+```
+
+Or using PKCE for browser-based login (see [outgoing auth docs](security/outgoing-auth.md)):
+
+```yaml
+backends:
+  remote-http:
+    type: streamable-http
+    url: "https://mcp.example.com/mcp"
+    auth:
+      type: pkce
+      authorization_endpoint: "https://auth.example.com/authorize"
+      token_endpoint: "https://auth.example.com/token"
+      client_id: "my-client"
+      scopes: ["openid"]
 ```
 
 | Field | Type | Default | Description |

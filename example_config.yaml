@@ -78,6 +78,31 @@ backends:
   #   headers:
   #     Authorization: "Bearer ${API_TOKEN}"
 
+  # Streamable HTTP with OAuth2 PKCE browser-based auth
+  # The first time a tool is invoked, Argus opens a browser for login,
+  # then caches and refreshes the token automatically.
+  # semgrep:
+  #   type: streamable-http
+  #   url: "https://mcp.semgrep.ai/mcp"
+  #   auth:
+  #     type: pkce
+  #     authorization_endpoint: "https://auth.semgrep.dev/authorize"
+  #     token_endpoint: "https://auth.semgrep.dev/oauth/token"
+  #     client_id: "${SEMGREP_CLIENT_ID}"
+  #     scopes: ["openid", "profile"]
+
+  # Stdio backend with container isolation overrides
+  # Container isolation is automatic for stdio backends; these
+  # settings override the defaults (memory, cpu, network).
+  # isolated_server:
+  #   type: stdio
+  #   command: npx
+  #   args: ["-y", "my-mcp-server"]
+  #   container:
+  #     memory: "256m"
+  #     cpus: 0.5
+  #     network: "none"
+
 # ── Conflict Resolution ─────────────────────────────────────────────────
 conflict_resolution:
   strategy: first-wins              # "first-wins", "prefix", "priority", "error"
@@ -98,9 +123,9 @@ optimizer:
 
 # ── Telemetry (OpenTelemetry) ────────────────────────────────────────────
 telemetry:
-  enabled: false                    # enable OTel tracing and metrics
+  enabled: false                          # enable OTel tracing and metrics
   otlp_endpoint: "http://localhost:4317"  # OTLP collector endpoint
-  service_name: "argus-mcp"      # service name in traces
+  service_name: "argus-mcp"               # service name in traces
 
 # ── Secrets Management ───────────────────────────────────────────────────
 secrets:
@@ -159,6 +184,7 @@ authorization:
 feature_flags:
   hot_reload: true                  # default: true
   optimizer: false                  # default: false
+  # container_isolation: true       # default: true — auto-wraps stdio backends in containers
   # outgoing_auth: true             # default: true
   # session_management: true        # default: true
   # yaml_config: true               # default: true
