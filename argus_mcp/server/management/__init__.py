@@ -16,6 +16,11 @@ def create_management_app() -> Starlette:
     Returns a Starlette app wrapping the management routes with
     ``BearerAuthMiddleware``.  The token is resolved from env var
     or config at construction time.
+
+    The middleware resolves the bind address lazily from the ASGI
+    ``server`` scope tuple, so it correctly detects non-localhost
+    exposure even though this function is called before the host
+    is known.
     """
     token = resolve_token()
     mgmt_app = Starlette(

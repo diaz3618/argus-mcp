@@ -19,6 +19,7 @@ from argus_mcp.constants import (
 from argus_mcp.server.handlers import register_handlers
 from argus_mcp.server.lifespan import app_lifespan
 from argus_mcp.server.management import create_management_app
+from argus_mcp.server.origin import OriginValidationMiddleware
 from argus_mcp.server.transport import handle_sse, handle_streamable_http, sse_transport
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,11 @@ def create_app() -> Starlette:
         mcp_path=STREAMABLE_HTTP_PATH,
         mcp_handler=_streamable_http_app,
     )
+
+    # Validate Origin header on MCP transport endpoints per MCP spec.
+    # Must be added AFTER _MCPSlashMiddleware (Starlette middleware
+    # wraps in reverse order, so last-added executes first).
+    application.add_middleware(OriginValidationMiddleware)
     # Store mgmt_app reference so lifespan can propagate service state to it.
     application.state.mgmt_app = mgmt_app  # type: ignore[attr-defined]
     logger.info(

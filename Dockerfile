@@ -22,7 +22,7 @@
 FROM python:3.13-slim AS builder
 
 # Install uv for fast dependency resolution
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /usr/local/bin/uv
 
 WORKDIR /build
 
@@ -46,21 +46,27 @@ LABEL org.opencontainers.image.title="Argus MCP" \
       org.opencontainers.image.source="https://github.com/diaz3618/argus-mcp" \
       org.opencontainers.image.licenses="GPL-3.0-only"
 
-# Install Node.js LTS (for npx-based MCP backend servers)
+# Install Node.js 22 LTS via NodeSource APT repo (GPG-verified, no pipe-to-bash)
+# Supply-chain hardening: pinned versions, GPG-verified packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+        ca-certificates \
+        gnupg && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+        > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
-    npm install -g npm@latest && \
     npm cache clean --force && \
-    apt-get purge -y curl && \
+    apt-get purge -y curl gnupg && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-# Upgrade system pip to patch CVE-2026-1703
-RUN pip install --no-cache-dir --upgrade pip
+# Pin pip to known-good version
+RUN pip install --no-cache-dir pip==25.1.1
 
 # Copy the pre-built virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv

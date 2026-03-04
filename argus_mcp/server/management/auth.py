@@ -50,14 +50,33 @@ class BearerAuthMiddleware:
     Uses the ASGI interface directly (no ``BaseHTTPMiddleware``) to avoid
     known performance and ``contextvars`` propagation issues.
 
+    When the server binds to a non-localhost address (``0.0.0.0``, a LAN
+    IP, etc.) **without** an auth token, a prominent warning is emitted
+    and *mutating* management endpoints (everything except ``/health``)
+    log a security warning per request.
+
     Usage::
 
         middleware = BearerAuthMiddleware(app, token="<your-token>")
     """
 
-    def __init__(self, app: ASGIApp, token: Optional[str] = None) -> None:
+    # Mutating path suffixes — these are the endpoints that should
+    # require auth when exposed to a non-localhost interface.
+    _MUTATING_SUFFIXES = frozenset({"/reload", "/reconnect", "/shutdown"})
+
+    _LOCALHOST_ADDRS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        token: Optional[str] = None,
+    ) -> None:
         self.app = app
         self._token = token
+        # Track whether the startup-time exposure warning has been logged
+        # so we emit it at most once (on the first non-localhost request).
+        self._warned_exposed = False
+
         if token:
             logger.info("Management API authentication ENABLED.")
         else:
@@ -84,8 +103,43 @@ class BearerAuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # If no token configured, allow all requests
+        # If no token configured, allow all requests — but warn on
+        # mutating endpoints when the server is bound to a non-localhost
+        # interface.
+        # The bind address is resolved lazily from the ASGI scope's
+        # ``server`` tuple so it works even though the middleware is
+        # constructed before the host is known.
         if not self.auth_enabled:
+            server_tuple = scope.get("server")
+            bind_host = server_tuple[0] if server_tuple else "127.0.0.1"
+            is_exposed = bind_host not in self._LOCALHOST_ADDRS
+
+            # Emit a one-time prominent warning on first exposed request.
+            if is_exposed and not self._warned_exposed:
+                self._warned_exposed = True
+                logger.warning(
+                    "⚠️  SECURITY WARNING: Management API authentication is "
+                    "DISABLED while serving on non-localhost address '%s'. "
+                    "Mutating endpoints (/reload, /reconnect, /shutdown) are "
+                    "accessible to anyone on the network. "
+                    "Set %s env var to secure admin endpoints.",
+                    bind_host,
+                    MGMT_TOKEN_ENV_VAR,
+                )
+
+            if is_exposed and any(
+                stripped.endswith(s) for s in self._MUTATING_SUFFIXES
+            ):
+                client = scope.get("client")
+                client_host = client[0] if client else "unknown"
+                logger.warning(
+                    "⚠️  Unauthenticated mutating request from %s → %s "
+                    "(no %s configured, binding on non-localhost '%s')",
+                    client_host,
+                    path,
+                    MGMT_TOKEN_ENV_VAR,
+                    bind_host,
+                )
             await self.app(scope, receive, send)
             return
 
