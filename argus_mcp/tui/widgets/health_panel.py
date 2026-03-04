@@ -1,19 +1,20 @@
 """Health checks & circuit breaker widget.
 
 Displays per-backend health indicators, circuit-breaker state,
-probe history, and latency. Can be shown in backend detail or as
-a standalone panel.
+probe history, and latency. Provides server lifecycle controls
+(reconnect, reload, shutdown) per-backend and globally.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
+from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import DataTable, Label, Static
+from textual.widgets import Button, DataTable, Label, Static
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +31,34 @@ class HealthPanel(Widget):
 
     Feed data via :meth:`update_from_backends` with a list of backend
     dicts (from the management API ``/manage/v1/backends`` response).
+
+    Provides lifecycle action buttons:
+    - **Reconnect** — reconnect the selected backend
+    - **Reload Config** — hot-reload configuration (add/remove/change backends)
+    - **Shutdown Server** — gracefully shut down the entire Argus server
     """
+
+    # ── Messages ─────────────────────────────────────────────────
+
+    class BackendReconnect(Message):
+        """Posted when the user wants to reconnect a specific backend."""
+
+        def __init__(self, backend_name: str) -> None:
+            self.backend_name = backend_name
+            super().__init__()
+
+    class ReloadRequested(Message):
+        """Posted when the user clicks Reload Config."""
+
+    class ShutdownRequested(Message):
+        """Posted when the user clicks Shutdown Server."""
+
+    # ── Styles ───────────────────────────────────────────────────
 
     DEFAULT_CSS = """
     HealthPanel {
         height: auto;
-        max-height: 20;
+        max-height: 28;
         border: round $accent;
         padding: 0 1;
     }
@@ -53,6 +76,19 @@ class HealthPanel(Widget):
         height: auto;
         max-height: 10;
     }
+    #health-actions-bar {
+        height: 3;
+        padding: 0 1;
+        margin-top: 1;
+    }
+    #health-actions-bar Button {
+        margin-right: 1;
+    }
+    #health-action-status {
+        height: 1;
+        padding: 0 1;
+        color: $text-muted;
+    }
     #circuit-breaker-info {
         height: auto;
         max-height: 4;
@@ -62,11 +98,20 @@ class HealthPanel(Widget):
     }
     """
 
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._backend_names: List[str] = []
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label("[b]Health Status[/b]", id="health-title")
             yield Static("Healthy: 0  Degraded: 0  Unhealthy: 0", id="health-summary")
             yield DataTable(id="health-table")
+            with Horizontal(id="health-actions-bar"):
+                yield Button("Reconnect", id="btn-health-reconnect", variant="warning")
+                yield Button("Reload Config", id="btn-health-reload", variant="primary")
+                yield Button("Shutdown Server", id="btn-health-shutdown", variant="error")
+            yield Static("", id="health-action-status")
             yield Static("", id="circuit-breaker-info")
 
     def on_mount(self) -> None:
@@ -78,17 +123,59 @@ class HealthPanel(Widget):
         except Exception:
             pass
 
+    # ── Button handlers ──────────────────────────────────────────
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle action button presses."""
+        btn_id = event.button.id
+        if btn_id == "btn-health-reconnect":
+            self._action_reconnect_selected()
+        elif btn_id == "btn-health-reload":
+            self.post_message(self.ReloadRequested())
+        elif btn_id == "btn-health-shutdown":
+            self.post_message(self.ShutdownRequested())
+
+    def _action_reconnect_selected(self) -> None:
+        """Reconnect the backend selected in the table."""
+        name = self._get_selected_backend()
+        if name is None:
+            self.app.notify("Select a backend row first.", severity="warning")
+            return
+        self.post_message(self.BackendReconnect(backend_name=name))
+
+    def _get_selected_backend(self) -> Optional[str]:
+        """Return the backend name at the currently highlighted row."""
+        try:
+            table = self.query_one("#health-table", DataTable)
+            idx = table.cursor_row
+            if 0 <= idx < len(self._backend_names):
+                return self._backend_names[idx]
+        except Exception:
+            pass
+        return None
+
+    def set_action_status(self, text: str) -> None:
+        """Update the action status line below the buttons."""
+        try:
+            self.query_one("#health-action-status", Static).update(text)
+        except Exception:
+            pass
+
+    # ── Data update ──────────────────────────────────────────────
+
     def update_from_backends(self, backends: List[Dict[str, Any]]) -> None:
         """Refresh the health table from backend data."""
         try:
             table = self.query_one("#health-table", DataTable)
             table.clear()
+            self._backend_names.clear()
 
             healthy = degraded = unhealthy = 0
             circuit_info_lines = []
 
             for b in backends:
                 name = b.get("name", "?")
+                self._backend_names.append(name)
                 phase = b.get("phase", "unknown").lower()
                 health = b.get("health", {})
                 health_status = health.get("status", "unknown") if health else "unknown"

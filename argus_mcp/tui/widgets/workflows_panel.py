@@ -1,20 +1,23 @@
 """Composite workflows widget — multi-step tool chain builder and viewer.
 
 Displays registered composite workflows (multi-step tool chains),
-their execution status, and a simple builder interface.
+their execution status, a simple builder interface, and a live
+output log that streams step-by-step progress during execution.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Label, Static, TextArea
+from textual.widgets import Button, DataTable, Label, RichLog, Static, TextArea
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +105,7 @@ class WorkflowsPanel(Widget):
     DEFAULT_CSS = """
     WorkflowsPanel {
         height: auto;
-        max-height: 20;
+        max-height: 30;
         border: round $accent;
         padding: 0 1;
     }
@@ -117,11 +120,11 @@ class WorkflowsPanel(Widget):
     }
     #wf-table {
         height: auto;
-        max-height: 10;
+        max-height: 8;
     }
     #wf-detail {
         height: auto;
-        max-height: 6;
+        max-height: 4;
         padding: 0 1;
         margin-top: 1;
     }
@@ -131,6 +134,18 @@ class WorkflowsPanel(Widget):
     }
     #wf-actions-bar Button {
         margin-right: 1;
+    }
+    #wf-output-log {
+        height: auto;
+        max-height: 10;
+        border: round $secondary;
+        margin-top: 1;
+        padding: 0 1;
+    }
+    #wf-output-title {
+        text-style: bold;
+        color: $secondary;
+        margin-bottom: 0;
     }
     """
 
@@ -148,6 +163,14 @@ class WorkflowsPanel(Widget):
                 yield Button("New Workflow", id="btn-wf-new", variant="primary")
                 yield Button("Run", id="btn-wf-run", variant="success")
                 yield Button("Delete", id="btn-wf-delete", variant="error")
+            yield Label("[b]Execution Output[/b]", id="wf-output-title")
+            yield RichLog(
+                highlight=True,
+                markup=True,
+                wrap=True,
+                auto_scroll=True,
+                id="wf-output-log",
+            )
 
     def on_mount(self) -> None:
         try:
@@ -256,6 +279,40 @@ class WorkflowsPanel(Widget):
         elif btn_id == "btn-wf-delete":
             self._action_delete_workflow()
 
+    # ── Output log helpers ───────────────────────────────────────────
+
+    def _log_output(self, text: str | Text) -> None:
+        """Write a line to the execution output log."""
+        try:
+            log_widget = self.query_one("#wf-output-log", RichLog)
+            log_widget.write(text)
+        except Exception:
+            pass
+
+    def _log_step(
+        self,
+        step_id: str,
+        message: str,
+        *,
+        style: str = "bold",
+        prefix: str = "►",
+    ) -> None:
+        """Write a formatted step entry to the execution output log."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = Text.assemble(
+            (f"[{ts}] ", "dim"),
+            (f"{prefix} ", style),
+            (f"{step_id}: ", "bold"),
+            (message, ""),
+        )
+        self._log_output(line)
+
+    def _log_header(self, text: str) -> None:
+        """Write a section header to the output log."""
+        self._log_output(Text(f"{'─' * 50}", style="dim"))
+        self._log_output(Text(text, style="bold bright_cyan"))
+        self._log_output(Text(f"{'─' * 50}", style="dim"))
+
     def _action_new_workflow(self) -> None:
         """Open the workflow editor modal with a starter template."""
 
@@ -314,7 +371,7 @@ class WorkflowsPanel(Widget):
         return None
 
     def _action_run_workflow(self) -> None:
-        """Execute the selected workflow in a background worker."""
+        """Execute the selected workflow in a background worker with live output."""
         idx = self._get_selected_index()
         if idx is None:
             self.app.notify("Select a workflow first.", severity="warning")
@@ -324,35 +381,131 @@ class WorkflowsPanel(Widget):
         name = wf_data.get("name", "?")
         self.app.notify(f"Running workflow '{name}'…")
 
+        # Clear previous output
+        try:
+            log_widget = self.query_one("#wf-output-log", RichLog)
+            log_widget.clear()
+        except Exception:
+            pass
+
+        panel = self  # capture for closure
+
         async def _run() -> None:
+            import time
+
             from argus_mcp.workflows.dsl import parse_workflow
             from argus_mcp.workflows.executor import WorkflowExecutor
 
             wf = parse_workflow(wf_data)
+            steps = wf.steps
 
-            async def _noop_invoke(tool_name: str, arguments: dict) -> Any:
-                """Placeholder invoker — real dispatch requires a running server."""
-                logger.warning(
-                    "Workflow step '%s' invoked from TUI without server context; "
-                    "returning empty result.",
+            panel._log_header(f"Workflow: {name}")
+            panel._log_output(Text(
+                f"  Steps: {len(steps)}  |  Mode: dry-run  |  "
+                f"Started: {datetime.now().strftime('%H:%M:%S')}",
+                style="dim",
+            ))
+            panel._log_output(Text(""))
+
+            # Build a logging invoker that reports each step to the output panel
+            call_count = 0
+
+            async def _logging_invoke(tool_name: str, arguments: dict) -> Any:
+                """Invoker that logs to the output panel and returns a dry-run result."""
+                nonlocal call_count
+                call_count += 1
+                panel._log_step(
                     tool_name,
+                    f"Calling with {len(arguments)} arg(s)…",
+                    prefix="⚡",
+                    style="bright_yellow",
                 )
-                return {"status": "ok", "note": "TUI dry-run (no server context)"}
+                # Show arguments (truncated)
+                for k, v in arguments.items():
+                    val_str = str(v)
+                    if len(val_str) > 80:
+                        val_str = val_str[:77] + "…"
+                    panel._log_output(Text(f"    {k}: {val_str}", style="dim"))
 
-            executor = WorkflowExecutor(_noop_invoke)
-            results = await executor.execute(wf, inputs={})
+                # Simulate a brief delay for visual feedback
+                await asyncio.sleep(0.1)
 
-            summary_parts = []
+                result = {
+                    "status": "ok",
+                    "note": "TUI dry-run (no server context)",
+                    "_tool": tool_name,
+                    "_call": call_count,
+                }
+                panel._log_step(
+                    tool_name,
+                    f"Returned (dry-run) ✓",
+                    prefix="✓",
+                    style="green",
+                )
+                return result
+
+            import asyncio  # noqa: F811
+
+            executor = WorkflowExecutor(_logging_invoke)
+
+            panel._log_output(Text(""))
+            panel._log_step("executor", "Starting execution…", prefix="▶", style="bright_cyan")
+
+            start_time = time.monotonic()
+            try:
+                results = await executor.execute(wf, inputs={})
+            except Exception as exc:
+                panel._log_step(
+                    "executor",
+                    f"FAILED: {exc}",
+                    prefix="✕",
+                    style="red",
+                )
+                self.app.notify(f"Workflow '{name}' failed: {exc}", severity="error")
+                wf_data["status"] = "failed"
+                wf_data["last_run"] = datetime.now(timezone.utc).isoformat()
+                self.update_workflows(self._workflows)
+                return
+
+            elapsed = (time.monotonic() - start_time) * 1000
+
+            # Summary
+            panel._log_output(Text(""))
+            panel._log_header(f"Results — {name}")
+
+            completed = failed = skipped = 0
             for step_id, res in results.items():
-                summary_parts.append(f"{step_id}: {res.status.value}")
-            self.app.notify(
-                f"Workflow '{name}' finished — {', '.join(summary_parts)}",
-                severity="information",
-            )
-            # Mark as completed in the table display
-            wf_data["status"] = "completed"
-            from datetime import datetime, timezone
+                status = res.status.value
+                dur = f" ({res.duration_ms:.0f}ms)" if res.duration_ms else ""
+                if status == "completed":
+                    completed += 1
+                    panel._log_step(step_id, f"completed{dur}", prefix="✓", style="green")
+                elif status == "failed":
+                    failed += 1
+                    err = res.error or "unknown"
+                    panel._log_step(step_id, f"FAILED: {err}{dur}", prefix="✕", style="red")
+                elif status == "skipped":
+                    skipped += 1
+                    panel._log_step(step_id, "skipped", prefix="⊘", style="dim")
+                else:
+                    panel._log_step(step_id, f"{status}{dur}", prefix="?", style="yellow")
 
+            panel._log_output(Text(""))
+            panel._log_output(Text(
+                f"  Total: {len(results)} steps  |  "
+                f"✓ {completed}  ✕ {failed}  ⊘ {skipped}  |  "
+                f"{elapsed:.0f}ms",
+                style="bold",
+            ))
+
+            severity = "information" if failed == 0 else "warning"
+            self.app.notify(
+                f"Workflow '{name}' finished — {completed} ok, {failed} failed, {skipped} skipped",
+                severity=severity,
+            )
+
+            # Mark in the table
+            wf_data["status"] = "completed" if failed == 0 else "failed"
             wf_data["last_run"] = datetime.now(timezone.utc).isoformat()
             self.update_workflows(self._workflows)
 

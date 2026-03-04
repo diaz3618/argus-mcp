@@ -34,6 +34,7 @@ from argus_mcp.tui.screens.operations import OperationsScreen
 from argus_mcp.tui.screens.registry import RegistryScreen
 from argus_mcp.tui.screens.security import SecurityScreen
 from argus_mcp.tui.screens.settings import SettingsScreen
+from argus_mcp.tui.screens.setup_wizard import SetupWizardScreen
 from argus_mcp.tui.screens.skills import SkillsScreen
 from argus_mcp.tui.screens.theme_picker import ThemeScreen
 from argus_mcp.tui.screens.tool_editor import ToolEditorScreen
@@ -96,6 +97,7 @@ class ArgusApp(App):
         Binding("9", "switch_mode('security')", "Sec", key_display="9"),
         Binding("0", "switch_mode('operations')", "Ops", key_display="0"),
         Binding("o", "switch_mode('operations')", "Ops", show=False),
+        Binding("w", "switch_mode('wizard')", "Wizard", show=False),
         # ── Actions ────────────────────────────────────────────
         Binding("x", "export_client_config", "Export Config", show=False),
         # ── Navigation (within active screen) ──────────────────
@@ -118,6 +120,7 @@ class ArgusApp(App):
         "health": HealthScreen,
         "security": SecurityScreen,
         "operations": OperationsScreen,
+        "wizard": SetupWizardScreen,
     }
 
     DEFAULT_MODE = "dashboard"
@@ -214,6 +217,11 @@ class ArgusApp(App):
             title="Operations Mode",
             help="Workflows, optimizer, and telemetry (0/o)",
             callback=lambda: self.switch_mode("operations"),
+        )
+        yield SystemCommand(
+            title="Setup Wizard",
+            help="Config editor with import/export, backend templates (w)",
+            callback=lambda: self.switch_mode("wizard"),
         )
         yield SystemCommand(
             title="Export Client Config",
@@ -442,7 +450,7 @@ class ArgusApp(App):
                 self._apply_capabilities_response(caps)
                 self._caps_loaded = True
 
-                events = await client.get_events(limit=50)
+                events = await client.get_events(limit=100)
                 self._apply_events_response(events)
             except Exception as exc:
                 logger.warning("Initial data fetch failed: %s", exc)
