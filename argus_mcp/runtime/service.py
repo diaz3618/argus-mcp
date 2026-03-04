@@ -320,7 +320,29 @@ class ArgusService:
 
             # --- Phase 2: Connect backends --------------------------------
             logger.info("Connecting %d backend service(s)...", self._backends_total)
-            await self._manager.start_all(config, progress_callback=progress_callback)
+            self.emit_event(
+                "backend_init",
+                f"Connecting {self._backends_total} backend service(s)...",
+            )
+
+            # Wrap progress_callback to also emit events for TUI visibility
+            def _event_progress_cb(
+                name: str, phase: str, message: str | None = None
+            ) -> None:
+                """Bridge backend progress to the event system."""
+                severity = "info"
+                if phase == "failed":
+                    severity = "error"
+                elif phase == "retrying":
+                    severity = "warning"
+                stage = f"backend_{phase}"
+                msg = message or phase
+                self.emit_event(stage, f"[{name}] {msg}", severity=severity, backend=name)
+                # Also call original callback if provided
+                if progress_callback is not None:
+                    progress_callback(name, phase, message)
+
+            await self._manager.start_all(config, progress_callback=_event_progress_cb)
             active_sessions = self._manager.get_all_sessions()
             self._backends_connected = len(active_sessions)
 
@@ -432,6 +454,10 @@ class ArgusService:
                 self._health_checker = None
             await self._manager.stop_all()
             logger.info("All backend connections stopped.")
+            self._transition(ServiceState.STOPPED)
+        except RuntimeError as e_rt:
+            # anyio cancel-scope cross-task errors during forced shutdown
+            logger.warning("Cancel scope error during shutdown (safe to ignore): %s", e_rt)
             self._transition(ServiceState.STOPPED)
         except Exception as exc:
             self._error_message = f"Shutdown error: {type(exc).__name__}: {exc}"
@@ -665,13 +691,19 @@ class ArgusService:
     # ------------------------------------------------------------------ #
 
     async def _disconnect_backend(self, name: str) -> None:
-        """Disconnect a single backend by name (best-effort)."""
+        """Disconnect a single backend by name.
+
+        Delegates to ``ClientManager.disconnect_one()`` which properly
+        closes the per-backend ``AsyncExitStack`` — tearing down the MCP
+        session, transport streams, and any subprocess spawned for this
+        backend.  This prevents the subprocess / resource leak identified
+        the subprocess / resource leak that occurs without proper cleanup.
+        """
         session = self._manager.get_session(name)
         if session is not None:
-            # Remove from sessions dict — the AsyncExitStack cleanup won't
-            # help for individual backends, so we just do best-effort cleanup.
-            self._manager._sessions.pop(name, None)
-            logger.info("Backend '%s' disconnected.", name)
+            await self._manager.disconnect_one(name)
+        else:
+            logger.debug("Backend '%s' was not connected — nothing to disconnect.", name)
 
     async def _connect_backend(self, name: str, config: Dict[str, Any]) -> bool:
         """Connect a single backend. Returns True on success."""

@@ -106,10 +106,92 @@ class OAuth2AuthConfig(BaseModel):
     scopes: List[str] = Field(default_factory=list)
 
 
+class PKCEAuthConfig(BaseModel):
+    """OAuth 2.0 Authorization Code + PKCE authentication.
+
+    Triggers an interactive browser-based login flow on first use.
+    Tokens are cached to disk so the flow only needs to run once
+    (until the refresh token expires).
+    """
+
+    type: Literal["pkce"]
+    authorization_endpoint: str = Field(
+        ..., min_length=1, description="OAuth authorization URL."
+    )
+    token_endpoint: str = Field(
+        ..., min_length=1, description="OAuth token exchange URL."
+    )
+    client_id: str = Field(..., min_length=1, description="OAuth client ID.")
+    client_secret: str = Field(
+        default="", description="Optional client secret. Supports ${ENV_VAR}."
+    )
+    scopes: List[str] = Field(default_factory=list)
+
+
 AuthConfig = Annotated[
-    Union[StaticAuthConfig, OAuth2AuthConfig],
+    Union[StaticAuthConfig, OAuth2AuthConfig, PKCEAuthConfig],
     Field(discriminator="type"),
 ]
+
+
+# ── Container isolation ──────────────────────────────────────────────────
+
+
+class ContainerConfig(BaseModel):
+    """Optional per-backend container tuning.
+
+    The automatic container isolation system builds and caches images
+    for supported commands (*uvx*, *npx*) without any user
+    configuration.  This model exposes **optional** knobs for advanced
+    users who want to override the defaults (network mode, resource
+    limits, extra volumes, etc.).
+
+    Add a ``container`` section to a stdio backend to customise::
+
+        backends:
+          my-server:
+            type: stdio
+            command: uvx
+            args: ["my-mcp-server"]
+            container:
+              network: none
+              memory: 1g
+    """
+
+    network: Optional[str] = Field(
+        default=None,
+        description=(
+            "Container network mode override. Default is 'bridge' "
+            "(allows outbound). Set to 'none' for full network isolation, "
+            "or specify a custom Docker network name."
+        ),
+    )
+    memory: Optional[str] = Field(
+        default=None,
+        description="Memory limit override (e.g. '256m', '1g'). Default: 512m.",
+    )
+    cpus: Optional[str] = Field(
+        default=None,
+        description="CPU limit override (e.g. '0.5', '2'). Default: 1.",
+    )
+    volumes: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Volume mounts in Docker format: 'host:container[:ro]'. "
+            "Use sparingly — each mount weakens isolation."
+        ),
+    )
+    extra_args: List[str] = Field(
+        default_factory=list,
+        description="Additional raw arguments passed to 'docker run'.",
+    )
+
+    @field_validator("network")
+    @classmethod
+    def _validate_network(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+        return v
 
 
 # ── Backend server configs ───────────────────────────────────────────────
@@ -122,6 +204,15 @@ class StdioBackendConfig(BaseModel):
     command: str = Field(..., min_length=1, description="Executable to run")
     args: List[str] = Field(default_factory=list)
     env: Optional[Dict[str, str]] = None
+    container: Optional[ContainerConfig] = Field(
+        default=None,
+        description=(
+            "Optional container isolation overrides. "
+            "Container isolation is automatic for supported commands "
+            "(uvx, npx) — this section is only needed to customise "
+            "network, memory, CPU limits, or add volumes."
+        ),
+    )
     group: str = Field(default="default", description="Logical server group name.")
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     tool_overrides: Dict[str, ToolOverrideEntry] = Field(

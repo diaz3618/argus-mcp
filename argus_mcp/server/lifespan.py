@@ -6,9 +6,38 @@ delegates lifecycle management to :class:`~argus_mcp.runtime.ArgusService`.
 The display/console status callbacks are kept here so that the runtime service
 layer (``runtime/service.py``) remains presentation-agnostic and can be reused
 by the management API (Phase 0.2).
+
+**Signal Handling Note (Ctrl+C)**
+
+Uvicorn's ``Server.capture_signals()`` context manager replaces *all*
+SIGINT/SIGTERM handlers with its own ``handle_exit()`` before the lifespan
+runs.  That means any signal handlers registered in ``cli.py`` are silently
+overwritten and never fire.  Worse, ``handle_exit()`` merely sets boolean
+flags (``should_exit`` / ``force_exit``) that are only polled in the main
+serve-loop — they are *not* checked during the blocking
+``await startup() → lifespan.startup()`` call.
+
+The fix is the **Temporary Signal Override** pattern: inside ``app_lifespan``
+we save uvicorn's current handler, install our own handler that (a) cancels
+in-flight startup tasks and (b) raises ``SystemExit`` via ``os._exit`` on a
+second press, then restore uvicorn's original handler before ``yield`` so
+that normal graceful shutdown continues to work.
+
+**Thread-safety**: Per the Python asyncio documentation
+(https://docs.python.org/3/library/asyncio-dev.html#signals), calling
+``task.cancel()`` from a POSIX signal handler installed via
+``signal.signal()`` is **unsafe** because POSIX handlers execute in an
+arbitrary thread context.  We therefore use ``loop.add_signal_handler()``
+which schedules the callback within the event loop's thread.  On platforms
+where ``loop.add_signal_handler()`` is unavailable (Windows), we fall back
+to ``signal.signal()`` — acceptable since Windows SIGINT handling is
+fundamentally different (Ctrl+C raises ``KeyboardInterrupt``).
 """
 
+import asyncio
 import logging
+import os
+import signal
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
@@ -99,7 +128,7 @@ def _load_composite_workflows(mcp_svr_instance: Any, chain: Any) -> None:
     )
 
 
-def _attach_to_mcp_server(
+async def _attach_to_mcp_server(
     mcp_svr_instance: Any,
     service: ArgusService,
 ) -> None:
@@ -187,7 +216,7 @@ def _attach_to_mcp_server(
         tool_index = ToolIndex()
         tools = service.registry.get_aggregated_tools()
         route_map = service.registry.get_route_map()
-        tool_index.store(tools, route_map)
+        await tool_index.store(tools, route_map)
         mcp_svr_instance.optimizer_index = tool_index
         logger.info(
             "Optimizer enabled: indexed %d tool(s), keep-list=%s.",
@@ -213,6 +242,12 @@ def _attach_to_mcp_server(
     mcp_svr_instance.feature_flags = FeatureFlags(ff_overrides)
     logger.info("Feature flags: %s", mcp_svr_instance.feature_flags)
 
+    # Propagate container_isolation flag to env so the container
+    # wrapper module can read it without direct FeatureFlags access.
+    if not mcp_svr_instance.feature_flags.is_enabled("container_isolation"):
+        os.environ.setdefault("ARGUS_CONTAINER_ISOLATION", "false")
+        logger.info("Container isolation disabled via feature flag.")
+
     # ── Version Drift Detection (Task 5.4 wiring) ────────────────────
     from argus_mcp.bridge.version_checker import VersionChecker
 
@@ -229,6 +264,135 @@ def _attach_to_mcp_server(
 
     # ── Composite Workflows (Task 6) ────────────────────────────────
     _load_composite_workflows(mcp_svr_instance, chain)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Startup-Phase Signal Override
+# ──────────────────────────────────────────────────────────────────────
+
+def _install_startup_signal_override(
+    service: "ArgusService",
+) -> tuple[Any, Any]:
+    """Replace SIGINT/SIGTERM with handlers that cancel in-flight startup.
+
+    Returns ``(original_sigint_handler, original_sigterm_handler)`` so the
+    caller can restore them after startup completes.
+
+    **Why this exists**: Uvicorn installs its own signal handlers *before*
+    calling ``lifespan.startup()``.  Those handlers only set a flag that the
+    main serve-loop polls — they do nothing while the lifespan is blocked
+    on ``await service.start()``.  By temporarily overriding the handlers
+    inside the lifespan we regain the ability to react to Ctrl+C during
+    the (potentially very long) backend-connection phase.
+
+    Behaviour:
+    * **First Ctrl+C** — calls ``service._manager.cancel_startup()`` to
+      cooperatively cancel all pending tasks, sets ``should_exit`` on the
+      uvicorn server so it will exit after the lifespan returns, and prints
+      a user-visible message.
+    * **Second Ctrl+C** — calls ``os._exit(1)`` for an immediate hard exit,
+      just like the user would expect from double Ctrl+C.
+
+    **Thread-safety**: Uses ``loop.add_signal_handler()`` per Python asyncio
+    docs (https://docs.python.org/3/library/asyncio-dev.html#signals) so
+    that ``cancel_startup()`` / ``task.cancel()`` are called within the
+    event-loop thread rather than from a POSIX signal context.  Falls back
+    to ``signal.signal()`` on platforms without ``add_signal_handler``
+    support (e.g. Windows / ProactorEventLoop).
+    """
+    _force_count = 0
+
+    def _cancel_startup() -> None:
+        """Cancel all pending startup tasks (runs in event-loop thread)."""
+        mgr = getattr(service, "_manager", None)
+        if mgr is not None and hasattr(mgr, "cancel_startup"):
+            mgr.cancel_startup()
+
+        # Tell uvicorn to exit once the lifespan returns
+        import argus_mcp.cli as _cli_mod
+        uvicorn_svr = getattr(_cli_mod, "uvicorn_svr_inst", None)
+        if uvicorn_svr is not None:
+            uvicorn_svr.should_exit = True
+
+    def _handle_sigint() -> None:
+        """SIGINT handler — first press cancels, second force-exits."""
+        nonlocal _force_count
+        _force_count += 1
+
+        if _force_count >= 2:
+            logger.warning("Force-exit requested (double Ctrl+C during startup).")
+            print("\n[Ctrl+C] Force exit.")
+            os._exit(1)
+
+        logger.info("Ctrl+C received during startup — cancelling backend connections…")
+        print("\n[Ctrl+C] Cancelling startup… (press again to force-quit)")
+        _cancel_startup()
+
+    def _handle_sigterm() -> None:
+        """SIGTERM handler — cancel startup gracefully."""
+        logger.info("SIGTERM received during startup — cancelling backend connections…")
+        _cancel_startup()
+
+    # Legacy-style signal handlers (fallback for Windows / non-Unix loops).
+    def _startup_sigint_legacy(signum: int, frame: Any) -> None:
+        _handle_sigint()
+
+    def _startup_sigterm_legacy(signum: int, frame: Any) -> None:
+        _handle_sigterm()
+
+    # Save originals so we can restore them later.
+    original_sigint = signal.getsignal(signal.SIGINT)
+    original_sigterm = signal.getsignal(signal.SIGTERM)
+
+    # Prefer loop.add_signal_handler (thread-safe, asyncio-native).
+    # Per Python docs: "loop.add_signal_handler() is the preferred way
+    # to register signal handlers in asyncio programs."
+    try:
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, _handle_sigint)
+        loop.add_signal_handler(signal.SIGTERM, _handle_sigterm)
+        logger.debug(
+            "Startup signal override installed via loop.add_signal_handler() "
+            "(thread-safe, replaces uvicorn handlers temporarily)."
+        )
+    except (NotImplementedError, AttributeError, RuntimeError):
+        # NotImplementedError / AttributeError → Windows ProactorEventLoop
+        #   does not support add_signal_handler.
+        # RuntimeError → No running event loop (e.g. sync test context).
+        # Fall back to signal.signal() — acceptable on Windows where
+        # SIGINT handling is fundamentally different (raises KeyboardInterrupt).
+        signal.signal(signal.SIGINT, _startup_sigint_legacy)
+        signal.signal(signal.SIGTERM, _startup_sigterm_legacy)
+        logger.debug(
+            "Startup signal override installed via signal.signal() "
+            "(fallback — loop.add_signal_handler not available)."
+        )
+
+    return original_sigint, original_sigterm
+
+
+def _restore_signal_handlers(
+    original_sigint: Any,
+    original_sigterm: Any,
+) -> None:
+    """Restore the signal handlers that were active before the override.
+
+    Removes any ``loop.add_signal_handler`` registrations first, then
+    restores the POSIX-level handlers saved during ``_install_…()``.
+    """
+    # Remove loop-level handlers (safe even if they were never installed —
+    # remove_signal_handler returns False in that case).
+    try:
+        loop = asyncio.get_running_loop()
+        loop.remove_signal_handler(signal.SIGINT)
+        loop.remove_signal_handler(signal.SIGTERM)
+    except (NotImplementedError, AttributeError, RuntimeError):
+        pass
+
+    # Restore the POSIX-level handlers to whatever uvicorn had installed.
+    signal.signal(signal.SIGINT, original_sigint)
+    signal.signal(signal.SIGTERM, original_sigterm)
+    logger.debug("Signal handlers restored to uvicorn defaults.")
 
 
 @asynccontextmanager
@@ -315,14 +479,24 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
                 installer_display = None
 
         # ── Delegate full startup to ArgusService ─────────────────
-        await service.start(config_path, progress_callback=progress_callback)
+        # Install a temporary signal override so Ctrl+C works during
+        # the (potentially very long) backend-connection phase.
+        # See module docstring for the full rationale.
+        orig_sigint, orig_sigterm = _install_startup_signal_override(service)
+        try:
+            await service.start(config_path, progress_callback=progress_callback)
+        finally:
+            # Always restore uvicorn's signal handlers — even if startup
+            # was cancelled — so that normal graceful shutdown works for
+            # the running server.
+            _restore_signal_handlers(orig_sigint, orig_sigterm)
 
         # Finalize the installer display (print summary line)
         if installer_display is not None:
             installer_display.finalize()
 
         # ── Monkey-patch bridge components onto mcp_server ───────────
-        _attach_to_mcp_server(mcp_server, service)
+        await _attach_to_mcp_server(mcp_server, service)
 
         # ── Create & start the SDK streamable-HTTP session manager ───
         # This must happen *after* handlers are attached so that
@@ -419,8 +593,17 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         # active MCP sessions and their task groups).
         if "_exit_stack" in dir() and _exit_stack is not None:
             try:
-                await _exit_stack.aclose()
+                await asyncio.wait_for(_exit_stack.aclose(), timeout=10.0)
                 logger.info("SDK StreamableHTTPSessionManager stopped.")
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "StreamableHTTPSessionManager aclose() timed out after 10s."
+                )
+            except RuntimeError as e_rt:
+                logger.debug(
+                    "Cancel scope error during session manager shutdown: %s",
+                    e_rt,
+                )
             except Exception:
                 logger.debug(
                     "Error stopping StreamableHTTPSessionManager",

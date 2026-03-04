@@ -28,9 +28,13 @@ except ImportError:
 
 from argus_mcp.constants import (
     BACKEND_RETRIES,
+    BACKEND_RETRY_BACKOFF,
     BACKEND_RETRY_DELAY,
+    IMAGE_BUILD_TIMEOUT,
     MCP_INIT_TIMEOUT,
     SSE_LOCAL_START_DELAY,
+    STARTUP_CONCURRENCY,
+    STARTUP_STAGGER_DELAY,
     STARTUP_TIMEOUT,
 )
 from argus_mcp.errors import BackendServerError, ConfigurationError
@@ -236,10 +240,33 @@ class ClientManager:
         self._sessions: Dict[str, ClientSession] = {}
         self._pending_tasks: Dict[str, asyncio.Task] = {}
         self._exit_stack = AsyncExitStack()
-        self._devnull_files: list = []  # keep refs so GC doesn't close them early
-        self._status_records: Dict[str, Any] = {}  # BackendStatusRecord instances
+        self._backend_stacks: Dict[str, AsyncExitStack] = {}
+        self._devnull_files: list = []
+        self._status_records: Dict[str, Any] = {}
         self._progress_cb: Optional[Callable[..., None]] = None
+        self._shutdown_requested: bool = False
         logger.info("ClientManager initialized.")
+
+    def cancel_startup(self) -> None:
+        """Cancel all pending startup tasks (safe to call from signal handler).
+
+        Sets an internal flag so that ``start_all`` skips retries and
+        cancels any in-flight connection tasks.  The cancel is
+        cooperative — tasks will raise ``asyncio.CancelledError`` on
+        their next ``await`` and ``asyncio.gather`` will collect them
+        cleanly because ``return_exceptions=True`` is used.
+        """
+        self._shutdown_requested = True
+        cancelled = 0
+        for task in list(self._pending_tasks.values()):
+            if not task.done():
+                task.cancel()
+                cancelled += 1
+        if cancelled:
+            logger.info(
+                "cancel_startup: cancelled %d pending startup task(s).",
+                cancelled,
+            )
 
     @staticmethod
     def _apply_network_env(
@@ -295,9 +322,11 @@ class ClientManager:
         )
 
     async def _init_stdio_backend(
-        self, svr_name: str, stdio_cfg: StdioServerParameters
+        self, svr_name: str, stdio_cfg: StdioServerParameters,
+        stack: Optional[AsyncExitStack] = None,
     ) -> Tuple[Any, ClientSession]:
         """Initialize and connect to a stdio backend server."""
+        _stack = stack or self._exit_stack
         logger.debug("[%s] Stdio backend, preparing stdio_client.", svr_name)
 
         # Suppress subprocess stderr so it does not corrupt the TUI.
@@ -308,11 +337,11 @@ class ClientManager:
         devnull = open(os.devnull, "w")  # noqa: SIM115
         self._devnull_files.append(devnull)
         transport_ctx = stdio_client(stdio_cfg, errlog=devnull)
-        streams = await self._exit_stack.enter_async_context(transport_ctx)
+        streams = await _stack.enter_async_context(transport_ctx)
         logger.debug("[%s] (stdio) transport streams established.", svr_name)
 
         session_ctx = ClientSession(*streams)
-        session = await self._exit_stack.enter_async_context(session_ctx)
+        session = await _stack.enter_async_context(session_ctx)
         return transport_ctx, session
 
     async def _init_sse_backend(
@@ -324,14 +353,16 @@ class ClientManager:
         sse_cmd_env: Optional[Dict[str, str]],
         sse_startup_delay: float = SSE_LOCAL_START_DELAY,
         headers: Optional[Dict[str, str]] = None,
+        stack: Optional[AsyncExitStack] = None,
     ) -> Tuple[Any, ClientSession]:
         """Initialize and connect to an SSE backend; launch command first if configured."""
+        _stack = stack or self._exit_stack
         if sse_cmd:
             logger.info(
                 "[%s] Local launch command configured, starting SSE subprocess...",
                 svr_name,
             )
-            await self._exit_stack.enter_async_context(
+            await _stack.enter_async_context(
                 _manage_subproc(sse_cmd, sse_cmd_args, sse_cmd_env, svr_name)
             )
             logger.info(
@@ -342,11 +373,11 @@ class ClientManager:
             await asyncio.sleep(sse_startup_delay)
 
         transport_ctx = sse_client(url=sse_url, headers=headers)
-        streams = await self._exit_stack.enter_async_context(transport_ctx)
+        streams = await _stack.enter_async_context(transport_ctx)
         logger.debug("[%s] (sse) transport streams established.", svr_name)
 
         session_ctx = ClientSession(*streams)
-        session = await self._exit_stack.enter_async_context(session_ctx)
+        session = await _stack.enter_async_context(session_ctx)
         return transport_ctx, session
 
     async def _init_streamablehttp_backend(
@@ -354,25 +385,33 @@ class ClientManager:
         svr_name: str,
         url: str,
         headers: Optional[Dict[str, str]] = None,
+        stack: Optional[AsyncExitStack] = None,
     ) -> Tuple[Any, ClientSession]:
         """Initialize and connect to a streamable-http backend server."""
+        _stack = stack or self._exit_stack
         logger.debug("[%s] Streamable-HTTP backend, url=%s", svr_name, url)
         transport_ctx = streamablehttp_client(url=url, headers=headers)
-        read_stream, write_stream, _get_session_id = await self._exit_stack.enter_async_context(
+        read_stream, write_stream, _get_session_id = await _stack.enter_async_context(
             transport_ctx
         )
         logger.debug("[%s] (streamable-http) transport streams established.", svr_name)
 
         session_ctx = ClientSession(read_stream, write_stream)
-        session = await self._exit_stack.enter_async_context(session_ctx)
+        session = await _stack.enter_async_context(session_ctx)
         return transport_ctx, session
 
     async def _start_backend_svr(self, svr_name: str, svr_conf: Dict[str, Any]) -> bool:
         """Start and initialize a single backend server connection.
 
-        The entire flow (subprocess spawn + MCP init) is wrapped in an
-        overall ``startup_timeout`` so that cold-start package downloads
-        (uvx / npx) don't hang indefinitely.
+        For stdio backends the flow is:
+
+        1. **Image build phase** (separate timeout, ``IMAGE_BUILD_TIMEOUT``) —
+           builds a container image if the command is uvx/npx and no cached
+           image exists.  This is intentionally outside the startup timeout
+           because first-run builds download base images and install packages,
+           which can take several minutes.
+        2. **Connection phase** (``startup_timeout``) — spawns the subprocess
+           (or ``docker run``) and initialises the MCP session.
         """
         svr_type = svr_conf.get("type")
         logger.info("[%s] Attempting connection, type: %s...", svr_name, svr_type)
@@ -396,6 +435,36 @@ class ClientManager:
         if self._progress_cb is not None:
             self._progress_cb(svr_name, "initializing", f"Connecting ({svr_type})")
 
+        # ── Pre-build container image (outside startup timeout) ──────
+        # For stdio backends, build the container image BEFORE entering
+        # the startup timeout.  Image builds can take minutes on first
+        # run and should not count against the MCP init timeout.
+        if svr_type == "stdio":
+            try:
+                await self._pre_build_container_image(svr_name, svr_conf)
+            except asyncio.TimeoutError:
+                msg = (
+                    f"Container image build timed out after {IMAGE_BUILD_TIMEOUT}s"
+                )
+                logger.error("[%s] %s", svr_name, msg)
+                try:
+                    record.transition(BackendPhase.FAILED, msg)
+                except ValueError:
+                    pass
+                if self._progress_cb is not None:
+                    self._progress_cb(svr_name, "failed", msg)
+                return False
+            except Exception as exc:
+                msg = f"Container image pre-build failed: {exc}"
+                logger.error("[%s] %s", svr_name, msg, exc_info=True)
+                try:
+                    record.transition(BackendPhase.FAILED, msg)
+                except ValueError:
+                    pass
+                if self._progress_cb is not None:
+                    self._progress_cb(svr_name, "failed", msg)
+                return False
+
         try:
             await asyncio.wait_for(
                 self._connect_backend(svr_name, svr_conf, svr_type, record),
@@ -418,17 +487,39 @@ class ClientManager:
             return False
 
         except asyncio.CancelledError:
-            logger.warning(
-                "[%s] (%s) startup task cancelled.",
-                svr_name,
-                svr_type or "unknown type",
-            )
+            # Distinguish between user-initiated cancellation (Ctrl+C /
+            # shutdown) and transport-level drops (e.g. server requires
+            # OAuth and rejects unauthenticated connections).
+            # Preserve the reason in the status record so the
+            # TUI / management API shows actionable info.
+            if self._shutdown_requested:
+                cancel_reason = "Startup cancelled (shutdown requested)"
+                logger.info(
+                    "[%s] (%s) startup cancelled (shutdown requested).",
+                    svr_name,
+                    svr_type or "unknown type",
+                )
+            else:
+                cancel_reason = (
+                    "Connection rejected — possible auth failure "
+                    "(OAuth/API key). Check auth config."
+                )
+                logger.warning(
+                    "[%s] (%s) startup task cancelled. This may indicate "
+                    "the remote server dropped the connection during "
+                    "handshake — possibly because it requires "
+                    "authentication (OAuth/API key). Check the server's "
+                    "auth requirements and add an 'auth' block to its "
+                    "config. Will retry if attempts remain.",
+                    svr_name,
+                    svr_type or "unknown type",
+                )
             try:
-                record.transition(BackendPhase.FAILED, "Startup cancelled")
+                record.transition(BackendPhase.FAILED, cancel_reason)
             except ValueError:
                 pass
             if self._progress_cb is not None:
-                self._progress_cb(svr_name, "failed", "Startup cancelled")
+                self._progress_cb(svr_name, "failed", cancel_reason)
             return False
         except Exception as e_start:
             _log_backend_fail(svr_name, svr_type, e_start, context="connect/initialize")
@@ -439,6 +530,49 @@ class ClientManager:
             if self._progress_cb is not None:
                 self._progress_cb(svr_name, "failed", str(e_start))
             return False
+
+    async def _pre_build_container_image(
+        self,
+        svr_name: str,
+        svr_conf: Dict[str, Any],
+    ) -> None:
+        """Pre-build the container image for a stdio backend.
+
+        This runs OUTSIDE the startup timeout so that first-run image
+        builds (which download base images + install packages) don't cause
+        spurious timeouts.  The result is stored in ``svr_conf`` as
+        ``_prebuild_params`` so ``_connect_backend`` can skip the build.
+
+        If the backend is already containerised, disabled, or uses an
+        unknown command, this is a no-op.
+        """
+        stdio_params = svr_conf.get("params")
+        if not isinstance(stdio_params, StdioServerParameters):
+            return  # let _connect_backend raise the proper error
+
+        from argus_mcp.bridge.container import wrap_backend
+
+        container_cfg = svr_conf.get("container") or {}
+        net_override = container_cfg.get("network") or (
+            (svr_conf.get("network") or {}).get("network_mode")
+        )
+
+        wrapped_params, was_isolated = await asyncio.wait_for(
+            wrap_backend(
+                svr_name,
+                stdio_params,
+                network=net_override,
+                memory=container_cfg.get("memory"),
+                cpus=container_cfg.get("cpus"),
+                volumes=container_cfg.get("volumes"),
+                extra_args=container_cfg.get("extra_args"),
+            ),
+            timeout=IMAGE_BUILD_TIMEOUT,
+        )
+
+        # Stash the result so _connect_backend doesn't rebuild.
+        svr_conf["_prebuild_params"] = wrapped_params
+        svr_conf["_prebuild_isolated"] = was_isolated
 
     async def _connect_backend(
         self,
@@ -451,11 +585,33 @@ class ClientManager:
 
         Extracted so ``_start_backend_svr`` can wrap this in
         ``asyncio.wait_for`` with the overall ``startup_timeout``.
+
+        Each backend gets its own :class:`AsyncExitStack` so that
+        individual backends can be disconnected (and their transport /
+        subprocess cleaned up) without tearing down every other backend.
+        The per-backend stack is also entered into the global
+        ``_exit_stack`` so that ``stop_all()`` still works as a
+        catch-all during full shutdown.
         """
         from argus_mcp.runtime.models import BackendPhase
 
         # Resolve outgoing-auth headers (if configured)
         auth_headers = await self._resolve_auth_headers(svr_name, svr_conf)
+
+        # Create a per-backend exit stack for isolated cleanup.
+        # If a previous stack for this name exists (e.g. failed retry),
+        # close it first to avoid resource leaks.
+        old_stack = self._backend_stacks.pop(svr_name, None)
+        if old_stack is not None:
+            try:
+                await asyncio.wait_for(old_stack.aclose(), timeout=5.0)
+            except Exception:
+                logger.debug(
+                    "[%s] Error closing previous backend stack (benign).",
+                    svr_name, exc_info=True,
+                )
+        backend_stack = AsyncExitStack()
+        self._backend_stacks[svr_name] = backend_stack
 
         session: Optional[ClientSession] = None
 
@@ -465,9 +621,41 @@ class ClientManager:
                 raise ConfigurationError(
                     f"Invalid stdio config for server '{svr_name}' " "('params' type mismatch)."
                 )
-            # Apply network isolation env vars if configured
-            stdio_params = self._apply_network_env(svr_name, svr_conf, stdio_params)
-            _, session = await self._init_stdio_backend(svr_name, stdio_params)
+            # Use pre-built container params from _pre_build_container_image
+            # (image was already built outside the startup timeout).
+            prebuild_params = svr_conf.pop("_prebuild_params", None)
+            prebuild_isolated = svr_conf.pop("_prebuild_isolated", None)
+
+            if prebuild_params is not None:
+                stdio_params = prebuild_params
+                _isolated = prebuild_isolated or False
+            else:
+                # Fallback: build inline (non-stdio types, or pre-build skipped).
+                from argus_mcp.bridge.container import wrap_backend
+
+                container_cfg = svr_conf.get("container") or {}
+                net_override = container_cfg.get("network") or (
+                    (svr_conf.get("network") or {}).get("network_mode")
+                )
+                stdio_params, _isolated = await wrap_backend(
+                    svr_name, stdio_params,
+                    network=net_override,
+                    memory=container_cfg.get("memory"),
+                    cpus=container_cfg.get("cpus"),
+                    volumes=container_cfg.get("volumes"),
+                    extra_args=container_cfg.get("extra_args"),
+                )
+
+            if not _isolated:
+                # Container isolation not applied — inject proxy env
+                # vars if the config has a network section (bare subproc
+                # fallback only).
+                stdio_params = self._apply_network_env(
+                    svr_name, svr_conf, stdio_params,
+                )
+            _, session = await self._init_stdio_backend(
+                svr_name, stdio_params, stack=backend_stack,
+            )
 
         elif svr_type == "sse":
             sse_url = svr_conf.get("url")
@@ -485,6 +673,7 @@ class ClientManager:
                 svr_conf.get("env"),
                 sse_startup_delay=svr_conf.get("sse_startup_delay", SSE_LOCAL_START_DELAY),
                 headers=sse_headers,
+                stack=backend_stack,
             )
 
         elif svr_type == "streamable-http":
@@ -494,7 +683,9 @@ class ClientManager:
                     f"Invalid streamable-http 'url' configuration " f"for server '{svr_name}'."
                 )
             sh_headers = _merge_headers(svr_conf.get("headers"), auth_headers)
-            _, session = await self._init_streamablehttp_backend(svr_name, sh_url, sh_headers)
+            _, session = await self._init_streamablehttp_backend(
+                svr_name, sh_url, sh_headers, stack=backend_stack,
+            )
 
         else:
             raise ConfigurationError(
@@ -532,24 +723,58 @@ class ClientManager:
     ) -> None:
         """Start all backend server connections, retrying failures.
 
-        After the initial parallel connection attempt, any backends that
-        failed are automatically retried up to ``retries`` times (per-backend
-        or global default).  Between attempts the display shows "Retrying…"
-        and a configurable delay (``retry_delay``) is applied.
+        Backends are started with **staggered concurrency** — at most
+        ``STARTUP_CONCURRENCY`` backends spawn at the same time, with a
+        small inter-launch delay (``STARTUP_STAGGER_DELAY``) to spread
+        I/O and avoid npm/pip cache-lock contention.
+
+        After the initial pass, any failures are automatically retried up
+        to ``retries`` times (per-backend or global default) using the
+        same concurrency limiter.
         """
         self._progress_cb = progress_callback
+        total = len(config_data)
+        concurrency = max(1, int(os.environ.get(
+            "ARGUS_STARTUP_CONCURRENCY", STARTUP_CONCURRENCY
+        )))
+        stagger = float(os.environ.get(
+            "ARGUS_STARTUP_STAGGER", STARTUP_STAGGER_DELAY
+        ))
         logger.info(
-            "Starting all backend server connections (%s total)...",
-            len(config_data),
+            "Starting all backend server connections (%s total, "
+            "concurrency=%s, stagger=%.1fs)...",
+            total, concurrency, stagger,
         )
 
-        # ── First pass: connect all backends in parallel ─────────────
-        for svr_name, svr_conf in config_data.items():
+        # ── Staggered first pass ─────────────────────────────────────
+        # Sort backends so lightweight remote connections (sse,
+        # streamable-http) start before heavy stdio backends that may
+        # trigger package installs via uvx/npx.
+        _type_priority = {"streamable-http": 0, "sse": 1, "stdio": 2}
+        sorted_items = sorted(
+            config_data.items(),
+            key=lambda kv: _type_priority.get(kv[1].get("type", "stdio"), 2),
+        )
+
+        sem = asyncio.Semaphore(concurrency)
+        launch_idx = 0
+
+        async def _gated_start(name: str, conf: Dict[str, Any], idx: int) -> bool:
+            """Acquire semaphore, optionally stagger, then connect."""
+            async with sem:
+                # Small delay between launches within the concurrency
+                # window to avoid thundering-herd I/O.
+                if idx > 0 and stagger > 0:
+                    await asyncio.sleep(stagger * (idx % concurrency))
+                return await self._start_backend_svr(name, conf)
+
+        for svr_name, svr_conf in sorted_items:
             task = asyncio.create_task(
-                self._start_backend_svr(svr_name, svr_conf),
+                _gated_start(svr_name, svr_conf, launch_idx),
                 name=f"start_{svr_name}",
             )
             self._pending_tasks[svr_name] = task
+            launch_idx += 1
 
         if self._pending_tasks:
             results = await asyncio.gather(*self._pending_tasks.values(), return_exceptions=True)
@@ -572,7 +797,7 @@ class ClientManager:
         # ── Retry loop for failed backends ───────────────────────────
         failed_names = [n for n, ok in first_pass.items() if not ok]
 
-        if failed_names:
+        if failed_names and not self._shutdown_requested:
             # Determine the global retry params (use the max across all
             # failed backends so every one gets its configured chances).
             max_retries = max(config_data[n].get("retries", BACKEND_RETRIES) for n in failed_names)
@@ -584,13 +809,15 @@ class ClientManager:
             )
 
             for attempt in range(1, max_retries + 1):
-                if not failed_names:
+                if not failed_names or self._shutdown_requested:
                     break
 
-                # Per-backend delay (use the max among remaining failures)
-                delay = max(
+                # Per-backend delay with exponential backoff
+                base_delay = max(
                     config_data[n].get("retry_delay", BACKEND_RETRY_DELAY) for n in failed_names
                 )
+                backoff = config_data[failed_names[0]].get("retry_backoff", BACKEND_RETRY_BACKOFF)
+                delay = base_delay * (backoff ** (attempt - 1))
                 logger.info(
                     "Retry attempt %d/%d — waiting %.1fs before retrying %d backend(s)...",
                     attempt,
@@ -621,19 +848,30 @@ class ClientManager:
 
                 await asyncio.sleep(delay)
 
-                # Retry failed backends in parallel
+                # Retry failed backends with same concurrency limiter
                 retry_tasks: Dict[str, asyncio.Task] = {}
+                retry_idx = 0
                 for svr_name in failed_names:
                     svr_conf = config_data[svr_name]
                     # Only retry if this backend still has attempts left
                     per_backend_retries = svr_conf.get("retries", BACKEND_RETRIES)
                     if attempt > per_backend_retries:
                         continue
+
+                    async def _gated_retry(
+                        name: str, conf: Dict[str, Any], idx: int
+                    ) -> bool:
+                        async with sem:
+                            if idx > 0 and stagger > 0:
+                                await asyncio.sleep(stagger * (idx % concurrency))
+                            return await self._start_backend_svr(name, conf)
+
                     task = asyncio.create_task(
-                        self._start_backend_svr(svr_name, svr_conf),
+                        _gated_retry(svr_name, svr_conf, retry_idx),
                         name=f"retry_{svr_name}_{attempt}",
                     )
                     retry_tasks[svr_name] = task
+                    retry_idx += 1
 
                 if retry_tasks:
                     retry_results = await asyncio.gather(
@@ -676,7 +914,7 @@ class ClientManager:
 
     async def stop_all(self) -> None:
         """Close all active sessions and subprocesses started by the manager."""
-        logger.info("Stopping all backend connections and local processes (via AsyncExitStack)...")
+        logger.info("Stopping all backend connections and local processes...")
 
         # Transition operational backends to SHUTTING_DOWN
         from argus_mcp.runtime.models import BackendPhase
@@ -700,16 +938,37 @@ class ClientManager:
             self._pending_tasks.clear()
             logger.info("Pending startup tasks cancelled and cleaned up.")
 
-        logger.info("Calling AsyncExitStack.aclose() to clean up managed resources...")
+        # Close per-backend stacks first (each closes its own transport +
+        # session + subprocess).  This is the primary cleanup path.
+        for name, stack in list(self._backend_stacks.items()):
+            try:
+                await asyncio.wait_for(stack.aclose(), timeout=5.0)
+                logger.debug("Backend '%s' stack closed.", name)
+            except asyncio.TimeoutError:
+                logger.warning("Backend '%s' stack close timed out.", name)
+            except RuntimeError as e_rt:
+                logger.debug("Cancel scope error closing '%s': %s", name, e_rt)
+            except Exception:
+                logger.debug("Error closing backend '%s' stack.", name, exc_info=True)
+        self._backend_stacks.clear()
+
+        # Close the global exit stack as a safety net for any resources
+        # that were entered there directly (e.g. by older code paths).
+        logger.debug("Closing global AsyncExitStack as safety net...")
         try:
-            await self._exit_stack.aclose()
-            logger.info(
-                "AsyncExitStack closed all managed contexts " "(connections and subprocesses)."
+            await asyncio.wait_for(self._exit_stack.aclose(), timeout=10.0)
+            logger.info("Global AsyncExitStack closed.")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Global AsyncExitStack.aclose() timed out after 10s."
+            )
+        except RuntimeError as e_rt:
+            logger.warning(
+                "Cancel scope error during shutdown (safe to ignore): %s", e_rt
             )
         except Exception as e_aclose:
-            logger.exception(
-                "Error while closing AsyncExitStack: %s. "
-                "Some resources may not have been released.",
+            logger.warning(
+                "Error while closing global AsyncExitStack: %s.",
                 e_aclose,
             )
 
@@ -724,6 +983,39 @@ class ClientManager:
         self._devnull_files.clear()
 
         logger.info("ClientManager closed, all sessions cleared.")
+
+    async def disconnect_one(self, name: str) -> None:
+        """Disconnect and clean up a single backend by name.
+
+        Closes the per-backend :class:`AsyncExitStack` which tears down
+        the transport, session, and any subprocess created for this
+        backend.  This is the correct way to disconnect an individual
+        backend (e.g. during reconnect) without leaking child processes.
+
+        If no per-backend stack exists (legacy path), only the session
+        reference is removed — a warning is logged since this may leak.
+        """
+        backend_stack = self._backend_stacks.pop(name, None)
+        if backend_stack is not None:
+            try:
+                await asyncio.wait_for(backend_stack.aclose(), timeout=10.0)
+                logger.info("Backend '%s' disconnected (stack closed, subprocess terminated).", name)
+            except asyncio.TimeoutError:
+                logger.warning("Backend '%s' disconnect timed out after 10s.", name)
+            except RuntimeError as e_rt:
+                logger.debug(
+                    "Cancel scope error disconnecting '%s' (benign): %s", name, e_rt,
+                )
+            except Exception:
+                logger.warning("Error disconnecting backend '%s'.", name, exc_info=True)
+        else:
+            logger.warning(
+                "Backend '%s' has no per-backend exit stack — "
+                "subprocess may leak (legacy code path).",
+                name,
+            )
+
+        self._sessions.pop(name, None)
 
     def get_session(self, svr_name: str) -> Optional[ClientSession]:
         """Get an active backend session by server name."""
@@ -759,7 +1051,7 @@ class ClientManager:
         try:
             from argus_mcp.bridge.auth.provider import create_auth_provider
 
-            provider = create_auth_provider(auth_cfg)
+            provider = create_auth_provider(auth_cfg, backend_name=svr_name)
             headers = await provider.get_headers()
             logger.info("[%s] Auth provider resolved: %s", svr_name, provider.redacted_repr())
             return headers

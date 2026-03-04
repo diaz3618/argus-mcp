@@ -26,8 +26,17 @@ DEFAULT_LOG_LEVEL = "INFO"
 SSE_LOCAL_START_DELAY = 5  # seconds to wait for local SSE server startup
 MCP_INIT_TIMEOUT = 15  # seconds for MCP session initialization
 CAP_FETCH_TIMEOUT = 10.0  # seconds for capability list fetch
-STARTUP_TIMEOUT = 120  # overall per-backend connection timeout (spawn + init)
+STARTUP_TIMEOUT = 90  # overall per-backend connection timeout (spawn + init)
+IMAGE_BUILD_TIMEOUT = 600  # seconds allowed for container image builds (first-run cold builds)
+
+# Staggered startup – limit how many backends connect concurrently to
+# avoid resource contention (npm/pip cache lock fights, network
+# saturation, CPU spikes).  A small inter-launch delay spreads the
+# load further.
+STARTUP_CONCURRENCY = 4  # max simultaneous backend initialisations
+STARTUP_STAGGER_DELAY = 0.5  # seconds between launching each backend within a batch
 
 # Backend retry defaults
-BACKEND_RETRIES = 1  # number of automatic retries for failed backends
-BACKEND_RETRY_DELAY = 5.0  # seconds to wait between retries
+BACKEND_RETRIES = 3  # number of automatic retries for failed backends
+BACKEND_RETRY_DELAY = 5.0  # base delay between retries (exponential backoff applied)
+BACKEND_RETRY_BACKOFF = 1.5  # multiplier applied to delay on each successive retry

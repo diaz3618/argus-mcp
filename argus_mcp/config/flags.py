@@ -28,6 +28,7 @@ _DEFAULTS: Dict[str, bool] = {
     "outgoing_auth": True,
     "session_management": True,
     "yaml_config": True,
+    "container_isolation": True,
 }
 
 

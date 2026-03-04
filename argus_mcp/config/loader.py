@@ -73,6 +73,9 @@ def _backend_to_dict(
             env=cfg.env,
         )
         entry: Dict[str, Any] = {"type": "stdio", "params": params}
+        # Pass optional container overrides to client_manager
+        if cfg.container is not None:
+            entry["container"] = cfg.container.model_dump(exclude_none=True)
     elif isinstance(cfg, StreamableHttpBackendConfig):
         entry = {"type": "streamable-http", "url": cfg.url}
         if cfg.headers:

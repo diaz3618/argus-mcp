@@ -97,18 +97,10 @@ class ToolIndex:
 
     # ── Population ───────────────────────────────────────────────────
 
-    def store(
+    def _populate(
         self, tools: Sequence[Any], route_map: Optional[Dict[str, Tuple[str, str]]] = None
     ) -> None:
-        """Index a list of MCP Tool objects (or dicts).
-
-        Parameters
-        ----------
-        tools:
-            List of ``mcp.types.Tool`` (or dicts with name/description/inputSchema).
-        route_map:
-            Optional mapping ``tool_name → (backend_name, original_name)``.
-        """
+        """Parse *tools* into ``_tools`` dict (synchronous, no TF-IDF build)."""
         self._tools.clear()
         for t in tools:
             name = t.name if hasattr(t, "name") else t.get("name", "")
@@ -134,6 +126,34 @@ class ToolIndex:
                 backend=backend,
             )
 
+    async def store(
+        self, tools: Sequence[Any], route_map: Optional[Dict[str, Tuple[str, str]]] = None
+    ) -> None:
+        """Index a list of MCP Tool objects (or dicts) — **async**.
+
+        The TF-IDF ``fit_transform()`` call is offloaded to a thread
+        via ``asyncio.to_thread`` to avoid blocking the event loop
+        to avoid blocking the event loop.
+
+        Parameters
+        ----------
+        tools:
+            List of ``mcp.types.Tool`` (or dicts with name/description/inputSchema).
+        route_map:
+            Optional mapping ``tool_name → (backend_name, original_name)``.
+        """
+        self._populate(tools, route_map)
+
+        import asyncio
+
+        await asyncio.to_thread(self._build_tfidf)
+        logger.info("ToolIndex: indexed %d tools (sklearn=%s)", len(self._tools), _HAS_SKLEARN)
+
+    def store_sync(
+        self, tools: Sequence[Any], route_map: Optional[Dict[str, Tuple[str, str]]] = None
+    ) -> None:
+        """Synchronous variant of :meth:`store` for non-async contexts and tests."""
+        self._populate(tools, route_map)
         self._build_tfidf()
         logger.info("ToolIndex: indexed %d tools (sklearn=%s)", len(self._tools), _HAS_SKLEARN)
 
