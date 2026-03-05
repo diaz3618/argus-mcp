@@ -102,7 +102,7 @@ def register_handlers(mcp_server: McpServer) -> None:
         return prompts
 
     @mcp_server.call_tool()
-    async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[mcp_types.TextContent]:
+    async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> mcp_types.CallToolResult:
         logger.debug("Handling callTool: name='%s'", name)
 
         # Handle optimizer meta-tools
@@ -114,12 +114,15 @@ def register_handlers(mcp_server: McpServer) -> None:
                 query = arguments.get("query", "")
                 limit = int(arguments.get("limit", 5))
                 results = optimizer.search(query, limit=limit)
-                return [
-                    mcp_types.TextContent(
-                        type="text",
-                        text=json.dumps(results, indent=2),
-                    )
-                ]
+                return mcp_types.CallToolResult(
+                    content=[
+                        mcp_types.TextContent(
+                            type="text",
+                            text=json.dumps(results, indent=2),
+                        )
+                    ],
+                    isError=False,
+                )
 
             if name == CALL_TOOL_NAME:
                 # Delegate to the real tool via dispatch
@@ -130,7 +133,7 @@ def register_handlers(mcp_server: McpServer) -> None:
                 logger.info("Optimizer call_tool dispatching to '%s'", real_name)
                 result = await _dispatch(mcp_server, real_name, "call_tool", real_args)
                 if isinstance(result, mcp_types.CallToolResult):
-                    return result.content
+                    return result
                 raise BackendServerError(
                     f"Backend returned invalid type for tool call '{real_name}'."
                 )
@@ -142,16 +145,19 @@ def register_handlers(mcp_server: McpServer) -> None:
                 logger.info("Dispatching composite workflow tool '%s'", name)
                 try:
                     output = await ct.invoke(arguments)
-                    return [
-                        mcp_types.TextContent(
-                            type="text",
-                            text=(
-                                json.dumps(output, indent=2)
-                                if not isinstance(output, str)
-                                else output
-                            ),
-                        )
-                    ]
+                    return mcp_types.CallToolResult(
+                        content=[
+                            mcp_types.TextContent(
+                                type="text",
+                                text=(
+                                    json.dumps(output, indent=2)
+                                    if not isinstance(output, str)
+                                    else output
+                                ),
+                            )
+                        ],
+                        isError=False,
+                    )
                 except Exception as exc:
                     # (final handler boundary — this IS the error handler)
                     logger.error(  # nosemgrep: code-quality-logging-error-without-handling
@@ -163,7 +169,7 @@ def register_handlers(mcp_server: McpServer) -> None:
 
         result = await _dispatch(mcp_server, name, "call_tool", arguments)
         if isinstance(result, mcp_types.CallToolResult):
-            return result.content
+            return result
         logger.error(
             "call_tool forwarding returned unexpected type: " "%s for tool '%s'",
             type(result),
