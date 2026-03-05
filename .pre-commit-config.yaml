@@ -1,5 +1,8 @@
 # Pre-commit hooks — run before each commit
-# Install: pip install pre-commit && pre-commit install
+# Install:
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit install --hook-type pre-push
 # Docs: https://pre-commit.com
 
 repos:
@@ -30,3 +33,14 @@ repos:
     hooks:
       - id: typos
         args: ['--config', '.typos.toml']
+
+  # Local hooks (pytest on pre-push — tests/ is local-only)
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (pre-push)
+        entry: python -m pytest tests/ -m "not live_server" --cov=argus_mcp --cov-report=term-missing --timeout=60 -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

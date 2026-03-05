@@ -1,5 +1,6 @@
-# CI workflow — Lint, Format, Type Check, Tests, Security
+# CI workflow — Lint, Format, Type Check, Security
 # Tiered: Tier 1 (fast) gates Tier 2 (expensive).
+# NOTE: tests/ is local-only — pytest runs via pre-push git hook.
 # Modeled after fastapi/fastapi and pydantic/pydantic CI patterns.
 # Uses astral-sh/setup-uv for fast dependency resolution and caching.
 
@@ -92,42 +93,8 @@ jobs:
       - name: Run mypy
         run: uv run mypy
 
-  # ──────────────────────────────────────────────
-  # Unit tests with coverage
-  # ──────────────────────────────────────────────
-  unit-tests:
-    name: Tests (pytest + coverage)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: "3.10"
-          enable-cache: true
-          cache-dependency-glob: "pyproject.toml"
-
-      - name: Install dependencies
-        run: uv sync --group dev --group test
-
-      - name: Run tests with coverage
-        run: |
-          uv run pytest tests/ \
-            -m "not live_server" \
-            --cov=argus_mcp \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing \
-            --timeout=60 \
-            -q
-
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
-        with:
-          file: coverage.xml
-          flags: unittests
-          fail_ci_if_error: false
+  # NOTE: tests/ is local-only (excluded from remote). Test suite runs
+  # via pre-push git hook instead — see .pre-commit-config.yaml.
 
   # ──────────────────────────────────────────────
   # Security — filesystem scan
@@ -164,7 +131,7 @@ jobs:
   # ──────────────────────────────────────────────
   container-scan:
     name: Container scan (Trivy image)
-    needs: [lint, unit-tests]
+    needs: [lint]
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -199,7 +166,6 @@ jobs:
       - lint
       - format
       - typecheck
-      - unit-tests
       - security-scan
       - container-scan
     runs-on: ubuntu-latest
