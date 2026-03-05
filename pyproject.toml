@@ -35,6 +35,13 @@ dev = [
     "textual-dev>=1.0.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
+test = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=7.0.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.5.0",
+]
 
 [tool.black]
 line-length = 100
@@ -102,6 +109,42 @@ disable_error_code = ["attr-defined"]
 [[tool.mypy.overrides]]
 module = ["argus_mcp.tui.*"]
 ignore_errors = true
+
+# ── pytest ───────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+timeout = 60
+markers = [
+    "integration: tests requiring live backend servers",
+    "live_server: tests that require a running argus-mcp gateway (deselect in CI)",
+    "semgrep: tests requiring Semgrep CLI or API authentication",
+    "slow: tests that take more than 10 seconds",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:anyio",
+    "ignore::DeprecationWarning:pkg_resources",
+]
+addopts = "-q --strict-markers"
+
+[tool.coverage.run]
+source = ["argus_mcp"]
+omit = [
+    "argus_mcp/__main__.py",
+    "argus_mcp/tui/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__",
+    "@overload",
+    "raise NotImplementedError",
+]
+show_missing = true
+skip_empty = true
 
 # ── python-semantic-release ──────────────────────────────────────────────
 

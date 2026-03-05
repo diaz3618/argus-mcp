@@ -1,0 +1,19 @@
+# typos configuration — https://github.com/crate-ci/typos
+[default.extend-words]
+# Project-specific terms that are not typos
+mcp = "mcp"
+sse = "sse"
+oidc = "oidc"
+pkce = "pkce"
+sarif = "sarif"
+numer = "numer"
+
+[files]
+extend-exclude = [
+    "*.jsonl",
+    "logs/",
+    "internal/",
+    "memory-bank/",
+    ".venv*",
+    "*.egg-info",
+]
