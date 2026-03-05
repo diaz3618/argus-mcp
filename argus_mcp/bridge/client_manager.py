@@ -245,6 +245,14 @@ class ClientManager:
         self._status_records: Dict[str, Any] = {}
         self._progress_cb: Optional[Callable[..., None]] = None
         self._shutdown_requested: bool = False
+        # Auth configs discovered at runtime (PKCE/OAuth auto-discovery).
+        # Keyed by backend name → auth config dict suitable for
+        # ``create_auth_provider``.
+        self._discovered_auth: Dict[str, Dict[str, Any]] = {}
+        # Track ongoing auth discovery tasks per backend.  Used to
+        # prevent duplicate DCR registrations and PKCE flows when the
+        # retry loop fires while interactive browser auth is pending.
+        self._auth_discovery_tasks: Dict[str, asyncio.Task] = {}
         logger.info("ClientManager initialized.")
 
     def cancel_startup(self) -> None:
@@ -487,11 +495,6 @@ class ClientManager:
             return False
 
         except asyncio.CancelledError:
-            # Distinguish between user-initiated cancellation (Ctrl+C /
-            # shutdown) and transport-level drops (e.g. server requires
-            # OAuth and rejects unauthenticated connections).
-            # Preserve the reason in the status record so the
-            # TUI / management API shows actionable info.
             if self._shutdown_requested:
                 cancel_reason = "Startup cancelled (shutdown requested)"
                 logger.info(
@@ -502,18 +505,18 @@ class ClientManager:
             else:
                 cancel_reason = (
                     "Connection rejected — possible auth failure "
-                    "(OAuth/API key). Check auth config."
+                    "(OAuth/API key). Attempting auto-discovery…"
                 )
                 logger.warning(
-                    "[%s] (%s) startup task cancelled. This may indicate "
-                    "the remote server dropped the connection during "
-                    "handshake — possibly because it requires "
-                    "authentication (OAuth/API key). Check the server's "
-                    "auth requirements and add an 'auth' block to its "
-                    "config. Will retry if attempts remain.",
+                    "[%s] (%s) startup task cancelled — possible auth "
+                    "failure. Will attempt OAuth auto-discovery.",
                     svr_name,
                     svr_type or "unknown type",
                 )
+                cancel_reason = await self._attempt_auth_discovery_for_backend(
+                    svr_name, svr_conf, svr_type, cancel_reason,
+                )
+
             try:
                 record.transition(BackendPhase.FAILED, cancel_reason)
             except ValueError:
@@ -521,14 +524,40 @@ class ClientManager:
             if self._progress_cb is not None:
                 self._progress_cb(svr_name, "failed", cancel_reason)
             return False
-        except Exception as e_start:
-            _log_backend_fail(svr_name, svr_type, e_start, context="connect/initialize")
+
+        except BaseException as e_start:
+            # Catches both Exception and BaseExceptionGroup (which
+            # the MCP SDK's TaskGroup raises on 401 Unauthorized —
+            # may wrap CancelledError sub-exceptions).
+            fail_reason = str(e_start)
+
+            # Check if this looks like an auth failure (401/403 or
+            # ExceptionGroup containing HTTP status errors).
+            is_auth_failure = _looks_like_auth_failure(e_start)
+
+            if is_auth_failure and not self._shutdown_requested:
+                logger.warning(
+                    "[%s] (%s) connection failed with auth-related error: "
+                    "%s. Attempting OAuth auto-discovery.",
+                    svr_name,
+                    svr_type or "unknown type",
+                    type(e_start).__name__,
+                )
+                fail_reason = await self._attempt_auth_discovery_for_backend(
+                    svr_name, svr_conf, svr_type, fail_reason,
+                )
+            else:
+                _log_backend_fail(
+                    svr_name, svr_type, e_start,
+                    context="connect/initialize",
+                )
+
             try:
-                record.transition(BackendPhase.FAILED, str(e_start))
+                record.transition(BackendPhase.FAILED, fail_reason)
             except ValueError:
                 pass
             if self._progress_cb is not None:
-                self._progress_cb(svr_name, "failed", str(e_start))
+                self._progress_cb(svr_name, "failed", fail_reason)
             return False
 
     async def _pre_build_container_image(
@@ -545,6 +574,14 @@ class ClientManager:
 
         If the backend is already containerised, disabled, or uses an
         unknown command, this is a no-op.
+
+        .. note::
+
+            During normal startup, ``build_if_missing=False`` is used so
+            that only **cached** images are returned — no builds are
+            triggered.  This prevents long first-run image builds from
+            blocking all backend connections (the old failure mode).
+            Run ``argus-mcp build`` to pre-build images offline.
         """
         stdio_params = svr_conf.get("params")
         if not isinstance(stdio_params, StdioServerParameters):
@@ -566,6 +603,7 @@ class ClientManager:
                 cpus=container_cfg.get("cpus"),
                 volumes=container_cfg.get("volumes"),
                 extra_args=container_cfg.get("extra_args"),
+                build_if_missing=False,
             ),
             timeout=IMAGE_BUILD_TIMEOUT,
         )
@@ -644,6 +682,7 @@ class ClientManager:
                     cpus=container_cfg.get("cpus"),
                     volumes=container_cfg.get("volumes"),
                     extra_args=container_cfg.get("extra_args"),
+                    build_if_missing=False,
                 )
 
             if not _isolated:
@@ -848,6 +887,56 @@ class ClientManager:
 
                 await asyncio.sleep(delay)
 
+                # ── Wait for pending auth discovery tasks ────────────
+                # If a backend has an ongoing PKCE browser auth flow (from
+                # a previous attempt), wait for it to complete before
+                # retrying.  This prevents duplicate DCR registrations and
+                # browser tabs.
+                auth_wait_names = [
+                    n for n in failed_names
+                    if n in self._auth_discovery_tasks
+                    and not self._auth_discovery_tasks[n].done()
+                ]
+                if auth_wait_names:
+                    # Wait up to 120s for interactive browser auth
+                    _AUTH_WAIT_TIMEOUT = 120.0
+                    logger.info(
+                        "Waiting up to %.0fs for pending auth discovery "
+                        "on %d backend(s): %s",
+                        _AUTH_WAIT_TIMEOUT,
+                        len(auth_wait_names),
+                        ", ".join(auth_wait_names),
+                    )
+                    pending_tasks = [
+                        self._auth_discovery_tasks[n] for n in auth_wait_names
+                    ]
+                    for n in auth_wait_names:
+                        if self._progress_cb is not None:
+                            self._progress_cb(
+                                n, "initializing",
+                                "Waiting for browser authentication…",
+                            )
+                    try:
+                        done, _ = await asyncio.wait(
+                            pending_tasks,
+                            timeout=_AUTH_WAIT_TIMEOUT,
+                        )
+                        for n in auth_wait_names:
+                            auth_task = self._auth_discovery_tasks.get(n)
+                            if auth_task and auth_task.done():
+                                try:
+                                    auth_ok = auth_task.result()
+                                    if auth_ok:
+                                        logger.info(
+                                            "[%s] Auth discovery completed "
+                                            "— will retry with credentials.",
+                                            n,
+                                        )
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
                 # Retry failed backends with same concurrency limiter
                 retry_tasks: Dict[str, asyncio.Task] = {}
                 retry_idx = 0
@@ -1044,8 +1133,16 @@ class ClientManager:
     async def _resolve_auth_headers(
         self, svr_name: str, svr_conf: Dict[str, Any]
     ) -> Optional[Dict[str, str]]:
-        """Resolve outgoing-auth headers for a backend, if configured."""
+        """Resolve outgoing-auth headers for a backend, if configured.
+
+        Checks (in order):
+        1. Explicit ``auth`` block in the backend config.
+        2. Runtime-discovered auth config from ``_discovered_auth``.
+        """
         auth_cfg = svr_conf.get("auth")
+        if not auth_cfg:
+            # Check for runtime-discovered auth
+            auth_cfg = self._discovered_auth.get(svr_name)
         if not auth_cfg:
             return None
         try:
@@ -1059,8 +1156,337 @@ class ClientManager:
             logger.error("[%s] Failed to resolve auth headers: %s", svr_name, exc)
             return None
 
+    async def _attempt_auth_discovery_for_backend(
+        self,
+        svr_name: str,
+        svr_conf: Dict[str, Any],
+        svr_type: Optional[str],
+        default_reason: str,
+    ) -> str:
+        """Run OAuth auto-discovery for a backend, shielded from cancellation.
+
+        Returns an updated failure reason string.  Uses task tracking to
+        prevent duplicate DCR registrations and PKCE flows — if an auth
+        discovery task is already running for this backend, waits on it
+        instead of starting a new one.
+
+        For remote backends (SSE / streamable-http) only.
+        """
+        if svr_type not in ("sse", "streamable-http"):
+            return default_reason
+
+        # ── Deduplicate: reuse existing running task ────────────────
+        existing_task = self._auth_discovery_tasks.get(svr_name)
+        if existing_task is not None and not existing_task.done():
+            logger.info(
+                "[%s] Auth discovery already in progress — "
+                "waiting for existing flow to complete.",
+                svr_name,
+            )
+            try:
+                auth_ok = await asyncio.shield(existing_task)
+                if auth_ok:
+                    return "Auth discovered — will retry with OAuth token."
+            except asyncio.CancelledError:
+                logger.info(
+                    "[%s] Wait for existing auth flow interrupted by "
+                    "cancellation — flow continues in background.",
+                    svr_name,
+                )
+            except Exception as wait_exc:
+                logger.debug(
+                    "[%s] Existing auth flow failed: %s",
+                    svr_name,
+                    wait_exc,
+                )
+            return default_reason
+
+        # ── Start a new auth discovery task ─────────────────────────
+        coro = self._try_auth_discovery(svr_name, svr_conf)
+        task = asyncio.create_task(
+            coro, name=f"auth_discovery_{svr_name}",
+        )
+        self._auth_discovery_tasks[svr_name] = task
+
+        try:
+            auth_ok = await asyncio.shield(task)
+            if auth_ok:
+                return "Auth discovered — will retry with OAuth token."
+        except asyncio.CancelledError:
+            # shield() re-raises CancelledError in the outer scope
+            # when the parent task is cancelled, but the inner task
+            # (auth discovery + PKCE) continues running independently.
+            logger.info(
+                "[%s] Auth discovery interrupted by cancellation — "
+                "inner coroutine continues in background.",
+                svr_name,
+            )
+        except Exception as auth_exc:
+            logger.debug(
+                "[%s] Auth discovery attempt failed: %s",
+                svr_name,
+                auth_exc,
+            )
+        return default_reason
+
+    async def _try_auth_discovery(
+        self,
+        svr_name: str,
+        svr_conf: Dict[str, Any],
+    ) -> bool:
+        """Attempt OAuth auto-discovery for a backend that failed with auth errors.
+
+        Probes the backend URL for RFC 9728 / OIDC metadata.  If the
+        server advertises OAuth with PKCE support, runs the interactive
+        browser flow and stores the resulting auth config for subsequent
+        retry attempts.
+
+        Returns ``True`` if auth was successfully discovered and tokens
+        obtained, ``False`` otherwise.
+        """
+        backend_url = svr_conf.get("url")
+        if not backend_url:
+            return False
+
+        # Already has explicit auth config — don't override.
+        if svr_conf.get("auth"):
+            return False
+
+        # Already discovered auth for this backend.
+        if svr_name in self._discovered_auth:
+            return False
+
+        try:
+            from argus_mcp.bridge.auth.discovery import discover_oauth_metadata
+
+            logger.info(
+                "[%s] Attempting OAuth auto-discovery on %s…",
+                svr_name,
+                backend_url,
+            )
+
+            if self._progress_cb is not None:
+                self._progress_cb(
+                    svr_name, "initializing",
+                    "Discovering auth requirements…",
+                )
+
+            meta = await discover_oauth_metadata(backend_url, timeout=15.0)
+            if not meta:
+                logger.info(
+                    "[%s] No OAuth metadata found — auth discovery failed.",
+                    svr_name,
+                )
+                return False
+
+            logger.info(
+                "[%s] OAuth discovered: issuer=%s, pkce=%s, "
+                "registration=%s",
+                svr_name,
+                meta.issuer,
+                meta.supports_pkce,
+                meta.supports_dynamic_registration,
+            )
+
+            if not meta.authorization_endpoint or not meta.token_endpoint:
+                logger.warning(
+                    "[%s] OAuth metadata incomplete — missing endpoints.",
+                    svr_name,
+                )
+                return False
+
+            # ── Prepare PKCE flow early to learn redirect URI ──────
+            from argus_mcp.bridge.auth.pkce import PKCEFlow
+
+            scopes = meta.scopes_supported or []
+            flow = PKCEFlow(
+                authorization_endpoint=meta.authorization_endpoint,
+                token_endpoint=meta.token_endpoint,
+                client_id="pending",  # placeholder until DCR completes
+                scopes=scopes,
+                timeout=600.0,  # 10 minutes for interactive auth
+            )
+
+            # Bind the callback server NOW so the exact port is known
+            # before Dynamic Client Registration.
+            redirect_uri = flow.bind_callback_server()
+            logger.info(
+                "[%s] PKCE callback server pre-bound: %s",
+                svr_name,
+                redirect_uri,
+            )
+
+            # ── Dynamic Client Registration (if available) ──────────
+            client_id = ""
+            client_secret = ""
+
+            if meta.supports_dynamic_registration:
+                try:
+                    client_id, client_secret = await self._dynamic_register(
+                        svr_name,
+                        meta.registration_endpoint,
+                        backend_url,
+                        redirect_uri=redirect_uri,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[%s] Dynamic client registration failed: %s. "
+                        "Trying without registration.",
+                        svr_name,
+                        exc,
+                    )
+
+            if not client_id:
+                logger.warning(
+                    "[%s] No client_id available (registration failed or "
+                    "not supported). Cannot proceed with PKCE auth.",
+                    svr_name,
+                )
+                return False
+
+            # ── Run PKCE flow ───────────────────────────────────────
+            # Patch in the real client_id/secret from DCR
+            flow._client_id = client_id  # noqa: SLF001
+            flow._client_secret = client_secret  # noqa: SLF001
+
+            if self._progress_cb is not None:
+                self._progress_cb(
+                    svr_name, "initializing",
+                    "Waiting for browser authentication…",
+                )
+
+            tokens = await flow.execute()
+
+            # Store tokens persistently
+            from argus_mcp.bridge.auth.store import TokenStore
+
+            store = TokenStore()
+            store.save(svr_name, tokens)
+
+            # Store discovered auth config for retry
+            self._discovered_auth[svr_name] = {
+                "type": "pkce",
+                "authorization_endpoint": meta.authorization_endpoint,
+                "token_endpoint": meta.token_endpoint,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scopes": scopes,
+            }
+
+            logger.info(
+                "[%s] OAuth PKCE auth succeeded — token stored for retry.",
+                svr_name,
+            )
+            return True
+
+        except (Exception, asyncio.CancelledError) as exc:
+            logger.warning(
+                "[%s] Auth discovery/PKCE flow failed: %s",
+                svr_name,
+                exc,
+            )
+            return False
+
+    async def _dynamic_register(
+        self,
+        svr_name: str,
+        registration_endpoint: str,
+        backend_url: str,
+        redirect_uri: str = "",
+    ) -> Tuple[str, str]:
+        """Register a dynamic OAuth client (RFC 7591).
+
+        Parameters
+        ----------
+        redirect_uri:
+            The full redirect URI including the ephemeral port, e.g.
+            ``http://127.0.0.1:46293/callback``.  When supplied, this
+            exact URI is registered so it matches the PKCE callback
+            server that is already listening.  If empty, falls back to
+            ``http://127.0.0.1/callback`` (legacy behaviour).
+
+        Returns ``(client_id, client_secret)``.
+        Raises on failure.
+        """
+        import httpx  # noqa: PLC0415
+
+        if not redirect_uri:
+            redirect_uri = "http://127.0.0.1/callback"
+
+        reg_data = {
+            "client_name": f"Argus MCP ({svr_name})",
+            "redirect_uris": [redirect_uri],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+            "application_type": "native",
+            "scope": "openid email profile offline_access",
+        }
+
+        logger.info(
+            "[%s] Dynamic client registration → %s "
+            "(redirect_uris=%s)",
+            svr_name,
+            registration_endpoint,
+            reg_data["redirect_uris"],
+        )
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                registration_endpoint,
+                json=reg_data,
+                headers={"Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+
+        payload = resp.json()
+        client_id = payload.get("client_id", "")
+        client_secret = payload.get("client_secret", "")
+        registered_uris = payload.get("redirect_uris", [])
+        logger.info(
+            "[%s] Dynamic registration succeeded: client_id=%s, "
+            "registered_redirect_uris=%s",
+            svr_name,
+            client_id[:12] + "…" if len(client_id) > 12 else client_id,
+            registered_uris,
+        )
+        return client_id, client_secret
+
 
 # ── Module-level helpers ─────────────────────────────────────────────────
+
+
+def _looks_like_auth_failure(exc: BaseException) -> bool:
+    """Return ``True`` if *exc* appears to be an HTTP authentication error.
+
+    Detects HTTP 401/403 status codes inside:
+    - ``httpx.HTTPStatusError`` directly.
+    - ``ExceptionGroup`` / ``BaseExceptionGroup`` wrapping one or more
+      status errors (as produced by the MCP SDK's internal TaskGroup
+      when a server returns 401 Unauthorized).
+    - String representations mentioning "401" or "Unauthorized" (broad
+      fallback for exception types we don't import).
+    """
+    def _is_auth_status(e: BaseException) -> bool:
+        # Check httpx.HTTPStatusError without importing httpx at module
+        # level (it's an optional dependency for some backends).
+        type_name = type(e).__name__
+        if type_name == "HTTPStatusError":
+            status = getattr(getattr(e, "response", None), "status_code", 0)
+            return status in (401, 403)
+        # Broad text check for wrapped error messages
+        msg = str(e).lower()
+        return "401" in msg or "unauthorized" in msg or "403" in msg
+
+    if _is_auth_status(exc):
+        return True
+
+    # Check sub-exceptions inside ExceptionGroup / BaseExceptionGroup
+    sub_exceptions = getattr(exc, "exceptions", None)
+    if sub_exceptions:
+        return any(_is_auth_status(sub) for sub in sub_exceptions)
+
+    return False
 
 
 def _merge_headers(

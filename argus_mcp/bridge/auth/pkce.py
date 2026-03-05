@@ -129,22 +129,37 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         if "error" in params:
             self.__class__.error = params["error"][0]
             desc = params.get("error_description", [""])[0]
+            logger.warning(
+                "OAuth callback received error: %s — %s",
+                self.__class__.error,
+                desc,
+            )
             self._send_html(
                 f"<h2>Authentication Failed</h2>"
                 f"<p>{self.__class__.error}: {desc}</p>"
                 f"<p>You can close this window.</p>"
             )
         elif "code" in params:
+            code = params["code"][0]
+            state = params.get("state", [""])[0]
             self.__class__.result = {
-                "code": params["code"][0],
-                "state": params.get("state", [""])[0],
+                "code": code,
+                "state": state,
             }
+            logger.info(
+                "OAuth callback received authorization code "
+                "(code=%s…, state=%s…)",
+                code[:8] if len(code) > 8 else code,
+                state[:8] if len(state) > 8 else state,
+            )
             self._send_html(
                 "<h2>Authentication Successful</h2>"
+                "<p>Authorization code received. Exchanging for token…</p>"
                 "<p>You can close this window and return to your terminal.</p>"
             )
         else:
             self.__class__.error = "missing_code"
+            logger.warning("OAuth callback received no code or error.")
             self._send_html(
                 "<h2>Unexpected Response</h2>"
                 "<p>No authorization code received.</p>"
@@ -214,9 +229,47 @@ class PKCEFlow:
         self._scopes = scopes or []
         self._port = redirect_port
         self._timeout = timeout
+        # Pre-bound callback server state (populated by bind_callback_server)
+        self._server: Optional[HTTPServer] = None
+        self._redirect_uri: Optional[str] = None
+
+    def bind_callback_server(self) -> str:
+        """Pre-bind the local callback server and return the redirect URI.
+
+        Call this **before** Dynamic Client Registration so the exact
+        loopback port is known at registration time.  The returned URI
+        includes the ephemeral port assigned by the OS.
+
+        The server is *not* started yet — ``execute()`` will start it
+        and reuse the pre-bound socket.
+
+        Returns:
+            The full redirect URI, e.g. ``http://127.0.0.1:46293/callback``.
+        """
+        if self._server is not None:
+            assert self._redirect_uri is not None  # noqa: S101
+            return self._redirect_uri
+
+        self._server = HTTPServer(
+            (_CALLBACK_HOST, self._port), _CallbackHandler,
+        )
+        actual_port = self._server.server_address[1]
+        self._redirect_uri = (
+            f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
+        )
+        logger.debug(
+            "PKCE callback server pre-bound on %s:%d",
+            _CALLBACK_HOST,
+            actual_port,
+        )
+        return self._redirect_uri
 
     async def execute(self) -> TokenSet:
         """Run the full PKCE flow and return tokens.
+
+        If ``bind_callback_server()`` was called beforehand the
+        pre-bound server is reused; otherwise a new one is created
+        (backwards-compatible behaviour).
 
         Raises ``RuntimeError`` if the user does not complete auth
         within the timeout, or the server returns an error.
@@ -234,9 +287,17 @@ class PKCEFlow:
         _CallbackHandler.ready_event = ready
         _CallbackHandler.loop = loop
 
-        server = HTTPServer((_CALLBACK_HOST, self._port), _CallbackHandler)
-        actual_port = server.server_address[1]
-        redirect_uri = f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
+        # Reuse pre-bound server or create a new one
+        if self._server is not None:
+            server = self._server
+            redirect_uri = self._redirect_uri
+            assert redirect_uri is not None  # noqa: S101
+        else:
+            server = HTTPServer((_CALLBACK_HOST, self._port), _CallbackHandler)
+            actual_port = server.server_address[1]
+            redirect_uri = (
+                f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
+            )
 
         server_thread = Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
@@ -260,10 +321,9 @@ class PKCEFlow:
             logger.info(
                 "Opening browser for OAuth authorization…\n"
                 "  URL: %s\n"
-                "  Listening on %s:%d for callback.",
+                "  Listening on %s for callback.",
                 auth_url,
-                _CALLBACK_HOST,
-                actual_port,
+                redirect_uri,
             )
             webbrowser.open(auth_url)
 
@@ -302,6 +362,9 @@ class PKCEFlow:
         finally:
             server.shutdown()
             server_thread.join(timeout=5.0)
+            # Clear pre-bound state so a fresh server is used on retry
+            self._server = None
+            self._redirect_uri = None
 
     async def _exchange_code(
         self,
@@ -322,12 +385,29 @@ class PKCEFlow:
         if self._client_secret:
             data["client_secret"] = self._client_secret
 
+        logger.debug(
+            "Token exchange request → %s\n"
+            "  redirect_uri: %s\n"
+            "  client_id: %s\n"
+            "  code: %s…",
+            self._token_endpoint,
+            redirect_uri,
+            self._client_id,
+            code[:8] if len(code) > 8 else code,
+        )
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 self._token_endpoint,
                 data=data,
                 headers={"Accept": "application/json"},
             )
+            if resp.status_code >= 400:
+                logger.error(
+                    "Token exchange failed: HTTP %d\n  Body: %s",
+                    resp.status_code,
+                    resp.text[:500],
+                )
             resp.raise_for_status()
 
         payload = resp.json()

@@ -25,11 +25,21 @@ All network I/O uses httpx (lazy-imported to keep it optional).
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 logger = logging.getLogger(__name__)
+
+
+# ── Metadata cache (follows ContextForge's DcrService pattern) ───────────
+
+# In-memory cache for AS metadata keyed by MCP server URL.
+# Format: {url: {"metadata": OAuthMetadata, "cached_at": float}}
+# Default TTL: 3600s (same as ContextForge's dcr_metadata_cache_ttl).
+_METADATA_CACHE_TTL: float = 3600.0
+_metadata_cache: Dict[str, Dict[str, Any]] = {}
 
 
 # ── Data classes ─────────────────────────────────────────────────────────
@@ -72,11 +82,29 @@ async def discover_oauth_metadata(
     Tries in order:
 
     1. RFC 9728 protected-resource metadata on the MCP server.
-    2. OIDC discovery on the authorization server URL.
+    2. RFC 8414 / OIDC discovery on the authorization server URL.
+
+    Results are cached for ``_METADATA_CACHE_TTL`` seconds (following
+    ContextForge's ``dcr_metadata_cache_ttl`` pattern) to avoid
+    redundant network calls on retries.
 
     Returns ``None`` if discovery fails entirely (server does not
     require OAuth, or endpoints are unreachable).
     """
+    # Check cache first
+    cached = _metadata_cache.get(mcp_server_url)
+    if cached:
+        age = time.monotonic() - cached["cached_at"]
+        if age < _METADATA_CACHE_TTL:
+            logger.debug(
+                "Using cached OAuth metadata for %s (age=%.0fs).",
+                mcp_server_url,
+                age,
+            )
+            return cached["metadata"]
+        # Expired — remove stale entry
+        _metadata_cache.pop(mcp_server_url, None)
+
     import httpx  # noqa: PLC0415
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -96,6 +124,14 @@ async def discover_oauth_metadata(
 
         # Step 2 — OIDC discovery on the authorization server
         meta = await _discover_oidc(client, auth_server_url)
+
+        # Cache the result (including None for negative caching)
+        if meta is not None:
+            _metadata_cache[mcp_server_url] = {
+                "metadata": meta,
+                "cached_at": time.monotonic(),
+            }
+
         return meta
 
 
@@ -214,55 +250,102 @@ async def _discover_oidc(
     client: Any,
     auth_server_url: str,
 ) -> Optional[OAuthMetadata]:
-    """Fetch OIDC discovery document from the authorization server."""
+    """Fetch OAuth/OIDC discovery documents from the authorization server.
+
+    Tries **RFC 8414** first (``/.well-known/oauth-authorization-server``)
+    because it is the more complete source for OAuth-specific fields
+    (``registration_endpoint``, ``code_challenge_methods_supported``,
+    ``scopes_supported``).  When RFC 8414 succeeds but is missing key
+    fields, the OIDC document is fetched as well and used to fill gaps.
+
+    This two-pass approach follows the pattern used by ContextForge's
+    ``DcrService.discover_as_metadata`` and addresses servers like
+    Semgrep whose OIDC endpoint omits DCR and PKCE metadata while the
+    RFC 8414 endpoint includes them.
+    """
     parsed = urlparse(auth_server_url)
-    discovery_url = urljoin(
-        f"{parsed.scheme}://{parsed.netloc}",
-        "/.well-known/openid-configuration",
-    )
+    base = f"{parsed.scheme}://{parsed.netloc}"
 
+    rfc8414_url = urljoin(base, "/.well-known/oauth-authorization-server")
+    oidc_url = urljoin(base, "/.well-known/openid-configuration")
+
+    rfc8414_data: Optional[Dict[str, Any]] = None
+    oidc_data: Optional[Dict[str, Any]] = None
+
+    # ── Pass 1: RFC 8414 (preferred) ────────────────────────────────
     try:
-        resp = await client.get(discovery_url)
-        if resp.status_code != 200:
-            # Try OAuth Authorization Server Metadata (RFC 8414)
-            discovery_url = urljoin(
-                f"{parsed.scheme}://{parsed.netloc}",
-                "/.well-known/oauth-authorization-server",
+        resp = await client.get(rfc8414_url)
+        if resp.status_code == 200:
+            rfc8414_data = resp.json()
+            logger.debug(
+                "RFC 8414 metadata fetched for %s (issuer=%s).",
+                auth_server_url,
+                rfc8414_data.get("issuer", "?"),
             )
-            resp = await client.get(discovery_url)
-            if resp.status_code != 200:
-                logger.debug(
-                    "OIDC/OAuth discovery returned %d for %s.",
-                    resp.status_code,
-                    auth_server_url,
-                )
-                return None
-
-        data = resp.json()
-        meta = OAuthMetadata(
-            issuer=data.get("issuer", ""),
-            authorization_endpoint=data.get("authorization_endpoint", ""),
-            token_endpoint=data.get("token_endpoint", ""),
-            registration_endpoint=data.get("registration_endpoint", ""),
-            scopes_supported=data.get("scopes_supported", []),
-            response_types_supported=data.get("response_types_supported", []),
-            code_challenge_methods_supported=data.get(
-                "code_challenge_methods_supported", []
-            ),
-            raw=data,
+    except Exception as exc:
+        logger.debug(
+            "RFC 8414 discovery failed for %s: %s",
+            auth_server_url,
+            exc,
         )
-        logger.info(
-            "OIDC discovery succeeded: issuer=%s, pkce=%s, registration=%s",
-            meta.issuer,
-            meta.supports_pkce,
-            meta.supports_dynamic_registration,
-        )
-        return meta
 
+    # ── Pass 2: OIDC (fallback / supplement) ────────────────────────
+    try:
+        resp = await client.get(oidc_url)
+        if resp.status_code == 200:
+            oidc_data = resp.json()
+            logger.debug(
+                "OIDC metadata fetched for %s (issuer=%s).",
+                auth_server_url,
+                oidc_data.get("issuer", "?"),
+            )
     except Exception as exc:
         logger.debug(
             "OIDC discovery failed for %s: %s",
             auth_server_url,
             exc,
         )
+
+    if not rfc8414_data and not oidc_data:
+        logger.debug(
+            "Neither RFC 8414 nor OIDC discovery succeeded for %s.",
+            auth_server_url,
+        )
         return None
+
+    # Merge: RFC 8414 takes precedence, OIDC fills gaps.
+    # This mirrors ContextForge's pattern of preferring the more
+    # OAuth-specific metadata while still leveraging OIDC for fields
+    # like userinfo_endpoint that only OIDC publishes.
+    merged: Dict[str, Any] = {}
+    if oidc_data:
+        merged.update(oidc_data)
+    if rfc8414_data:
+        # Only overwrite with non-empty values from RFC 8414
+        for key, value in rfc8414_data.items():
+            if value or key not in merged:
+                merged[key] = value
+
+    meta = OAuthMetadata(
+        issuer=merged.get("issuer", ""),
+        authorization_endpoint=merged.get("authorization_endpoint", ""),
+        token_endpoint=merged.get("token_endpoint", ""),
+        registration_endpoint=merged.get("registration_endpoint", ""),
+        scopes_supported=merged.get("scopes_supported", []),
+        response_types_supported=merged.get("response_types_supported", []),
+        code_challenge_methods_supported=merged.get(
+            "code_challenge_methods_supported", []
+        ),
+        raw=merged,
+    )
+    logger.info(
+        "OAuth discovery succeeded: issuer=%s, pkce=%s, registration=%s, "
+        "source=%s",
+        meta.issuer,
+        meta.supports_pkce,
+        meta.supports_dynamic_registration,
+        "rfc8414+oidc" if rfc8414_data and oidc_data
+        else "rfc8414" if rfc8414_data
+        else "oidc",
+    )
+    return meta
