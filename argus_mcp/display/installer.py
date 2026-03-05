@@ -431,36 +431,44 @@ class InstallerDisplay:
             return
         self._finalized = True
 
-        # Force-finish any still-pending tasks so spinners stop
-        if self._progress is not None:
-            for entry in self._ordered:
-                if entry.task_id is not None:
-                    task_obj = self._progress.tasks[entry.task_id]
-                    if not task_obj.finished:
-                        self._progress.update(
-                            entry.task_id,
-                            completed=1,
-                            status_msg="Skipped",
-                            current_status_style="dim",
-                            result_icon="-",
-                            result_style="dim",
-                        )
-            self._progress.stop()
+        # Force-finish any still-pending tasks so spinners stop.
+        # Wrap in BrokenPipeError guard — stdout may already be closed
+        # if the server was started via `timeout` or piped to a pager.
+        try:
+            if self._progress is not None:
+                for entry in self._ordered:
+                    if entry.task_id is not None:
+                        task_obj = self._progress.tasks[entry.task_id]
+                        if not task_obj.finished:
+                            self._progress.update(
+                                entry.task_id,
+                                completed=1,
+                                status_msg="Skipped",
+                                current_status_style="dim",
+                                result_icon="-",
+                                result_style="dim",
+                            )
+                self._progress.stop()
+        except (BrokenPipeError, SystemExit):
+            pass  # stdout closed — nothing to display
 
         ready = sum(1 for e in self._ordered if e.phase == DisplayPhase.READY)
         failed = sum(1 for e in self._ordered if e.phase == DisplayPhase.FAILED)
         total = len(self._ordered)
 
-        if failed == 0:
-            self._console.print(
-                f"\n[bold bright_green]Backends: {ready}/{total} connected"
-                f"[/bold bright_green]\n"
-            )
-        else:
-            self._console.print(
-                f"\n[bold bright_red]Backends: {ready}/{total} connected"
-                f"[/bold bright_red]  [red]({failed} failed)[/red]\n"
-            )
+        try:
+            if failed == 0:
+                self._console.print(
+                    f"\n[bold bright_green]Backends: {ready}/{total} connected"
+                    f"[/bold bright_green]\n"
+                )
+            else:
+                self._console.print(
+                    f"\n[bold bright_red]Backends: {ready}/{total} connected"
+                    f"[/bold bright_red]  [red]({failed} failed)[/red]\n"
+                )
+        except (BrokenPipeError, SystemExit):
+            pass  # stdout closed — nothing to display
 
     def make_callback(self) -> Callable[..., None]:
         """Return a callback suitable for ClientManager progress reporting.
