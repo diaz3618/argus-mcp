@@ -138,7 +138,9 @@ docker run -p 9000:9000 -v ./config.yaml:/app/config.yaml argus-mcp
 Use a specific tag instead of `latest`:
 
 ```bash
-docker pull diaz3618/argus-mcp:0.5.0
+docker pull diaz3618/argus-mcp:0.7.0
 ```
 
-Tags follow the project version and are published on each release.
+Tags follow the project version (semver) and are published on each release.
+Both `diaz3618/argus-mcp` (Docker Hub) and `ghcr.io/diaz3618/argus-mcp` (GHCR)
+carry the same tags. All images are multi-arch (`linux/amd64`, `linux/arm64`).

@@ -1,17 +1,19 @@
 # CLI Reference
 
-Argus MCP provides three subcommands:
+Argus MCP provides five subcommands:
 
 | Command | Description |
 |---------|-------------|
 | [`argus-mcp server`](server.md) | Run the headless gateway server |
+| [`argus-mcp stop`](server.md#stop) | Stop a detached background server |
+| [`argus-mcp status`](server.md#status) | List all running detached sessions |
 | [`argus-mcp tui`](tui.md) | Launch the interactive terminal UI |
 | [`argus-mcp secret`](secret.md) | Manage encrypted secrets |
 
 ## Usage
 
 ```
-argus-mcp [-h] {server,tui,secret} ...
+argus-mcp [-h] {server,stop,status,tui,secret} ...
 ```
 
 ## Global Help

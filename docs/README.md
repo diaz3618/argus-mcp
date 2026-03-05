@@ -98,6 +98,6 @@ docs/
 
 ## Version
 
-Current version: **0.6.0**
+Current version: **0.7.0**
 
 License: GPL-3.0-only

@@ -7,29 +7,38 @@
 
 ## Installation
 
-### With uv (recommended)
+### From PyPI (recommended)
 
 ```bash
-# Clone the repository
+# uv tool install — isolated, auto-managed (recommended)
+uv tool install argus-mcp
+
+# pipx — same isolation, more established
+pipx install argus-mcp
+
+# pip — installs into current environment
+pip install argus-mcp
+```
+
+Verify:
+
+```bash
+argus-mcp --help
+```
+
+### From Source
+
+```bash
+# Clone and enter the repository
 git clone https://github.com/diaz3618/argus-mcp.git
 cd argus-mcp
 
-# Install in development mode
-uv pip install -e ".[yaml,dev]"
+# Install all runtime + dev dependencies
+uv sync --group dev
+
+# Or just runtime dependencies
+uv sync
 ```
-
-### With pip
-
-```bash
-pip install -e ".[yaml,dev]"
-```
-
-### Optional Extras
-
-| Extra | Packages | Purpose |
-|-------|----------|---------|
-| `yaml` | `pyyaml>=6.0` | YAML config file support |
-| `dev` | `black`, `mypy`, `ruff`, `textual-dev` | Development tools |
 
 ## Quick Start
 

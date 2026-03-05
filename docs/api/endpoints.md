@@ -14,7 +14,7 @@ Liveness and readiness probe. **Always public** — no token required.
 {
   "status": "healthy",
   "uptime_seconds": 3600.5,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "backends": {
     "total": 3,
     "connected": 3,
@@ -49,7 +49,7 @@ Full service status including config and transport info.
 {
   "service": {
     "name": "Argus MCP",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "state": "running",
     "uptime_seconds": 3600.5,
     "started_at": "2026-02-23T12:00:00Z"

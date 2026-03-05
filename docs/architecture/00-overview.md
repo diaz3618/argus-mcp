@@ -12,7 +12,7 @@ operational visibility — all through a single connection point.
                      │                                          │
   MCP Clients        │  ┌─────────┐   ┌───────────────────┐     │
   ─────────────────► │  │Transport│──►│  Middleware Chain │     │
-  (Claude, Cursor,   │  │ Layer   │   │                   │     │      Backend MCP Servers    
+  (Claude, Cursor,   │  │ Layer   │   │                   │     │      Backend MCP Servers
    VS Code, etc.)    │  │         │   │  Auth             │     │
                      │  │ SSE     │   │  AuthZ            │     │      ┌──────────────┐
   ◄───────────────── │  │         │   │  Telemetry        │     │  ┌──►│ stdio server │
@@ -55,6 +55,7 @@ argus_mcp/
 ├── cli.py               # Entry point: server, tui, secret subcommands
 ├── constants.py         # Shared constants
 ├── errors.py            # Base exception hierarchy
+├── sessions.py          # Named detached-session registry (stop/status)
 │
 ├── config/              # Configuration system
 │   ├── loader.py        # JSON/YAML loading, validation

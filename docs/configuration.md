@@ -178,6 +178,19 @@ feature_flags:
   container_isolation: false
 ```
 
+#### `build_if_missing`
+
+By default Argus builds the container image from its `Dockerfile` the first
+time it encounters a command whose image is not yet available locally. To
+**skip the build** and fail fast if the image is absent, set:
+
+```bash
+ARGUS_CONTAINER_BUILD_IF_MISSING=false
+```
+
+This is useful in production deployments where images should be pre-built and
+pushed to a registry, not built on demand.
+
 ### SSE Backend
 
 Connects to a remote MCP server via Server-Sent Events.
@@ -295,6 +308,48 @@ tool_overrides:
   original_tool_name:
     name: better_name
     description: "A clearer description of what this tool does"
+```
+
+### Startup Concurrency and Stagger
+
+Argus limits how many backends initialize simultaneously to prevent resource
+contention (npm/pip package cache lock fights, network saturation, CPU spikes
+on cold starts).
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `STARTUP_CONCURRENCY` | `4` | Max simultaneous backend initializations |
+| `STARTUP_STAGGER_DELAY` | `0.5 s` | Delay between launching each backend within a batch |
+
+These are tunable via environment variables for deployments with many backends:
+
+```bash
+# Allow more parallel connections on a powerful host
+ARGUS_STARTUP_CONCURRENCY=8 argus-mcp server
+
+# Increase stagger to ease network pressure
+ARGUS_STARTUP_STAGGER_DELAY=1.0 argus-mcp server
+```
+
+### Backend Retry
+
+When a backend fails to initialize, Argus retries automatically with
+exponential back-off:
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `BACKEND_RETRIES` | `3` | Number of retry attempts after initial failure |
+| `BACKEND_RETRY_DELAY` | `5.0 s` | Base delay before first retry |
+| `BACKEND_RETRY_BACKOFF` | `1.5 ×` | Multiplier applied to delay on each successive retry |
+
+Example retry schedule (defaults): 5 s → 7.5 s → 11.25 s.
+
+Tunable via environment variables:
+
+```bash
+ARGUS_BACKEND_RETRIES=5
+ARGUS_BACKEND_RETRY_DELAY=10.0
+ARGUS_BACKEND_RETRY_BACKOFF=2.0
 ```
 
 ---

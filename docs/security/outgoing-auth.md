@@ -72,6 +72,8 @@ GitHub Copilot), use the PKCE auth type. On first use Argus opens a browser
 for the user to authenticate and then caches and refreshes the token
 automatically.
 
+### Option A — Explicit endpoints
+
 ```yaml
 backends:
   semgrep:
@@ -87,11 +89,46 @@ backends:
         - profile
 ```
 
+### Option B — Auto-discovery via `issuer`
+
+Provide only the `issuer` URL; Argus discovers `authorization_endpoint` and
+`token_endpoint` automatically from the AS metadata document
+(`/.well-known/openid-configuration` or `/.well-known/oauth-authorization-server`).
+
+```yaml
+backends:
+  my-server:
+    type: streamable-http
+    url: "https://mcp.example.com/mcp"
+    auth:
+      type: pkce
+      issuer: "https://auth.example.com"
+      client_id: "${CLIENT_ID}"
+      scopes:
+        - openid
+```
+
+If the server supports **Dynamic Client Registration (DCR)**, Argus can also
+register itself automatically — set `client_id` to `dynamic`:
+
+```yaml
+    auth:
+      type: pkce
+      issuer: "https://auth.example.com"
+      client_id: dynamic
+      scopes:
+        - openid
+        - mcp:read
+```
+
+### Field Reference
+
 | Field | Required | Description |
 |-------|----------|-------------|
-| `authorization_endpoint` | Yes | OAuth 2.0 authorization URL |
-| `token_endpoint` | Yes | OAuth 2.0 token endpoint URL |
-| `client_id` | Yes | Client identifier (supports `${ENV_VAR}`) |
+| `issuer` | Conditional | Authorization server issuer URL. If provided, `authorization_endpoint` and `token_endpoint` are auto-discovered. |
+| `authorization_endpoint` | Conditional | OAuth 2.0 authorization URL. Required if `issuer` is not set. |
+| `token_endpoint` | Conditional | OAuth 2.0 token endpoint URL. Required if `issuer` is not set. |
+| `client_id` | Yes | Client identifier (supports `${ENV_VAR}`). Set to `dynamic` to use DCR. |
 | `client_secret` | No | Client secret (empty for public clients) |
 | `scopes` | No | Requested OAuth scopes (default: empty) |
 
