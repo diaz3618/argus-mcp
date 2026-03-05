@@ -1,6 +1,7 @@
 # Trivy — Scheduled container vulnerability scan
-# Runs weekly against the latest published image.
-# On-PR/push scans are handled by ci.yml's container-scan job.
+# Runs weekly against the latest *published* image on Docker Hub and GHCR.
+# This catches CVEs introduced by upstream base-image updates between releases.
+# On-PR/push scans (freshly-built image) are handled by ci.yml.
 
 name: Trivy (scheduled)
 
@@ -13,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  container-scan:
-    name: Trivy image scan (latest)
+  scan-dockerhub:
+    name: Trivy image scan (Docker Hub latest)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,20 +24,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build image from Dockerfile
-        run: docker build -t diaz3618/argus-mcp:trivy-scan .
+      - name: Pull published image (Docker Hub)
+        run: docker pull diaz3618/argus-mcp:latest
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: diaz3618/argus-mcp:trivy-scan
+          image-ref: diaz3618/argus-mcp:latest
           format: sarif
-          output: trivy-results.sarif
+          output: trivy-dockerhub.sarif
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-results.sarif
-          category: trivy-scheduled
+          sarif_file: trivy-dockerhub.sarif
+          category: trivy-scheduled-dockerhub
+
+  scan-ghcr:
+    name: Trivy image scan (GHCR latest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull published image (GHCR)
+        run: docker pull ghcr.io/diaz3618/argus-mcp:latest
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/diaz3618/argus-mcp:latest
+          format: sarif
+          output: trivy-ghcr.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-ghcr.sarif
+          category: trivy-scheduled-ghcr
