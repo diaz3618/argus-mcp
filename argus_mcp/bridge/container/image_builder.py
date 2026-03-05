@@ -85,6 +85,8 @@ async def ensure_image(
     args: List[str],
     env: Optional[Dict[str, str]],
     container_runtime: str,
+    *,
+    build_if_missing: bool = True,
 ) -> Tuple[Optional[str], str, List[str]]:
     """Ensure an OCI image exists for the backend and return build info.
 
@@ -100,6 +102,11 @@ async def ensure_image(
         Backend environment variables (may contain build-relevant values).
     container_runtime:
         ``"docker"`` or ``"podman"``.
+    build_if_missing:
+        If ``False``, only return a cached image — never trigger a build.
+        This is used during server startup to avoid blocking on lengthy
+        first-run image builds.  Run ``argus-mcp build`` to pre-build
+        images offline.
 
     Returns
     -------
@@ -113,9 +120,15 @@ async def ensure_image(
         return None, command, list(args)
 
     if transport == "uvx":
-        return await _ensure_uvx_image(svr_name, args, env, container_runtime)
+        return await _ensure_uvx_image(
+            svr_name, args, env, container_runtime,
+            build_if_missing=build_if_missing,
+        )
     elif transport == "npx":
-        return await _ensure_npx_image(svr_name, args, env, container_runtime)
+        return await _ensure_npx_image(
+            svr_name, args, env, container_runtime,
+            build_if_missing=build_if_missing,
+        )
 
     return None, command, list(args)
 
@@ -125,6 +138,8 @@ async def _ensure_uvx_image(
     args: List[str],
     env: Optional[Dict[str, str]],
     container_runtime: str,
+    *,
+    build_if_missing: bool = True,
 ) -> Tuple[Optional[str], str, List[str]]:
     """Build (or reuse) a uvx image."""
     package, binary, runtime_args = parse_uvx_args(args)
@@ -139,6 +154,15 @@ async def _ensure_uvx_image(
             svr_name, image_tag, package,
         )
         return image_tag, binary, runtime_args
+
+    if not build_if_missing:
+        logger.info(
+            "[%s] Image '%s' not cached for uvx package '%s'. "
+            "Skipping build — running as bare subprocess. "
+            "Run 'argus-mcp build' to pre-build container images.",
+            svr_name, image_tag, package,
+        )
+        return None, "uvx", list(args)
 
     # Build the image
     logger.info(
@@ -162,6 +186,8 @@ async def _ensure_npx_image(
     args: List[str],
     env: Optional[Dict[str, str]],
     container_runtime: str,
+    *,
+    build_if_missing: bool = True,
 ) -> Tuple[Optional[str], str, List[str]]:
     """Build (or reuse) an npx image."""
     package, runtime_args = parse_npx_args(args)
@@ -176,6 +202,15 @@ async def _ensure_npx_image(
             svr_name, image_tag, package,
         )
         return image_tag, package, runtime_args
+
+    if not build_if_missing:
+        logger.info(
+            "[%s] Image '%s' not cached for npx package '%s'. "
+            "Skipping build — running as bare subprocess. "
+            "Run 'argus-mcp build' to pre-build container images.",
+            svr_name, image_tag, package,
+        )
+        return None, "npx", list(args)
 
     # Build the image
     logger.info(

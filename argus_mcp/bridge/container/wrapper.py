@@ -52,6 +52,7 @@ async def wrap_backend(
     cpus: Optional[str] = None,
     volumes: Optional[List[str]] = None,
     extra_args: Optional[List[str]] = None,
+    build_if_missing: bool = True,
 ) -> Tuple[StdioServerParameters, bool]:
     """Wrap a stdio backend in a container if possible.
 
@@ -76,6 +77,11 @@ async def wrap_backend(
         Extra volume mounts (``["host:container[:ro]"]``).
     extra_args:
         Additional raw arguments for ``docker run``.
+    build_if_missing:
+        If ``False``, only use cached images — never trigger a build.
+        When no cached image exists, falls back to bare subprocess.
+        This is used during server startup to avoid blocking on lengthy
+        first-run image builds.  Run ``argus-mcp build`` to pre-build.
 
     Returns
     -------
@@ -148,6 +154,7 @@ async def wrap_backend(
         args_list,
         params.env,
         container_runtime,
+        build_if_missing=build_if_missing,
     )
 
     if image_tag is None:
