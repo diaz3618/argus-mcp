@@ -403,10 +403,14 @@ async def _build_from_string(
     with tempfile.TemporaryDirectory(prefix="argus_build_") as tmpdir:
         df_path = await asyncio.to_thread(_write_dockerfile, tmpdir, dockerfile_content)
 
-        return await crt.build_image(
-            container_runtime,
-            tmpdir,
-            image_tag,
-            dockerfile=df_path,
-            line_callback=line_callback,
-        )
+        try:
+            return await crt.build_image(
+                container_runtime,
+                tmpdir,
+                image_tag,
+                dockerfile=df_path,
+                line_callback=line_callback,
+            )
+        except asyncio.CancelledError:
+            logger.info("Image build for '%s' was cancelled.", image_tag)
+            raise

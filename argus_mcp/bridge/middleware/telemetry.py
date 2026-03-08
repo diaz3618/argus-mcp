@@ -39,7 +39,7 @@ class TelemetryMiddleware:
             try:
                 result = await next_handler(ctx)
                 return result
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 success = False
                 span.record_exception(exc)
                 raise

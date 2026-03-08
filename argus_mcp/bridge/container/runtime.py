@@ -34,6 +34,7 @@ import enum
 import logging
 import os
 import shutil
+import subprocess
 from typing import Callable, ClassVar, List, Optional, Type
 
 logger = logging.getLogger(__name__)
@@ -190,10 +191,10 @@ class DockerRuntime(ContainerRuntime):
             )
             try:
                 proc.kill()
-            except Exception:
+            except (ProcessLookupError, OSError):
                 logger.debug("Container cleanup operation failed", exc_info=True)
             self._healthy = False
-        except Exception as exc:
+        except (OSError, subprocess.SubprocessError) as exc:
             logger.warning(
                 "Container runtime '%s' health check failed: %s.",
                 self._binary,
@@ -214,7 +215,8 @@ class DockerRuntime(ContainerRuntime):
             )
             rc = await proc.wait()
             return rc == 0
-        except Exception:
+        except (OSError, FileNotFoundError) as exc:
+            logger.debug("image_exists check failed for '%s': %s", image_tag, exc)
             return False
 
     async def build_image(
@@ -271,7 +273,7 @@ class DockerRuntime(ContainerRuntime):
                     return False
             logger.info("Image '%s' built successfully.", image_tag)
             return True
-        except Exception as exc:
+        except (OSError, asyncio.TimeoutError) as exc:
             logger.error("Error building image '%s': %s", image_tag, exc)
             return False
 
@@ -294,7 +296,7 @@ class DockerRuntime(ContainerRuntime):
                 )
                 return False
             return True
-        except Exception as exc:
+        except (OSError, asyncio.TimeoutError) as exc:
             logger.error("Error pulling image '%s': %s", image, exc)
             return False
 
@@ -309,7 +311,7 @@ class DockerRuntime(ContainerRuntime):
                 stderr=asyncio.subprocess.DEVNULL,
             )
             await proc.wait()
-        except Exception:
+        except OSError:
             logger.debug("Container cleanup operation failed", exc_info=True)
 
     async def create_network(
@@ -331,7 +333,7 @@ class DockerRuntime(ContainerRuntime):
             rc = await proc.wait()
             if rc == 0:
                 return True
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             logger.debug("Container cleanup operation failed", exc_info=True)
 
         cmd: List[str] = [self._binary, "network", "create"]
@@ -355,7 +357,7 @@ class DockerRuntime(ContainerRuntime):
                 return False
             logger.info("Created container network '%s'.", network_name)
             return True
-        except Exception as exc:
+        except (OSError, subprocess.SubprocessError) as exc:
             logger.error(
                 "Error creating network '%s': %s",
                 network_name,
@@ -374,7 +376,7 @@ class DockerRuntime(ContainerRuntime):
                 stderr=asyncio.subprocess.DEVNULL,
             )
             await proc.wait()
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Container cleanup operation failed", exc_info=True)
 
     async def list_images(self, prefix: str = "") -> List[str]:
@@ -397,7 +399,8 @@ class DockerRuntime(ContainerRuntime):
                 return []
             lines = stdout.decode(errors="replace").strip().splitlines()
             return [ln.strip() for ln in lines if ln.strip() and ln.strip() != "<none>:<none>"]
-        except Exception:
+        except (OSError, FileNotFoundError) as exc:
+            logger.debug("list_images failed: %s", exc)
             return []
 
 
@@ -452,7 +455,7 @@ class KubernetesRuntime(ContainerRuntime):
                 v1.get_api_resources,
             )
             self._healthy = True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Kubernetes runtime health check failed: %s. Falling back to Docker.",
                 exc,

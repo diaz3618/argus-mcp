@@ -171,6 +171,12 @@ class ReconnectResponse(BaseModel):
 # ── /manage/v1/shutdown (POST) ──────────────────────────────────────────
 
 
+class ShutdownRequest(BaseModel):
+    """Request body for ``POST /manage/v1/shutdown``."""
+
+    timeout_seconds: int = 30
+
+
 class ShutdownResponse(BaseModel):
     shutting_down: bool = True
 

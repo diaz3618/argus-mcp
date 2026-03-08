@@ -103,8 +103,7 @@ class FirstWinsStrategy(ConflictStrategy):
         new_server: str,
     ) -> ConflictAction:
         logger.warning(
-            "Conflict: '%s' already registered by '%s'; "
-            "duplicate from '%s' ignored (first-wins).",
+            "Conflict: '%s' already registered by '%s'; duplicate from '%s' ignored (first-wins).",
             exposed_name,
             existing_server,
             new_server,
@@ -179,7 +178,7 @@ class PriorityStrategy(ConflictStrategy):
         if new_pri < existing_pri:
             # New server has higher priority — replace.
             logger.info(
-                "Conflict: '%s' — server '%s' (priority %d) replaces " "'%s' (priority %d).",
+                "Conflict: '%s' — server '%s' (priority %d) replaces '%s' (priority %d).",
                 exposed_name,
                 new_server,
                 new_pri,
@@ -191,7 +190,7 @@ class PriorityStrategy(ConflictStrategy):
         # Existing wins; rename the new one with a prefix.
         prefixed = f"{new_server}{self.separator}{exposed_name}"
         logger.info(
-            "Conflict: '%s' won by '%s' (priority %d); " "'%s' renamed to '%s'.",
+            "Conflict: '%s' won by '%s' (priority %d); '%s' renamed to '%s'.",
             exposed_name,
             existing_server,
             existing_pri,
@@ -252,7 +251,7 @@ def create_strategy(
     """
     if strategy not in VALID_STRATEGIES:
         raise ValueError(
-            f"Unknown conflict strategy '{strategy}'. " f"Valid options: {sorted(VALID_STRATEGIES)}"
+            f"Unknown conflict strategy '{strategy}'. Valid options: {sorted(VALID_STRATEGIES)}"
         )
 
     if strategy == "first-wins":

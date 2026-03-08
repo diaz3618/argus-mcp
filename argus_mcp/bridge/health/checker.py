@@ -52,7 +52,7 @@ class BackendHealth:
         self.last_latency_ms: float = 0.0
         self.last_error: Optional[str] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "state": self.state.value,
             "circuit": self.circuit.to_dict(),
@@ -214,7 +214,7 @@ class HealthChecker:
             else:
                 health.state = HealthState.HEALTHY
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             health.last_error = f"{type(exc).__name__}: {exc}"
             health.circuit.record_failure()
             if health.circuit.state == CircuitState.OPEN:
@@ -313,5 +313,5 @@ class HealthChecker:
         if old != new and self._on_state_change is not None:
             try:
                 self._on_state_change(name, old, new)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("[%s] on_state_change callback error", name, exc_info=True)

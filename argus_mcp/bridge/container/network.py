@@ -62,7 +62,7 @@ async def ensure_managed_network(
     """
     try:
         return await runtime.create_network(network_name)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning(
             "Failed to create managed network '%s'.",
             network_name,

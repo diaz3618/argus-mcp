@@ -150,7 +150,7 @@ class WorkflowExecutor:
                     output=output,
                     duration_ms=duration,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 last_error = str(exc)
                 duration = (time.monotonic() - start) * 1000
                 logger.warning(
@@ -198,7 +198,7 @@ class WorkflowExecutor:
                 return resolved
 
         # Partial interpolation within a larger string
-        def _replacer(m: re.Match) -> str:
+        def _replacer(m: re.Match[str]) -> str:
             resolved = self._resolve_ref(m.group(1), m.group(2), context)
             return str(resolved) if resolved is not None else m.group(0)
 

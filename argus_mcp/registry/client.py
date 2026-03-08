@@ -87,7 +87,7 @@ class RegistryClient:
             if self._cache and not cursor:
                 self._cache.put(self._base_url, page.servers)
             return page
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Registry request failed (%s), falling back to cache: %s",
                 self._base_url,
@@ -102,7 +102,7 @@ class RegistryClient:
             resp = await client.get(f"/v0/servers/{name}")
             resp.raise_for_status()
             return ServerEntry.from_dict(resp.json())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Registry get_server(%s) failed: %s", name, exc)
             return self._fallback_server(name)
 
@@ -126,7 +126,7 @@ class RegistryClient:
             resp.raise_for_status()
             page = ServerPage.from_dict(resp.json())
             return page.servers
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Fallback: filter cached entries
             cached = self._fallback_page().servers
             q = query.lower()

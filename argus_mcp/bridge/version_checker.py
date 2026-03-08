@@ -163,7 +163,7 @@ class VersionChecker:
             server = await self._registry.get_server(name)
             if server and hasattr(server, "version"):
                 return server.version or None
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.debug("Registry lookup failed for '%s': %s", name, exc)
 
         return None

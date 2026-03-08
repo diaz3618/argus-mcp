@@ -69,7 +69,7 @@ def _read_config_file(cfg_fpath: str) -> Dict[str, Any]:
     try:
         with open(cfg_fpath, "r", encoding="utf-8") as f:
             raw_data = yaml.safe_load(f)
-    except Exception as exc:
+    except (OSError, yaml.YAMLError) as exc:
         raise ConfigurationError(f"Error reading configuration file: {cfg_fpath}\n  {exc}") from exc
 
     if not isinstance(raw_data, dict):
@@ -181,7 +181,7 @@ def _maybe_resolve_secrets(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     )
     try:
         return resolve_secrets(raw_data, store, strict=strict)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         raise ConfigurationError(f"Secret resolution failed: {exc}") from exc
 
 

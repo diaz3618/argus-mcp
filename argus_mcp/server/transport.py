@@ -60,13 +60,12 @@ async def handle_sse(request: Request) -> None:
                 srv_caps = mcp_server.get_capabilities(NotificationOptions(), {})
             else:
                 logger.warning(
-                    "mcp_server.registry is unset; SSE initialization "
-                    "will use empty capabilities."
+                    "mcp_server.registry is unset; SSE initialization will use empty capabilities."
                 )
             logger.debug("Server capabilities for SSE connection: %s", srv_caps)
-        except Exception as e_caps:
+        except Exception as e_caps:  # noqa: BLE001
             logger.exception(
-                "Error getting mcp_server.get_capabilities " "for SSE connection: %s",
+                "Error getting mcp_server.get_capabilities for SSE connection: %s",
                 e_caps,
             )
             srv_caps = {}
@@ -77,7 +76,7 @@ async def handle_sse(request: Request) -> None:
             capabilities=srv_caps,
         )
         logger.debug(
-            "Running mcp_server.run (MCP main loop) for SSE connection " "with options: %s",
+            "Running mcp_server.run (MCP main loop) for SSE connection with options: %s",
             init_opts,
         )
         await mcp_server.run(read_stream, write_stream, init_opts)

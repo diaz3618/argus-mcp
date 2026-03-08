@@ -15,9 +15,10 @@ import os
 import signal
 import subprocess
 import sys
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import uvicorn
+import yaml
 
 from argus_mcp.config.loader import find_config_file as _find_config_file
 from argus_mcp.constants import (
@@ -27,6 +28,10 @@ from argus_mcp.constants import (
     SERVER_VERSION,
 )
 from argus_mcp.display.logging_config import setup_logging
+
+if TYPE_CHECKING:
+    from argus_mcp.tui.client_config import ClientConfig
+    from argus_mcp.tui.server_manager import ServerManager
 
 module_logger = logging.getLogger(__name__)
 
@@ -66,8 +71,8 @@ async def _run_server(
         config_path = os.environ.get("ARGUS_CONFIG")
     if config_path is None:
         config_path = _find_config_file()
-    cfg_abs_path = os.path.abspath(config_path)
-    module_logger.info("Configuration file path resolved to: %s", cfg_abs_path)
+    resolved_config_path = os.path.abspath(config_path)
+    module_logger.info("Configuration file path resolved to: %s", resolved_config_path)
 
     # Import app here to avoid circular imports at module level
     from argus_mcp.server.app import app
@@ -77,16 +82,16 @@ async def _run_server(
     app_state.port = port
     app_state.actual_log_file = log_fpath
     app_state.file_log_level_configured = cfg_log_lvl
-    app_state.config_file_path = cfg_abs_path
+    app_state.config_file_path = resolved_config_path
     app_state.verbosity = verbosity
 
     # Read transport type from config so display/management can use it.
     try:
         from argus_mcp.config.loader import load_argus_config
 
-        _argus_cfg = load_argus_config(cfg_abs_path)
+        _argus_cfg = load_argus_config(resolved_config_path)
         app_state.transport_type = _argus_cfg.server.transport
-    except Exception:
+    except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
         app_state.transport_type = "streamable-http"
         module_logger.debug(
             "Transport type detection failed, defaulting to streamable-http", exc_info=True
@@ -112,8 +117,8 @@ async def _run_server(
     _probe = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
     try:
         _probe.bind((host, port))
-    except OSError as e_bind:
-        module_logger.error("Port %s on %s is already in use: %s", port, host, e_bind)
+    except OSError as exc:
+        module_logger.error("Port %s on %s is already in use: %s", port, host, exc)
         print(
             f"\n❌ Error: Port {port} on {host} is already in use.\n"
             f"   Release the port or choose a different one with --port.\n"
@@ -125,10 +130,10 @@ async def _run_server(
     module_logger.info("Preparing to start Uvicorn server: http://%s:%s", host, port)
     try:
         await uvicorn_svr_inst.serve()
-    except (KeyboardInterrupt, SystemExit) as e_exit:
-        module_logger.info("Server stopped due to '%s'.", type(e_exit).__name__)
-    except Exception as e_serve:
-        module_logger.exception("Unexpected error while running Uvicorn server: %s", e_serve)
+    except (KeyboardInterrupt, SystemExit) as exc:
+        module_logger.info("Server stopped due to '%s'.", type(exc).__name__)
+    except Exception as exc:  # noqa: BLE001
+        module_logger.exception("Unexpected error while running Uvicorn server: %s", exc)
         raise
     finally:
         module_logger.info("%s has shut down or is shutting down.", SERVER_NAME)
@@ -312,24 +317,24 @@ def _cmd_server(args: argparse.Namespace) -> None:
         )
     except KeyboardInterrupt:
         module_logger.info("%s main program interrupted by KeyboardInterrupt.", SERVER_NAME)
-    except SystemExit as e_sys_exit:
-        if e_sys_exit.code is None or e_sys_exit.code == 0:
+    except SystemExit as exc:
+        if exc.code is None or exc.code == 0:
             module_logger.info(
                 "%s main program exited normally (code: %s).",
                 SERVER_NAME,
-                e_sys_exit.code,
+                exc.code,
             )
         else:
             module_logger.error(
                 "%s main program exited with SystemExit (code: %s).",
                 SERVER_NAME,
-                e_sys_exit.code,
+                exc.code,
             )
-    except Exception as e_fatal:
+    except Exception as exc:  # noqa: BLE001
         module_logger.exception(
             "%s main program encountered an uncaught fatal error: %s",
             SERVER_NAME,
-            e_fatal,
+            exc,
         )
         sys.exit(1)
     finally:
@@ -340,65 +345,38 @@ def _cmd_server(args: argparse.Namespace) -> None:
 # ── ``argus-mcp stop`` ────────────────────────────────────────────────
 
 
-def _cmd_stop(args: argparse.Namespace) -> None:
-    """Entry-point for ``argus-mcp stop [NAME]``."""
-    from argus_mcp.sessions import find_session, list_sessions, stop_session
+def _cleanup_pid_file() -> None:
+    """Remove the legacy PID file, ignoring missing files."""
+    try:
+        os.unlink(_PID_FILE)
+    except FileNotFoundError:
+        pass
 
-    session_name: Optional[str] = getattr(args, "session_name", None)
 
-    if session_name:
-        # Stop a specific named session
-        from argus_mcp.sessions import load_session
+def _stop_named_session(session_name: str) -> None:
+    """Stop a specific named session by *session_name*."""
+    from argus_mcp.sessions import load_session, remove_session, stop_session
 
-        info = load_session(session_name)
-        if info is None:
-            print(f"No session named '{session_name}' found.", file=sys.stderr)
-            sys.exit(1)
-        if not info.is_alive():
-            print(f"Session '{session_name}' (PID {info.pid}) is not running (stale). Cleaning up.")
-            from argus_mcp.sessions import remove_session
-
-            remove_session(session_name)
-            return
-
-        print(f"Sending SIGTERM to '{session_name}' (PID {info.pid})…")
-        if stop_session(info):
-            print(f"Session '{session_name}' stopped.")
-        else:
-            print(f"Session '{session_name}' did not exit cleanly.", file=sys.stderr)
-            sys.exit(1)
-        # Also clean legacy PID file
-        try:
-            os.unlink(_PID_FILE)
-        except FileNotFoundError:
-            pass
-        return
-
-    # No name given — try to find the only running session
-    info = find_session()
-    if info is not None:
-        print(f"Sending SIGTERM to '{info.name}' (PID {info.pid})…")
-        if stop_session(info):
-            print(f"Session '{info.name}' stopped.")
-        else:
-            print(f"Session '{info.name}' did not exit cleanly.", file=sys.stderr)
-            sys.exit(1)
-        try:
-            os.unlink(_PID_FILE)
-        except FileNotFoundError:
-            pass
-        return
-
-    # Multiple sessions running
-    alive = list_sessions()
-    if len(alive) > 1:
-        print("Multiple sessions running. Specify which one to stop:", file=sys.stderr)
-        for s in alive:
-            print(f"  {s.name:20s}  PID {s.pid:>6d}  port {s.port}", file=sys.stderr)
-        print("\nUsage: argus-mcp stop <name>", file=sys.stderr)
+    info = load_session(session_name)
+    if info is None:
+        print(f"No session named '{session_name}' found.", file=sys.stderr)
         sys.exit(1)
+    if not info.is_alive():
+        print(f"Session '{session_name}' (PID {info.pid}) is not running (stale). Cleaning up.")
+        remove_session(session_name)
+        return
 
-    # Fall back to legacy PID file
+    print(f"Sending SIGTERM to '{session_name}' (PID {info.pid})…")
+    if stop_session(info):
+        print(f"Session '{session_name}' stopped.")
+    else:
+        print(f"Session '{session_name}' did not exit cleanly.", file=sys.stderr)
+        sys.exit(1)
+    _cleanup_pid_file()
+
+
+def _stop_legacy_pid() -> None:
+    """Stop a server process tracked only via a legacy PID file."""
     try:
         with open(_PID_FILE) as f:
             pid = int(f.read().strip())
@@ -413,10 +391,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
         os.kill(pid, 0)
     except ProcessLookupError:
         print(f"Server process {pid} is not running (stale PID file). Cleaning up.")
-        try:
-            os.unlink(_PID_FILE)
-        except OSError:
-            pass
+        _cleanup_pid_file()
         return
     except PermissionError:
         pass
@@ -443,11 +418,43 @@ def _cmd_stop(args: argparse.Namespace) -> None:
         except OSError:
             pass
 
-    try:
-        os.unlink(_PID_FILE)
-    except FileNotFoundError:
-        pass
+    _cleanup_pid_file()
     print("Server stopped.")
+
+
+def _cmd_stop(args: argparse.Namespace) -> None:
+    """Entry-point for ``argus-mcp stop [NAME]``."""
+    from argus_mcp.sessions import find_session, list_sessions, stop_session
+
+    session_name: Optional[str] = getattr(args, "session_name", None)
+
+    if session_name:
+        _stop_named_session(session_name)
+        return
+
+    # No name given — try to find the only running session
+    info = find_session()
+    if info is not None:
+        print(f"Sending SIGTERM to '{info.name}' (PID {info.pid})…")
+        if stop_session(info):
+            print(f"Session '{info.name}' stopped.")
+        else:
+            print(f"Session '{info.name}' did not exit cleanly.", file=sys.stderr)
+            sys.exit(1)
+        _cleanup_pid_file()
+        return
+
+    # Multiple sessions running
+    alive = list_sessions()
+    if len(alive) > 1:
+        print("Multiple sessions running. Specify which one to stop:", file=sys.stderr)
+        for s in alive:
+            print(f"  {s.name:20s}  PID {s.pid:>6d}  port {s.port}", file=sys.stderr)
+        print("\nUsage: argus-mcp stop <name>", file=sys.stderr)
+        sys.exit(1)
+
+    # Fall back to legacy PID file
+    _stop_legacy_pid()
 
 
 # ── ``argus-mcp status`` ──────────────────────────────────────────────
@@ -482,67 +489,79 @@ def _cmd_status(_args: argparse.Namespace) -> None:
 # ── ``argus-mcp tui`` ────────────────────────────────────────────────
 
 
-def _cmd_tui(args: argparse.Namespace) -> None:
-    """Entry-point for ``argus-mcp tui``.
+def _load_client_config(
+    args: argparse.Namespace,
+) -> tuple["ClientConfig", Optional[str]]:
+    """Load the client YAML config and resolve the config path.
 
-    CLI flags take precedence.  When a flag is not supplied the
-    ``client:`` section of the loaded config file is consulted.  Env
-    vars (``ARGUS_MGMT_TOKEN``, ``ARGUS_TUI_SERVER``) still
-    work as a middle layer.
+    Returns ``(client_cfg, config_path)``.
     """
-    # ── Load client config from YAML (lowest priority) ───────────
     from argus_mcp.config.schema import ClientConfig
 
     client_cfg = ClientConfig()  # safe defaults
-    cfg_path = getattr(args, "config", None) or os.environ.get("ARGUS_CONFIG")
-    if cfg_path is None:
-        cfg_path = _find_config_file()
-    if cfg_path and os.path.isfile(cfg_path):
+    config_path = getattr(args, "config", None) or os.environ.get("ARGUS_CONFIG")
+    if config_path is None:
+        config_path = _find_config_file()
+    if config_path and os.path.isfile(config_path):
         try:
             from argus_mcp.config.loader import load_argus_config
 
-            client_cfg = load_argus_config(cfg_path).client
-        except Exception:
+            client_cfg = load_argus_config(config_path).client
+        except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
             module_logger.debug("Client config load failed, using defaults", exc_info=True)
+    return client_cfg, config_path
 
-    # CLI flag → env var → config.yaml → default
-    token: Optional[str] = args.token or os.environ.get("ARGUS_MGMT_TOKEN") or client_cfg.token
+
+def _resolve_tui_server_url(args: argparse.Namespace, client_cfg: "ClientConfig") -> str:
+    """Determine the TUI server URL from CLI → env → config → default."""
+    from argus_mcp.tui.app import _normalise_server_url
+
+    default_url_str = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
+    raw_server: str = args.server
+    if raw_server == default_url_str:
+        raw_server = os.environ.get("ARGUS_TUI_SERVER") or client_cfg.server_url or default_url_str
+    return _normalise_server_url(raw_server) or raw_server
+
+
+def _build_tui_server_manager(
+    args: argparse.Namespace,
+    client_cfg: "ClientConfig",
+    clean_server: str,
+    token: Optional[str],
+) -> "ServerManager":
+    """Build the :class:`ServerManager` for TUI mode."""
+    from argus_mcp.tui.server_manager import ServerManager
+
     servers_config: Optional[str] = (
         getattr(args, "servers_config", None) or client_cfg.servers_config
     )
+    if servers_config:
+        return ServerManager.from_config(config_path=servers_config)
+    mgr = ServerManager.from_config()
+    if mgr.count == 0:
+        mgr.add("default", clean_server, token, set_active=True)
+    return mgr
+
+
+def _cmd_tui(args: argparse.Namespace) -> None:
+    """Entry-point for ``argus-mcp tui``."""
+    client_cfg, _ = _load_client_config(args)
+
+    token: Optional[str] = args.token or os.environ.get("ARGUS_MGMT_TOKEN") or client_cfg.token
 
     _saved_termios = None
     try:
         import termios
 
         _saved_termios = termios.tcgetattr(sys.stdin.fileno())
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass  # stdin may not be a real terminal
 
     try:
-        from argus_mcp.tui.app import ArgusApp, _normalise_server_url
-        from argus_mcp.tui.server_manager import ServerManager
+        from argus_mcp.tui.app import ArgusApp
 
-        # Normalise the --server URL (strip /mcp, /sse suffixes)
-        # CLI flag → env var → config.yaml → default
-        default_url_str = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
-        raw_server: str = args.server
-        if raw_server == default_url_str:
-            # Flag was not explicitly provided — check env / config
-            raw_server = (
-                os.environ.get("ARGUS_TUI_SERVER") or client_cfg.server_url or default_url_str
-            )
-        clean_server: str = _normalise_server_url(raw_server) or raw_server
-
-        # Build the ServerManager
-        if servers_config:
-            # Multi-server mode from explicit config file
-            mgr = ServerManager.from_config(config_path=servers_config)
-        else:
-            # Try loading from default servers.json; if empty, use --server flag
-            mgr = ServerManager.from_config()
-            if mgr.count == 0:
-                mgr.add("default", clean_server, token, set_active=True)
+        clean_server = _resolve_tui_server_url(args, client_cfg)
+        mgr = _build_tui_server_manager(args, client_cfg, clean_server, token)
 
         tui_app = ArgusApp(
             server_url=clean_server if mgr.count <= 1 else None,
@@ -550,19 +569,17 @@ def _cmd_tui(args: argparse.Namespace) -> None:
             server_manager=mgr,
         )
         tui_app.run()
-    except ImportError as e_imp:
+    except ImportError as exc:
         print(
             f"Error: Textual is required for TUI mode but could not be "
-            f"imported ({e_imp}). Install with:  pip install textual",
+            f"imported ({exc}). Install with:  pip install textual",
             file=sys.stderr,
         )
         sys.exit(1)
     except KeyboardInterrupt:
         module_logger.info("%s TUI interrupted by KeyboardInterrupt.", SERVER_NAME)
-    except Exception as e_fatal:
-        module_logger.exception(
-            "%s TUI encountered an uncaught fatal error: %s", SERVER_NAME, e_fatal
-        )
+    except Exception as exc:  # noqa: BLE001
+        module_logger.exception("%s TUI encountered an uncaught fatal error: %s", SERVER_NAME, exc)
         sys.exit(1)
     finally:
         _restore_terminal(_saved_termios)
@@ -590,7 +607,7 @@ def _restore_terminal(saved_termios: object | None) -> None:
 
             fd = sys.stdin.fileno()
             termios.tcsetattr(fd, termios.TCSANOW, saved_termios)  # type: ignore[arg-type]
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     import subprocess as _sp
@@ -603,7 +620,7 @@ def _restore_terminal(saved_termios: object | None) -> None:
             stderr=_sp.DEVNULL,
             timeout=2,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     try:
@@ -613,12 +630,12 @@ def _restore_terminal(saved_termios: object | None) -> None:
         attrs = termios.tcgetattr(fd)
         attrs[3] |= termios.ECHO | termios.ICANON
         termios.tcsetattr(fd, termios.TCSANOW, attrs)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     try:
         print()
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -701,7 +718,7 @@ def _cmd_build(args: argparse.Namespace) -> None:
                 else:
                     print("skipped (not wrappable or disabled)")
                     skip += 1
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 print(f"FAILED ({exc})")
                 log.error("[%s] Build failed: %s", name, exc, exc_info=True)
                 fail += 1
@@ -721,7 +738,7 @@ def _cmd_secret(args: argparse.Namespace) -> None:
     from argus_mcp.secrets.store import SecretStore
 
     provider = getattr(args, "provider", "file")
-    store_kwargs: dict = {}
+    store_kwargs: dict[str, str] = {}
     if provider == "file":
         path = getattr(args, "path", None) or "secrets.enc"
         store_kwargs["path"] = path

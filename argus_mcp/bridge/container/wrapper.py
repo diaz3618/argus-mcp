@@ -425,7 +425,7 @@ async def cleanup_container(svr_name: str) -> None:
             stderr=asyncio.subprocess.DEVNULL,
         )
         await asyncio.wait_for(proc.wait(), timeout=10.0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug(
             "[%s] Failed to cleanup container %s (may already be removed)",
             svr_name,

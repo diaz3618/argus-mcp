@@ -56,6 +56,113 @@ class CapabilityRegistry:
             len(self._rename_maps),
         )
 
+    def _parse_list_result(
+        self,
+        svr_name: str,
+        list_method_name: str,
+        cap_type: str,
+        list_result: Any,
+    ) -> List[Any]:
+        """Extract capability items from a list method response."""
+        if hasattr(list_result, cap_type) and isinstance(getattr(list_result, cap_type), list):
+            items: List[Any] = getattr(list_result, cap_type)
+            return items
+        if isinstance(list_result, list):
+            return list_result
+        if list_result is None:
+            logger.info(
+                "[%s] %s() returned None, treating as no %s.",
+                svr_name,
+                list_method_name,
+                cap_type,
+            )
+            return []
+        logger.warning(
+            "[%s] %s() returned unknown type %s; unable to parse %s list. Raw value: %r",
+            svr_name,
+            list_method_name,
+            type(list_result),
+            cap_type,
+            list_result,
+        )
+        return []
+
+    def _apply_filter_and_rename(
+        self,
+        svr_name: str,
+        cap_type: str,
+        cap_item: Union[mcp_types.Tool, mcp_types.Resource, mcp_types.Prompt],
+    ) -> Optional[tuple[str, Union[mcp_types.Tool, mcp_types.Resource, mcp_types.Prompt]]]:
+        """Apply filter and rename rules. Returns (orig_name, updated_item) or None if filtered."""
+        # Apply per-server filter (deny > allow > pass-through).
+        svr_filters = self._filters.get(svr_name, {})
+        cap_filter = svr_filters.get(cap_type)
+        if cap_filter and not cap_filter.is_allowed(cap_item.name):
+            logger.debug(
+                "[%s] %s '%s' filtered out by deny/allow rules.",
+                svr_name,
+                cap_type[:-1],
+                cap_item.name,
+            )
+            return None
+
+        # Apply per-server rename / description override (tools only).
+        orig_name = cap_item.name
+        rename_map = self._rename_maps.get(svr_name)
+        if rename_map and cap_type == "tools":
+            new_name = rename_map.get_new_name(cap_item.name)
+            desc_override = rename_map.get_description_override(cap_item.name)
+            updates: Dict[str, Any] = {}
+            if new_name != cap_item.name:
+                updates["name"] = new_name
+                logger.debug("[%s] Renamed tool '%s' -> '%s'.", svr_name, cap_item.name, new_name)
+            if desc_override is not None:
+                updates["description"] = desc_override
+            if updates:
+                cap_item = cap_item.model_copy(update=updates)
+
+        return orig_name, cap_item
+
+    def _resolve_conflict(
+        self,
+        svr_name: str,
+        cap_type: str,
+        exp_cap_name: str,
+        agg_list: List[Any],
+    ) -> Optional[str]:
+        """Handle name collision. Returns final exposed name, or None to skip."""
+        if exp_cap_name not in self._route_map:
+            return exp_cap_name
+
+        exist_svr_name, _ = self._route_map[exp_cap_name]
+        if exist_svr_name == svr_name:
+            logger.warning(
+                "[%s] Duplicate %s provided multiple times: '%s'. Only the first instance is registered.",
+                svr_name,
+                cap_type[:-1],
+                exp_cap_name,
+            )
+            return None
+
+        action = self._strategy.handle_conflict(exp_cap_name, exist_svr_name, svr_name)
+
+        if action.action == ConflictAction.SKIP:
+            return None
+        if action.action == ConflictAction.REPLACE:
+            agg_list[:] = [item for item in agg_list if getattr(item, "name", None) != exp_cap_name]
+            del self._route_map[exp_cap_name]
+            return exp_cap_name
+        if action.action == ConflictAction.RENAME:
+            new_name = action.new_name
+            if new_name in self._route_map:
+                logger.warning(
+                    "[%s] Renamed name '%s' also conflicts; skipping.", svr_name, new_name
+                )
+                return None
+            return new_name
+        # ConflictAction.ERROR — strategy already raised; fallback.
+        return None
+
     async def _discover_caps_by_type(
         self,
         svr_name: str,
@@ -75,46 +182,11 @@ class CapabilityRegistry:
         try:
             list_method = getattr(session, list_method_name)
             timeout = self._cap_fetch_timeouts.get(svr_name, CAP_FETCH_TIMEOUT)
-            logger.debug(
-                "[%s] Requesting %s list (timeout %ss)...",
-                svr_name,
-                cap_type,
-                timeout,
-            )
+            logger.debug("[%s] Requesting %s list (timeout %ss)...", svr_name, cap_type, timeout)
 
             list_result = await asyncio.wait_for(list_method(), timeout=timeout)
-
-            orig_caps: List[Any] = []
-
-            if hasattr(list_result, cap_type) and isinstance(getattr(list_result, cap_type), list):
-                orig_caps = getattr(list_result, cap_type)
-            elif isinstance(list_result, list):
-                orig_caps = list_result
-            elif list_result is None:
-                logger.info(
-                    "[%s] %s() returned None, treating as no %s.",
-                    svr_name,
-                    list_method_name,
-                    cap_type,
-                )
-                orig_caps = []
-            else:
-                logger.warning(
-                    "[%s] %s() returned unknown type %s; " "unable to parse %s list. Raw value: %r",
-                    svr_name,
-                    list_method_name,
-                    type(list_result),
-                    cap_type,
-                    list_result,
-                )
-                orig_caps = []
-
-            logger.debug(
-                "[%s] Parsed %s raw %s from response.",
-                svr_name,
-                len(orig_caps),
-                cap_type,
-            )
+            orig_caps = self._parse_list_result(svr_name, list_method_name, cap_type, list_result)
+            logger.debug("[%s] Parsed %s raw %s from response.", svr_name, len(orig_caps), cap_type)
 
             registered_count = 0
             for cap_item_raw in orig_caps:
@@ -128,118 +200,39 @@ class CapabilityRegistry:
                     continue
 
                 cap_item = cast(
-                    Union[mcp_types.Tool, mcp_types.Resource, mcp_types.Prompt],
-                    cap_item_raw,
+                    Union[mcp_types.Tool, mcp_types.Resource, mcp_types.Prompt], cap_item_raw
                 )
-
                 if not cap_item.name:
                     logger.warning(
-                        "[%s] Found unnamed %s, skipped: %r",
-                        svr_name,
-                        cap_type[:-1],
-                        cap_item,
+                        "[%s] Found unnamed %s, skipped: %r", svr_name, cap_type[:-1], cap_item
                     )
                     continue
 
-                # Apply per-server filter (deny > allow > pass-through).
-                svr_filters = self._filters.get(svr_name, {})
-                cap_filter = svr_filters.get(cap_type)
-                if cap_filter and not cap_filter.is_allowed(cap_item.name):
-                    logger.debug(
-                        "[%s] %s '%s' filtered out by deny/allow rules.",
-                        svr_name,
-                        cap_type[:-1],
-                        cap_item.name,
-                    )
+                result = self._apply_filter_and_rename(svr_name, cap_type, cap_item)
+                if result is None:
                     continue
-
-                # Apply per-server rename / description override (tools only).
-                orig_name_before_rename = cap_item.name
-                rename_map = self._rename_maps.get(svr_name)
-                if rename_map and cap_type == "tools":
-                    new_name = rename_map.get_new_name(cap_item.name)
-                    desc_override = rename_map.get_description_override(cap_item.name)
-                    updates: Dict[str, Any] = {}
-                    if new_name != cap_item.name:
-                        updates["name"] = new_name
-                        logger.debug(
-                            "[%s] Renamed tool '%s' -> '%s'.",
-                            svr_name,
-                            cap_item.name,
-                            new_name,
-                        )
-                    if desc_override is not None:
-                        updates["description"] = desc_override
-                    if updates:
-                        cap_item = cap_item.model_copy(update=updates)
+                orig_name, cap_item = result
 
                 exp_cap_name = self._strategy.transform_name(svr_name, cap_item.name)
+                resolved_name = self._resolve_conflict(svr_name, cap_type, exp_cap_name, agg_list)
+                if resolved_name is None:
+                    continue
 
-                if exp_cap_name in self._route_map:
-                    exist_svr_name, _ = self._route_map[exp_cap_name]
-                    if exist_svr_name == svr_name:
-                        logger.warning(
-                            "[%s] Duplicate %s provided multiple times: "
-                            "'%s'. Only the first instance is registered.",
-                            svr_name,
-                            cap_type[:-1],
-                            exp_cap_name,
-                        )
-                        continue
-
-                    action = self._strategy.handle_conflict(exp_cap_name, exist_svr_name, svr_name)
-
-                    if action.action == ConflictAction.SKIP:
-                        continue
-                    elif action.action == ConflictAction.REPLACE:
-                        # Remove the old entry from agg_list by exposed name.
-                        agg_list[:] = [
-                            item for item in agg_list if getattr(item, "name", None) != exp_cap_name
-                        ]
-                        del self._route_map[exp_cap_name]
-                        # Fall through to register the new one.
-                    elif action.action == ConflictAction.RENAME:
-                        exp_cap_name = action.new_name  # type: ignore[assignment]
-                        if exp_cap_name in self._route_map:
-                            logger.warning(
-                                "[%s] Renamed name '%s' also conflicts; skipping.",
-                                svr_name,
-                                exp_cap_name,
-                            )
-                            continue
-                    elif action.action == ConflictAction.ERROR:
-                        # Strategy already raised; this is a fallback.
-                        continue
-
-                # Store the item with the exposed name for client visibility.
-                orig_name = orig_name_before_rename
-                if exp_cap_name != cap_item.name:
-                    cap_item = cap_item.model_copy(update={"name": exp_cap_name})
+                if resolved_name != cap_item.name:
+                    cap_item = cap_item.model_copy(update={"name": resolved_name})
 
                 agg_list.append(cap_item)
-                self._route_map[exp_cap_name] = (svr_name, orig_name)
+                self._route_map[resolved_name] = (svr_name, orig_name)
                 registered_count += 1
 
             if registered_count > 0:
-                logger.info(
-                    "[%s] Registered %s unique %s.",
-                    svr_name,
-                    registered_count,
-                    cap_type,
-                )
+                logger.info("[%s] Registered %s unique %s.", svr_name, registered_count, cap_type)
             else:
-                logger.info(
-                    "[%s] No new %s discovered or registered.",
-                    svr_name,
-                    cap_type,
-                )
+                logger.info("[%s] No new %s discovered or registered.", svr_name, cap_type)
 
         except asyncio.TimeoutError:
             logger.error(
-                "[%s] %s() timed out (>%ss).",
-                svr_name,
-                list_method_name,
-                CAP_FETCH_TIMEOUT,
+                "[%s] %s() timed out (>%ss).", svr_name, list_method_name, CAP_FETCH_TIMEOUT
             )
         except McpError as mcp_e:
             logger.error(
@@ -250,17 +243,13 @@ class CapabilityRegistry:
                 mcp_e.error.message,
                 exc_info=False,
             )
-        except Exception:
-            logger.exception(
-                "[%s] Unknown error while discovering %s.",
-                svr_name,
-                cap_type,
-            )
+        except Exception:  # noqa: BLE001
+            logger.exception("[%s] Unknown error while discovering %s.", svr_name, cap_type)
 
     async def discover_and_register(self, sessions: Dict[str, ClientSession]) -> None:
         """Discover and register MCP capabilities from active backend sessions."""
         logger.info(
-            "Starting capability discovery/registration from " "%s active sessions...",
+            "Starting capability discovery/registration from %s active sessions...",
             len(sessions),
         )
 

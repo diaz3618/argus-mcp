@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ class CircuitBreaker:
 
     # ── Serialisation ────────────────────────────────────────────────────
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Snapshot for the management API / TUI."""
         return {
             "state": self.state.value,

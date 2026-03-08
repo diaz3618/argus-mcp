@@ -95,7 +95,7 @@ class SkillManifest:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError) as exc:
             raise SkillManifestError(f"Failed to read manifest: {path}: {exc}") from exc
 
         if not isinstance(data, dict):

@@ -123,5 +123,5 @@ class ConfigWatcher:
                 try:
                     logger.info("Config file changed, triggering reload...")
                     await self._on_change()
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.exception("Error in config-change callback.")

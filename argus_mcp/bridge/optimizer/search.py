@@ -10,6 +10,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from argus_mcp.constants import OPTIMIZER_SEARCH_LIMIT
+
 logger = logging.getLogger(__name__)
 
 # Try to use scikit-learn for proper TF-IDF; degrade gracefully.
@@ -176,7 +178,7 @@ class ToolIndex:
 
     # ── Search ───────────────────────────────────────────────────────
 
-    def search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str, limit: int = OPTIMIZER_SEARCH_LIMIT) -> List[Dict[str, Any]]:
         """Search for tools matching *query*.
 
         Returns list of dicts: ``{name, description, input_schema, backend, score}``.

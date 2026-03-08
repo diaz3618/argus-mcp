@@ -86,7 +86,7 @@ class WorkflowDefinition:
             ]
             if not ready:
                 raise WorkflowValidationError(
-                    f"Cycle detected in workflow '{self.name}'. " f"Unresolvable steps: {remaining}"
+                    f"Cycle detected in workflow '{self.name}'. Unresolvable steps: {remaining}"
                 )
             levels.append([step_map[sid] for sid in ready])
             completed.update(ready)
@@ -131,7 +131,7 @@ def parse_workflow(data: Dict[str, Any]) -> WorkflowDefinition:
         for dep in step.depends_on:
             if dep not in seen_ids:
                 raise WorkflowValidationError(
-                    f"Step '{step.id}' depends on unknown step '{dep}' " f"in workflow '{name}'"
+                    f"Step '{step.id}' depends on unknown step '{dep}' in workflow '{name}'"
                 )
 
     wf = WorkflowDefinition(

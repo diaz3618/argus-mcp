@@ -219,8 +219,9 @@ class SkillManager:
             return {}
         try:
             with open(self._state_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
+                loaded: Dict[str, str] = json.load(f)
+                return loaded
+        except (json.JSONDecodeError, OSError, ValueError):
             return {}
 
     def _save_state(self) -> None:

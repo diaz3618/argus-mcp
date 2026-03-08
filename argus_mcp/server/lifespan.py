@@ -41,6 +41,7 @@ import signal
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
+import yaml
 from starlette.applications import Starlette
 
 from argus_mcp.constants import SERVER_NAME, SERVER_VERSION
@@ -87,7 +88,7 @@ def _discover_workflow_yamls() -> list[dict]:
                     if isinstance(data, dict) and data.get("name"):
                         data.setdefault("_source", str(fpath))
                         results.append(data)
-                except Exception:
+                except (OSError, yaml.YAMLError):
                     logger.debug("Failed to parse workflow YAML: %s", fpath, exc_info=True)
     return results
 
@@ -159,7 +160,7 @@ async def _attach_to_mcp_server(
     if config_path:
         try:
             full_cfg = load_argus_config(config_path)
-        except Exception:
+        except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
             logger.debug(
                 "Could not load full config; sub-features will use defaults.", exc_info=True
             )
@@ -186,7 +187,7 @@ async def _attach_to_mcp_server(
                 full_cfg.telemetry.otlp_endpoint,
                 full_cfg.telemetry.service_name,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Telemetry init failed; continuing without OTel.", exc_info=True)
 
     mcp_svr_instance.telemetry_enabled = telemetry_enabled
@@ -275,6 +276,27 @@ async def _attach_to_mcp_server(
 
     # ── Composite Workflows (Task 6) ────────────────────────────────
     _load_composite_workflows(mcp_svr_instance, chain)
+
+    # ── Typed state bundle ────────────────────────────────────────────
+    # Attach a single typed object so consumers can access state with
+    # proper typing instead of ad-hoc getattr(mcp_server, ...) calls.
+    from argus_mcp.server.state import ServerState
+
+    mcp_svr_instance._argus_state = ServerState(
+        manager=service.manager,
+        registry=service.registry,
+        audit_logger=audit_logger,
+        middleware_chain=chain,
+        session_manager=session_manager,
+        feature_flags=mcp_svr_instance.feature_flags,
+        skill_manager=skill_manager,
+        version_checker=mcp_svr_instance.version_checker,
+        optimizer_index=getattr(mcp_svr_instance, "optimizer_index", None),
+        optimizer_enabled=optimizer_enabled,
+        optimizer_keep_list=keep_list,
+        telemetry_enabled=telemetry_enabled,
+        composite_tools=getattr(mcp_svr_instance, "composite_tools", []),
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -408,6 +430,70 @@ def _restore_signal_handlers(
     logger.debug("Signal handlers restored to uvicorn defaults.")
 
 
+def _setup_installer_display(
+    config_path: str, verbosity: int
+) -> tuple["InstallerDisplay | None", "Any"]:
+    """Create the verbose installer display if conditions are met."""
+    if verbosity < 1 or not config_path:
+        return None, None
+    try:
+        from argus_mcp.config.loader import load_and_validate_config
+
+        raw_config = load_and_validate_config(config_path)
+        installer_display = InstallerDisplay(raw_config, verbose=True)
+        installer_display.render_initial()
+        return installer_display, installer_display.make_callback()
+    except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
+        logger.debug(
+            "Could not initialise installer display; falling back to standard output.",
+            exc_info=True,
+        )
+        return None, None
+
+
+def _propagate_to_mgmt_app(app_state: Any, service: "ArgusService") -> None:
+    """Forward service + host/port/transport to the management sub-app."""
+    mgmt_app = getattr(app_state, "mgmt_app", None)
+    if mgmt_app is None:
+        return
+    mgmt_app.state.argus_service = service  # type: ignore[attr-defined]
+    mgmt_app.state.host = getattr(app_state, "host", "127.0.0.1")  # type: ignore[attr-defined]
+    mgmt_app.state.port = getattr(app_state, "port", 0)  # type: ignore[attr-defined]
+    mgmt_app.state.transport_type = getattr(  # type: ignore[attr-defined]
+        app_state, "transport_type", "streamable-http"
+    )
+
+
+async def _shutdown_streamable_http(_exit_stack: "AsyncExitStack | None", mcp_server: Any) -> None:
+    """Shut down the StreamableHTTPSessionManager and Argus session manager."""
+    if _exit_stack is not None:
+        try:
+            await asyncio.wait_for(_exit_stack.aclose(), timeout=10.0)
+            logger.info("SDK StreamableHTTPSessionManager stopped.")
+        except asyncio.TimeoutError:
+            logger.warning("StreamableHTTPSessionManager aclose() timed out after 10s.")
+        except RuntimeError as e_rt:
+            logger.debug(
+                "Cancel scope error during session manager shutdown: %s",
+                e_rt,
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug(
+                "Error stopping StreamableHTTPSessionManager",
+                exc_info=True,
+            )
+        try:
+            import argus_mcp.server.app as app_module
+
+            app_module.streamable_session_manager = None
+        except Exception:  # noqa: BLE001
+            logger.debug("Module reference cleanup failed", exc_info=True)
+
+    sm = getattr(mcp_server, "session_manager", None)
+    if sm is not None:
+        await sm.stop()
+
+
 @asynccontextmanager
 async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     """Application lifespan management: startup and shutdown.
@@ -452,14 +538,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
 
     # Also propagate to the management sub-app so its request handlers see
     # argus_service on *their* request.app.state (the sub-app's state).
-    mgmt_app = getattr(app_state, "mgmt_app", None)
-    if mgmt_app is not None:
-        mgmt_app.state.argus_service = service  # type: ignore[attr-defined]
-        # Forward host/port/transport so the status endpoint can build
-        # correct URLs (the mgmt sub-app has its own State object).
-        mgmt_app.state.host = getattr(app_state, "host", "127.0.0.1")  # type: ignore[attr-defined]
-        mgmt_app.state.port = getattr(app_state, "port", 0)  # type: ignore[attr-defined]
-        mgmt_app.state.transport_type = getattr(app_state, "transport_type", "streamable-http")  # type: ignore[attr-defined]
+    _propagate_to_mgmt_app(app_state, service)
 
     startup_ok = False
     err_detail_msg: Optional[str] = None
@@ -472,24 +551,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
 
         # ── Verbose installer display ────────────────
         verbosity: int = getattr(app_state, "verbosity", 0)
-        installer_display: InstallerDisplay | None = None
-        progress_callback = None
-
-        if verbosity >= 1 and config_path:
-            try:
-                from argus_mcp.config.loader import load_and_validate_config
-
-                raw_config = load_and_validate_config(config_path)
-                installer_display = InstallerDisplay(raw_config, verbose=True)
-                installer_display.render_initial()
-                progress_callback = installer_display.make_callback()
-            except Exception:
-                # Non-fatal — fall back to normal (non-verbose) output
-                logger.debug(
-                    "Could not initialise installer display; falling back to standard output.",
-                    exc_info=True,
-                )
-                installer_display = None
+        installer_display, progress_callback = _setup_installer_display(config_path, verbosity)
 
         # ── Delegate full startup to ArgusService ─────────────────
         # Install a temporary signal override so Ctrl+C works during
@@ -569,7 +631,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         disp_console_status("❌ Startup Failed", status_info_fail)
         log_file_status(status_info_fail, log_lvl=logging.ERROR)
         raise
-    except Exception as e_exc:
+    except Exception as e_exc:  # noqa: BLE001
         logger.exception(
             "Unexpected error during lifespan startup: %s",
             e_exc,
@@ -605,34 +667,8 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         # ── Delegate shutdown to ArgusService ─────────────────────
         # Stop SDK streamable-HTTP session manager first (closes all
         # active MCP sessions and their task groups).
-        if "_exit_stack" in dir() and _exit_stack is not None:
-            try:
-                await asyncio.wait_for(_exit_stack.aclose(), timeout=10.0)
-                logger.info("SDK StreamableHTTPSessionManager stopped.")
-            except asyncio.TimeoutError:
-                logger.warning("StreamableHTTPSessionManager aclose() timed out after 10s.")
-            except RuntimeError as e_rt:
-                logger.debug(
-                    "Cancel scope error during session manager shutdown: %s",
-                    e_rt,
-                )
-            except Exception:
-                logger.debug(
-                    "Error stopping StreamableHTTPSessionManager",
-                    exc_info=True,
-                )
-            # Clear the module-level reference
-            try:
-                import argus_mcp.server.app as app_module
-
-                app_module.streamable_session_manager = None
-            except Exception:
-                logger.debug("Module reference cleanup failed", exc_info=True)
-
-        # Stop Argus session manager before stopping backends
-        sm = getattr(mcp_server, "session_manager", None)
-        if sm is not None:
-            await sm.stop()
+        _es = _exit_stack if "_exit_stack" in dir() else None
+        await _shutdown_streamable_http(_es, mcp_server)
         await service.stop()
 
         final_msg_short = (

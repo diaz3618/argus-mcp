@@ -11,9 +11,10 @@ import json
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Any, Optional
 
 from argus_mcp.audit.models import AuditEvent
+from argus_mcp.constants import AUDIT_BACKUP_COUNT, AUDIT_MAX_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,6 @@ logging.addLevelName(AUDIT_LEVEL, "AUDIT")
 
 DEFAULT_AUDIT_DIR = "logs"
 DEFAULT_AUDIT_FILE = "audit.jsonl"
-DEFAULT_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
-DEFAULT_BACKUP_COUNT = 5
 
 
 class AuditLogger:
@@ -51,8 +50,8 @@ class AuditLogger:
         *,
         log_dir: str = DEFAULT_AUDIT_DIR,
         filename: str = DEFAULT_AUDIT_FILE,
-        max_bytes: int = DEFAULT_MAX_BYTES,
-        backup_count: int = DEFAULT_BACKUP_COUNT,
+        max_bytes: int = AUDIT_MAX_BYTES,
+        backup_count: int = AUDIT_BACKUP_COUNT,
         enabled: bool = True,
     ) -> None:
         self._enabled = enabled
@@ -91,17 +90,17 @@ class AuditLogger:
         try:
             line = event.model_dump_json()
             self._audit_logger.log(AUDIT_LEVEL, line)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Failed to emit audit event")
 
-    def emit_dict(self, data: dict) -> None:
+    def emit_dict(self, data: dict[str, Any]) -> None:
         """Write a raw dict as a JSON line (for non-model events)."""
         if not self._enabled:
             return
         try:
             line = json.dumps(data, default=str, separators=(",", ":"))
             self._audit_logger.log(AUDIT_LEVEL, line)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Failed to emit audit dict")
 
     def close(self) -> None:

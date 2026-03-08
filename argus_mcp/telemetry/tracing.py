@@ -32,7 +32,7 @@ def get_tracer() -> Any:
 @contextmanager
 def start_span(
     name: str,
-    attributes: Optional[dict] = None,
+    attributes: Optional[dict[str, Any]] = None,
 ) -> Generator[Any, None, None]:
     """Context manager that starts a trace span.
 

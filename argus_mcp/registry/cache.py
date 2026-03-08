@@ -84,7 +84,7 @@ class RegistryCache:
         if payload is None:
             return False
         fetched_at = payload.get("fetched_at", 0)
-        return (time.time() - fetched_at) < self._ttl
+        return bool((time.time() - fetched_at) < self._ttl)
 
     def clear(self, registry_url: Optional[str] = None) -> None:
         """Remove cache for a specific URL or all caches."""
@@ -119,7 +119,8 @@ class RegistryCache:
             return None
         try:
             with open(path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
+                result: Dict[str, Any] = json.load(fh)
+                return result
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Corrupt registry cache file %s: %s", path, exc)
             return None

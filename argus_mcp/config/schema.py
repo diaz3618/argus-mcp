@@ -50,6 +50,40 @@ from argus_mcp.config.schema_server import (  # noqa: F401
     ServerSettings,
 )
 
+__all__ = [
+    # schema_backends
+    "AuthConfig",
+    "BackendConfig",
+    "CapabilityFilterConfig",
+    "ContainerConfig",
+    "FiltersConfig",
+    "OAuth2AuthConfig",
+    "PKCEAuthConfig",
+    "SseBackendConfig",
+    "StaticAuthConfig",
+    "StdioBackendConfig",
+    "StreamableHttpBackendConfig",
+    "TimeoutConfig",
+    "ToolOverrideEntry",
+    # schema_client
+    "ClientConfig",
+    # schema_registry
+    "RegistryEntryConfig",
+    # schema_security
+    "AuthorizationConfig",
+    "IncomingAuthConfig",
+    # schema_server
+    "ManagementSettings",
+    "ServerSettings",
+    # This file
+    "ConflictResolutionConfig",
+    "AuditConfig",
+    "OptimizerConfig",
+    "TelemetrySettings",
+    "SecretsConfig",
+    "ArgusConfig",
+]
+
 # ── Models that remain in this file (small, tightly coupled to top-level) ──
 
 

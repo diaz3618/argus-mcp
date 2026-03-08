@@ -112,7 +112,7 @@ def load_composite_tools(
     invoke_tool: ToolInvoker,
 ) -> List[CompositeTool]:
     """Parse workflow definitions and return composite tools."""
-    from argus_mcp.workflows.dsl import parse_workflow
+    from argus_mcp.workflows.dsl import WorkflowValidationError, parse_workflow
 
     tools: List[CompositeTool] = []
     for wf_data in workflow_defs:
@@ -120,6 +120,6 @@ def load_composite_tools(
             wf = parse_workflow(wf_data)
             tools.append(CompositeTool(wf, invoke_tool))
             logger.info("Composite tool '%s' loaded (%d steps)", wf.name, len(wf.steps))
-        except Exception as exc:
+        except (KeyError, ValueError, TypeError, WorkflowValidationError) as exc:
             logger.warning("Failed to load composite workflow: %s", exc)
     return tools

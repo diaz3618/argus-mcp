@@ -83,12 +83,12 @@ def record_request(
 
 
 class _NoOpCounter:
-    def add(self, _amount: int, attributes: Optional[dict] = None) -> None:
+    def add(self, _amount: int, attributes: Optional[dict[str, Any]] = None) -> None:
         pass
 
 
 class _NoOpHistogram:
-    def record(self, value: float, attributes: Optional[dict] = None) -> None:
+    def record(self, value: float, attributes: Optional[dict[str, Any]] = None) -> None:
         pass
 
 

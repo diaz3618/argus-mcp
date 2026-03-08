@@ -44,7 +44,7 @@ class AuditMiddleware:
 
         outcome_status = "error" if ctx.error else "success"
         logger.info(
-            "AUDIT RESPONSE id=%s method=%s capability=%s backend=%s " "outcome=%s elapsed_ms=%.1f",
+            "AUDIT RESPONSE id=%s method=%s capability=%s backend=%s outcome=%s elapsed_ms=%.1f",
             ctx.request_id,
             ctx.mcp_method,
             ctx.capability_name,

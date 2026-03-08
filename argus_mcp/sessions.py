@@ -125,7 +125,7 @@ def load_session(name: str) -> Optional[SessionInfo]:
         return SessionInfo(**data)
     except FileNotFoundError:
         return None
-    except Exception:
+    except (json.JSONDecodeError, TypeError, ValueError, OSError):
         logger.warning("Corrupt session file %s", path, exc_info=True)
         return None
 
@@ -237,6 +237,6 @@ def stop_session(
 def check_port_conflict(host: str, port: int) -> Optional[SessionInfo]:
     """Return a running session using the same host:port, if any."""
     for info in list_sessions():
-        if info.port == port and (info.host == host or info.host == "0.0.0.0"):
+        if info.port == port and (info.host == host or info.host == "0.0.0.0"):  # noqa: S104 — wildcard bind matches any host
             return info
     return None

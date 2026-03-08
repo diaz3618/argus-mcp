@@ -41,3 +41,23 @@ STARTUP_STAGGER_DELAY = 0.5  # seconds between launching each backend within a b
 BACKEND_RETRIES = 3  # number of automatic retries for failed backends
 BACKEND_RETRY_DELAY = 5.0  # base delay between retries (exponential backoff applied)
 BACKEND_RETRY_BACKOFF = 1.5  # multiplier applied to delay on each successive retry
+
+# SSE heartbeat for management event streams
+SSE_HEARTBEAT_INTERVAL = 30  # seconds
+
+# Audit log defaults
+AUDIT_MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+AUDIT_BACKUP_COUNT = 5
+
+# Graceful shutdown default timeout
+SHUTDOWN_TIMEOUT = 30  # seconds
+
+# Optimizer search default result limit
+OPTIMIZER_SEARCH_LIMIT = 5
+
+# Management API input validation limits
+MGMT_EVENTS_LIMIT_MIN = 1
+MGMT_EVENTS_LIMIT_MAX = 10_000
+MGMT_SHUTDOWN_TIMEOUT_MIN = 1
+MGMT_SHUTDOWN_TIMEOUT_MAX = 300
+MGMT_BACKEND_NAME_MAX_LEN = 255

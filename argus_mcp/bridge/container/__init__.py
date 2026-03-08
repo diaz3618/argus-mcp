@@ -59,8 +59,3 @@ __all__ = [
     "container_cleanup_context",
     "wrap_backend",
 ]
-
-
-def _reset_health_cache() -> None:
-    """Reset the cached runtime health check result (for testing)."""
-    RuntimeFactory.get().reset()

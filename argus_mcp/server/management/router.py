@@ -7,14 +7,26 @@ Authentication is added in Phase 0.3.
 import asyncio
 import json
 import logging
+import re
 from typing import Any, Dict, Optional
+from urllib.parse import urlunparse
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route, Router
 
 from argus_mcp._task_utils import _log_task_exception
-from argus_mcp.constants import SERVER_VERSION, SSE_PATH, STREAMABLE_HTTP_PATH
+from argus_mcp.constants import (
+    MGMT_BACKEND_NAME_MAX_LEN,
+    MGMT_EVENTS_LIMIT_MAX,
+    MGMT_EVENTS_LIMIT_MIN,
+    MGMT_SHUTDOWN_TIMEOUT_MAX,
+    MGMT_SHUTDOWN_TIMEOUT_MIN,
+    SERVER_VERSION,
+    SSE_HEARTBEAT_INTERVAL,
+    SSE_PATH,
+    STREAMABLE_HTTP_PATH,
+)
 from argus_mcp.runtime.service import ArgusService
 from argus_mcp.server.management.schemas import (
     BackendCapabilities,
@@ -33,6 +45,7 @@ from argus_mcp.server.management.schemas import (
     ResourceDetail,
     SessionDetail,
     SessionsResponse,
+    ShutdownRequest,
     ShutdownResponse,
     StatusConfig,
     StatusResponse,
@@ -46,7 +59,8 @@ logger = logging.getLogger(__name__)
 # Strong references to background tasks to prevent GC before completion
 _background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
 
-SSE_HEARTBEAT_INTERVAL = 30  # seconds
+
+_BACKEND_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -117,8 +131,8 @@ async def handle_status(request: Request) -> JSONResponse:
     # host/port are set during server startup from CLI args (not user request data)
     host = getattr(request.app.state, "host", "127.0.0.1")  # nosec: not user-controlled
     port = getattr(request.app.state, "port", 0)  # nosec: not user-controlled
-    sse_url = f"http://{host}:{port}{SSE_PATH}"
-    streamable_http_url = f"http://{host}:{port}{STREAMABLE_HTTP_PATH}"
+    sse_url = urlunparse(("http", f"{host}:{port}", SSE_PATH, "", "", ""))
+    streamable_http_url = urlunparse(("http", f"{host}:{port}", STREAMABLE_HTTP_PATH, "", "", ""))
 
     resp = StatusResponse(
         service=StatusService(
@@ -342,7 +356,16 @@ async def handle_events(request: Request) -> JSONResponse:
     """Recent events (polling)."""
     service = _get_service(request)
 
-    limit = int(request.query_params.get("limit", "100"))
+    try:
+        limit = int(request.query_params.get("limit", "100"))
+    except (ValueError, TypeError):
+        return _error_json("bad_request", "'limit' must be an integer.", 400)
+    if not MGMT_EVENTS_LIMIT_MIN <= limit <= MGMT_EVENTS_LIMIT_MAX:
+        return _error_json(
+            "bad_request",
+            f"'limit' must be between {MGMT_EVENTS_LIMIT_MIN} and {MGMT_EVENTS_LIMIT_MAX}.",
+            400,
+        )
     since = request.query_params.get("since")
     severity = request.query_params.get("severity")
 
@@ -443,6 +466,10 @@ async def handle_reconnect(request: Request) -> JSONResponse:
 
     if not name:
         return _error_json("bad_request", "Backend name is required.", 400)
+    if len(name) > MGMT_BACKEND_NAME_MAX_LEN:
+        return _error_json("bad_request", "Backend name is too long.", 400)
+    if not _BACKEND_NAME_RE.match(name):
+        return _error_json("bad_request", "Backend name contains invalid characters.", 400)
 
     if not service.is_running:
         return _error_json("service_unavailable", "Service is not running.", 503)
@@ -465,14 +492,23 @@ async def handle_shutdown(request: Request) -> JSONResponse:
     service = _get_service(request)
 
     # Parse optional timeout from request body
-    timeout = 30
     try:
         body = await request.json()
-        timeout = int(body.get("timeout_seconds", 30))
+    except (json.JSONDecodeError, ValueError):  # noqa: E501
+        body = {}
+
+    try:
+        req = ShutdownRequest(**body) if isinstance(body, dict) else ShutdownRequest()
     except (ValueError, TypeError):
-        return _error_json("bad_request", "Malformed JSON or invalid timeout_seconds.", 400)
-    except Exception:
-        logger.debug("No request body for shutdown, using default timeout", exc_info=True)
+        return _error_json("bad_request", "Invalid shutdown request body.", 400)
+
+    timeout = req.timeout_seconds
+    if not MGMT_SHUTDOWN_TIMEOUT_MIN <= timeout <= MGMT_SHUTDOWN_TIMEOUT_MAX:
+        return _error_json(
+            "bad_request",
+            f"'timeout_seconds' must be between {MGMT_SHUTDOWN_TIMEOUT_MIN} and {MGMT_SHUTDOWN_TIMEOUT_MAX}.",
+            400,
+        )
 
     resp = ShutdownResponse(shutting_down=True)
     # Schedule shutdown in background so we can return the response first

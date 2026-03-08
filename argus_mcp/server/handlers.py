@@ -14,6 +14,7 @@ from argus_mcp.bridge.optimizer.meta_tools import (
     META_TOOLS,
 )
 from argus_mcp.errors import BackendServerError
+from argus_mcp.server.state import get_state
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,8 @@ async def _dispatch(
     arguments: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """Route a request through the middleware chain."""
-    chain = getattr(mcp_server, "middleware_chain", None)
+    state = get_state(mcp_server)
+    chain = state.middleware_chain
     if chain is None:
         raise RuntimeError("Middleware chain is not initialised on the MCP server instance.")
     ctx = RequestContext(
@@ -50,7 +52,8 @@ def register_handlers(mcp_server: McpServer) -> None:
         tools = mcp_server.registry.get_aggregated_tools()
 
         # Append composite workflow tools (if any are loaded)
-        composite_tools = getattr(mcp_server, "composite_tools", None) or []
+        state = get_state(mcp_server)
+        composite_tools = state.composite_tools
         for ct in composite_tools:
             info = ct.to_tool_info()
             tools.append(
@@ -62,10 +65,10 @@ def register_handlers(mcp_server: McpServer) -> None:
             )
 
         # If optimizer is active, return meta-tools + keep-list only
-        optimizer = getattr(mcp_server, "optimizer_index", None)
-        optimizer_enabled = getattr(mcp_server, "optimizer_enabled", False)
+        optimizer = state.optimizer_index
+        optimizer_enabled = state.optimizer_enabled
         if optimizer_enabled and optimizer is not None:
-            keep_names = set(getattr(mcp_server, "optimizer_keep_list", []))
+            keep_names = set(state.optimizer_keep_list)
             kept = [t for t in tools if t.name in keep_names]
             result = list(META_TOOLS) + kept
             logger.info(
@@ -106,8 +109,9 @@ def register_handlers(mcp_server: McpServer) -> None:
         logger.debug("Handling callTool: name='%s'", name)
 
         # Handle optimizer meta-tools
-        optimizer = getattr(mcp_server, "optimizer_index", None)
-        optimizer_enabled = getattr(mcp_server, "optimizer_enabled", False)
+        state = get_state(mcp_server)
+        optimizer = state.optimizer_index
+        optimizer_enabled = state.optimizer_enabled
 
         if optimizer_enabled and optimizer is not None:
             if name == FIND_TOOL_NAME:
@@ -139,7 +143,7 @@ def register_handlers(mcp_server: McpServer) -> None:
                 )
 
         # Handle composite workflow tools
-        composite_tools = getattr(mcp_server, "composite_tools", None) or []
+        composite_tools = state.composite_tools
         for ct in composite_tools:
             if ct.name == name:
                 logger.info("Dispatching composite workflow tool '%s'", name)
@@ -158,7 +162,7 @@ def register_handlers(mcp_server: McpServer) -> None:
                         ],
                         isError=False,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     # (final handler boundary — this IS the error handler)
                     logger.error(  # nosemgrep: code-quality-logging-error-without-handling
                         "Composite workflow '%s' failed: %s", name, exc, exc_info=True
@@ -171,7 +175,7 @@ def register_handlers(mcp_server: McpServer) -> None:
         if isinstance(result, mcp_types.CallToolResult):
             return result
         logger.error(
-            "call_tool forwarding returned unexpected type: " "%s for tool '%s'",
+            "call_tool forwarding returned unexpected type: %s for tool '%s'",
             type(result),
             name,
         )
@@ -184,7 +188,7 @@ def register_handlers(mcp_server: McpServer) -> None:
         if isinstance(result, mcp_types.ReadResourceResult):
             return result
         logger.error(
-            "read_resource forwarding returned unexpected type: " "%s for resource '%s'",
+            "read_resource forwarding returned unexpected type: %s for resource '%s'",
             type(result),
             name,
         )
@@ -199,7 +203,7 @@ def register_handlers(mcp_server: McpServer) -> None:
         if arguments is not None:
             try:
                 typed_args = {k: str(v) for k, v in arguments.items()}
-            except Exception:
+            except (TypeError, ValueError):
                 logger.warning(
                     "Could not cast get_prompt arguments to Dict[str, str] "
                     "for prompt '%s'. Will fall back to original arguments.",
@@ -211,7 +215,7 @@ def register_handlers(mcp_server: McpServer) -> None:
         if isinstance(result, mcp_types.GetPromptResult):
             return result
         logger.error(
-            "get_prompt forwarding returned unexpected type: " "%s for prompt '%s'",
+            "get_prompt forwarding returned unexpected type: %s for prompt '%s'",
             type(result),
             name,
         )
