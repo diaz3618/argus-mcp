@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from textual.app import ComposeResult
+from textual.css.query import NoMatches
 from textual.widgets import TabbedContent, TabPane
 
 from argus_mcp.tui.screens.base import ArgusScreen
@@ -60,13 +61,13 @@ class HealthScreen(ArgusScreen):
                 details = [b.model_dump() for b in backends_resp.backends]
                 try:
                     self.query_one(HealthPanel).update_from_backends(details)
-                except Exception:
+                except NoMatches:
                     pass
                 try:
                     self.query_one(ServerGroupsWidget).update_groups(details)
-                except Exception:
+                except NoMatches:
                     pass
-            except Exception:
+            except (OSError, ConnectionError):
                 pass
 
         app.run_worker(_fetch(), exclusive=False, name="health-refresh")
@@ -104,11 +105,9 @@ class HealthScreen(ArgusScreen):
                     self.app.notify(f"Backend '{name}' reconnected.", severity="information")
                 else:
                     err = resp.error or "unknown error"
-                    panel.set_action_status(
-                        f"[red]✕[/red] Reconnect failed: {err}"
-                    )
+                    panel.set_action_status(f"[red]✕[/red] Reconnect failed: {err}")
                     self.app.notify(f"Reconnect failed: {err}", severity="error")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 panel.set_action_status(f"[red]✕[/red] Reconnect error: {exc}")
                 self.app.notify(f"Reconnect error: {exc}", severity="error")
             # Refresh the health table
@@ -139,15 +138,13 @@ class HealthScreen(ArgusScreen):
                     if resp.backends_changed:
                         parts.append(f"~{len(resp.backends_changed)} changed")
                     detail = ", ".join(parts) if parts else "no changes"
-                    panel.set_action_status(
-                        f"[green]✓[/green] Config reloaded ({detail})"
-                    )
+                    panel.set_action_status(f"[green]✓[/green] Config reloaded ({detail})")
                     self.app.notify(f"Config reloaded: {detail}", severity="information")
                 else:
                     errs = "; ".join(resp.errors) if resp.errors else "unknown"
                     panel.set_action_status(f"[red]✕[/red] Reload failed: {errs}")
                     self.app.notify(f"Reload failed: {errs}", severity="error")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 panel.set_action_status(f"[red]✕[/red] Reload error: {exc}")
                 self.app.notify(f"Reload error: {exc}", severity="error")
             self._refresh_from_app()
@@ -169,20 +166,16 @@ class HealthScreen(ArgusScreen):
             try:
                 resp = await client.post_shutdown(timeout_seconds=10.0)
                 if resp.shutting_down:
-                    panel.set_action_status(
-                        "[yellow]⏻[/yellow] Server is shutting down"
-                    )
+                    panel.set_action_status("[yellow]⏻[/yellow] Server is shutting down")
                     self.app.notify(
                         "Server is shutting down. Connection will be lost.",
                         severity="warning",
                     )
                 else:
                     panel.set_action_status("[red]✕[/red] Shutdown request rejected")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 # Connection errors are expected after shutdown
-                panel.set_action_status(
-                    "[yellow]⏻[/yellow] Shutdown sent (connection closed)"
-                )
+                panel.set_action_status("[yellow]⏻[/yellow] Shutdown sent (connection closed)")
                 logger.debug("Expected error after shutdown: %s", exc)
 
         self.app.run_worker(_shutdown(), name="shutdown-server", exclusive=False)

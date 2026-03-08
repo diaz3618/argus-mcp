@@ -14,6 +14,8 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import DataTable, Label, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,13 +58,10 @@ class SyncStatusWidget(Widget):
             yield DataTable(id="sync-events")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#sync-events", DataTable)
+        if table := safe_query(self, "#sync-events", DataTable):
             table.add_columns("Time", "Event", "Details")
             table.cursor_type = "none"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_sync_status(
         self,
@@ -74,12 +73,10 @@ class SyncStatusWidget(Widget):
         """Update the sync status line."""
         hash_short = config_hash[:8] + "…" if len(config_hash) > 8 else config_hash
         state = "[green]● live[/green]" if is_live else "[dim]● idle[/dim]"
-        try:
-            self.query_one("#sync-status-line", Static).update(
+        if w := safe_query(self, "#sync-status-line", Static):
+            w.update(
                 f"Config: {config_file}   Hash: {hash_short}   Last sync: {last_sync}   {state}"
             )
-        except Exception:
-            pass
 
     def add_sync_event(self, event: Dict[str, Any]) -> None:
         """Add a sync event to the table."""
@@ -89,8 +86,7 @@ class SyncStatusWidget(Widget):
         self._refresh_events()
 
     def _refresh_events(self) -> None:
-        try:
-            table = self.query_one("#sync-events", DataTable)
+        if table := safe_query(self, "#sync-events", DataTable):
             table.clear()
             for evt in self._sync_events:
                 time = evt.get("time", "—")
@@ -107,8 +103,6 @@ class SyncStatusWidget(Widget):
                     event_display = event_type
 
                 table.add_row(str(time), event_display, details)
-        except Exception:
-            pass
 
 
 class SyncConfigPanel(Widget):

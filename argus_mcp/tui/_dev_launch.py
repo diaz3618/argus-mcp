@@ -45,17 +45,15 @@ def _resolve_server_url() -> str:
         return env_url
 
     # Try loading the client section from config.yaml
-    for name in ("config.yaml", "config.yml"):
-        candidate = os.path.join(os.getcwd(), name)
-        if os.path.isfile(candidate):
-            try:
-                from argus_mcp.config.loader import load_argus_config
+    from argus_mcp.config.loader import find_config_file, load_argus_config
 
-                cfg = load_argus_config(candidate)
-                return cfg.client.server_url
-            except Exception:
-                pass  # Fall through to default
-            break
+    candidate = find_config_file()
+    if os.path.isfile(candidate):
+        try:
+            cfg = load_argus_config(candidate)
+            return cfg.client.server_url
+        except (OSError, ValueError):
+            pass  # Fall through to default
 
     return "http://127.0.0.1:9000"
 

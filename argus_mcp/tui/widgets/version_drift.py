@@ -16,6 +16,8 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static, TextArea
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,53 +54,50 @@ class VersionDriftPanel(Widget):
             yield DataTable(id="vd-table")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#vd-table", DataTable)
+        if table := safe_query(self, "#vd-table", DataTable):
             table.add_columns("Server", "Current", "Registry", "Status")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_versions(self, servers: List[Dict[str, Any]]) -> None:
         """Refresh version comparison table.
 
         Each dict should have: name, current_version, registry_version.
         """
-        try:
-            table = self.query_one("#vd-table", DataTable)
-            table.clear()
+        table = safe_query(self, "#vd-table", DataTable)
+        if table is None:
+            return
+        table.clear()
 
-            updates_available = 0
-            total = len(servers)
+        updates_available = 0
+        total = len(servers)
 
-            for s in servers:
-                name = s.get("name", "?")
-                current = s.get("current_version", s.get("version", "—"))
-                registry = s.get("registry_version", s.get("latest", "—"))
+        for s in servers:
+            name = s.get("name", "?")
+            current = s.get("current_version", s.get("version", "—"))
+            registry = s.get("registry_version", s.get("latest", "—"))
 
-                if not registry or registry == "—":
-                    status = "[dim]— No registry[/dim]"
-                elif current == registry:
-                    status = "[green]✓ Up to date[/green]"
+            if not registry or registry == "—":
+                status = "[dim]— No registry[/dim]"
+            elif current == registry:
+                status = "[green]✓ Up to date[/green]"
+            else:
+                updates_available += 1
+                # Check if major version change
+                cur_major = _parse_major(current)
+                reg_major = _parse_major(registry)
+                if cur_major is not None and reg_major is not None and reg_major > cur_major:
+                    status = "[red]⬆ Major update[/red]"
+                elif current and registry and current < registry:
+                    status = "[yellow]⬆ Update available[/yellow]"
                 else:
-                    updates_available += 1
-                    # Check if major version change
-                    cur_major = _parse_major(current)
-                    reg_major = _parse_major(registry)
-                    if cur_major is not None and reg_major is not None and reg_major > cur_major:
-                        status = "[red]⬆ Major update[/red]"
-                    elif current and registry and current < registry:
-                        status = "[yellow]⬆ Update available[/yellow]"
-                    else:
-                        status = "[yellow]⬆ Update available[/yellow]"
+                    status = "[yellow]⬆ Update available[/yellow]"
 
-                table.add_row(name, str(current), str(registry), status)
+            table.add_row(name, str(current), str(registry), status)
 
-            summary = f"Updates available: {updates_available} of {total} servers"
-            self.query_one("#vd-summary", Static).update(summary)
-        except Exception:
-            logger.debug("Cannot update version drift", exc_info=True)
+        summary = f"Updates available: {updates_available} of {total} servers"
+        if w := safe_query(self, "#vd-summary", Static):
+            w.update(summary)
 
 
 def _parse_major(version: str) -> Optional[int]:

@@ -14,6 +14,8 @@ from textual.containers import Vertical
 from textual.widget import Widget
 from textual.widgets import DataTable, Label, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -78,13 +80,10 @@ class OTelPanel(Widget):
             yield Static("(no traces captured)", id="otel-trace")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#otel-backend-table", DataTable)
+        if table := safe_query(self, "#otel-backend-table", DataTable):
             table.add_columns("Backend", "Calls", "Avg ms", "Err%", "Health")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_otel_status(
         self,
@@ -101,10 +100,8 @@ class OTelPanel(Widget):
         else:
             status = "OTel: [dim]● inactive[/dim]    (enable in config)"
 
-        try:
-            self.query_one("#otel-status", Static).update(status)
-        except Exception:
-            pass
+        if w := safe_query(self, "#otel-status", Static):
+            w.update(status)
 
     def update_metrics(
         self,
@@ -121,15 +118,12 @@ class OTelPanel(Widget):
             f"  Avg latency: {avg_latency_ms:.0f}ms        P99: {p99_latency_ms:.0f}ms\n"
             f"  Active sessions: {active_sessions}"
         )
-        try:
-            self.query_one("#otel-metrics", Static).update(text)
-        except Exception:
-            pass
+        if w := safe_query(self, "#otel-metrics", Static):
+            w.update(text)
 
     def update_backend_breakdown(self, backends: List[Dict[str, Any]]) -> None:
         """Update the per-backend metrics table."""
-        try:
-            table = self.query_one("#otel-backend-table", DataTable)
+        if table := safe_query(self, "#otel-backend-table", DataTable):
             table.clear()
             for b in backends:
                 name = b.get("name", "?")
@@ -155,22 +149,18 @@ class OTelPanel(Widget):
                     f"{err_pct:.1f}%",
                     health_display,
                 )
-        except Exception:
-            pass
 
     def update_trace(self, trace_info: Dict[str, Any]) -> None:
         """Display a trace waterfall for the last request."""
-        try:
-            tool = trace_info.get("tool", "—")
-            spans = trace_info.get("spans", [])
-            total_ms = trace_info.get("total_ms", 0)
-            lines = [f"  {tool} — Total: {total_ms}ms"]
-            for span in spans:
-                name = span.get("name", "?")
-                duration = span.get("duration_ms", 0)
-                bar_len = max(1, int(duration / max(total_ms, 1) * 30))
-                bar = "█" * bar_len + "░" * (30 - bar_len)
-                lines.append(f"  ├── {name:<18} {bar}  {duration}ms")
-            self.query_one("#otel-trace", Static).update("\n".join(lines))
-        except Exception:
-            pass
+        tool = trace_info.get("tool", "—")
+        spans = trace_info.get("spans", [])
+        total_ms = trace_info.get("total_ms", 0)
+        lines = [f"  {tool} — Total: {total_ms}ms"]
+        for span in spans:
+            name = span.get("name", "?")
+            duration = span.get("duration_ms", 0)
+            bar_len = max(1, int(duration / max(total_ms, 1) * 30))
+            bar = "█" * bar_len + "░" * (30 - bar_len)
+            lines.append(f"  ├── {name:<18} {bar}  {duration}ms")
+        if w := safe_query(self, "#otel-trace", Static):
+            w.update("\n".join(lines))

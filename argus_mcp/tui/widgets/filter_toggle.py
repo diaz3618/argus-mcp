@@ -13,6 +13,8 @@ from textual.containers import Vertical
 from textual.message import Message
 from textual.widgets import Label, Static, Switch
 
+from argus_mcp._error_utils import safe_query
+
 
 class FilterToggleWidget(Static):
     """Displays toggleable filters for tools.
@@ -55,9 +57,6 @@ class FilterToggleWidget(Static):
         state: Dict[str, bool] = {}
         for tool in self._tools:
             name = tool.get("name", "unknown")
-            try:
-                switch = self.query_one(f"#filter-{name}", Switch)
-                state[name] = switch.value
-            except Exception:
-                state[name] = True
+            sw = safe_query(self, f"#filter-{name}", Switch)
+            state[name] = sw.value if sw is not None else True
         return state

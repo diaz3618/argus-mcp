@@ -16,6 +16,7 @@ from typing import Any, Dict
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
     Input,
@@ -291,7 +292,7 @@ class SettingsScreen(ArgusScreen):
                         sep_val = getattr(cr, "separator", "_")
                         self.query_one("#conflict-strategy-select", Select).value = strategy_val
                         self.query_one("#conflict-separator-input", Input).value = sep_val
-                    except Exception:
+                    except NoMatches:
                         logger.debug("Could not refresh conflict settings", exc_info=True)
 
     def _refresh_servers(self) -> None:
@@ -310,7 +311,7 @@ class SettingsScreen(ArgusScreen):
                 }
             viewer = self.query_one("#servers-viewer", TextArea)
             viewer.load_text(_json.dumps(data, indent=2))
-        except Exception:
+        except NoMatches:
             logger.debug("Could not refresh servers", exc_info=True)
 
     def _refresh_theme(self) -> None:
@@ -373,7 +374,7 @@ class SettingsScreen(ArgusScreen):
                 "default_port": DEFAULT_PORT,
             }
             viewer.load_text(_json.dumps(fallback, indent=2))
-        except Exception:
+        except NoMatches:
             logger.debug("Could not load config preview", exc_info=True)
 
     def _refresh_about(self) -> None:
@@ -414,7 +415,7 @@ class SettingsScreen(ArgusScreen):
         """Safely update a Static widget's content."""
         try:
             self.query_one(selector, Static).update(text)
-        except Exception:
+        except NoMatches:
             pass
 
     # ── Button handlers ──────────────────────────────────────────
@@ -481,7 +482,7 @@ class SettingsScreen(ArgusScreen):
                 else:
                     errors = "; ".join(result.errors) if result.errors else "unknown"
                     self.notify(f"Reload failed: {errors}", severity="error")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 self.notify(f"Reload failed: {exc}", severity="error")
 
         self.app.run_worker(_reload(), exclusive=True, name="config-reload")
@@ -503,7 +504,7 @@ class SettingsScreen(ArgusScreen):
                     title="Reconnect Complete",
                 )
                 self._refresh_servers()
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 self.notify(f"Reconnect failed: {exc}", severity="error")
 
         self.app.run_worker(_reconnect(), exclusive=True, name="reconnect-all")
@@ -514,7 +515,7 @@ class SettingsScreen(ArgusScreen):
             name = self.query_one("#server-name-input", Input).value.strip()
             url = self.query_one("#server-url-input", Input).value.strip()
             token = self.query_one("#server-token-input", Input).value.strip() or None
-        except Exception:
+        except NoMatches:
             return
 
         if not name or not url:
@@ -536,14 +537,14 @@ class SettingsScreen(ArgusScreen):
             self.query_one("#server-name-input", Input).value = ""
             self.query_one("#server-url-input", Input).value = ""
             self.query_one("#server-token-input", Input).value = ""
-        except Exception:
+        except NoMatches:
             pass
 
     def _do_remove_server(self) -> None:
         """Remove the server whose name is in the name input."""
         try:
             name = self.query_one("#server-name-input", Input).value.strip()
-        except Exception:
+        except NoMatches:
             return
 
         if not name:
@@ -582,7 +583,7 @@ class SettingsScreen(ArgusScreen):
                 "#config-validation-result",
                 "[dim]Editing enabled[/dim]" if not viewer.read_only else "",
             )
-        except Exception:
+        except NoMatches:
             logger.debug("Could not toggle config edit", exc_info=True)
 
     def _do_validate_config(self) -> None:
@@ -599,7 +600,7 @@ class SettingsScreen(ArgusScreen):
                 "#config-validation-result",
                 f"[red]✗ Invalid JSON: {exc}[/red]",
             )
-        except Exception:
+        except NoMatches:
             self._set_text("#config-validation-result", "[yellow]Could not validate[/yellow]")
 
     def _do_save_config(self) -> None:
@@ -631,7 +632,7 @@ class SettingsScreen(ArgusScreen):
                         indent=2,
                     )
                 )
-        except Exception:
+        except NoMatches:
             logger.debug("Could not refresh registries", exc_info=True)
 
     def _do_add_registry(self) -> None:
@@ -641,7 +642,7 @@ class SettingsScreen(ArgusScreen):
             url = self.query_one("#reg-url-input", Input).value.strip()
             priority = self.query_one("#reg-priority-input", Input).value.strip()
             auth = self.query_one("#reg-auth-select", Select).value
-        except Exception:
+        except NoMatches:
             return
 
         if not name or not url:
@@ -670,14 +671,14 @@ class SettingsScreen(ArgusScreen):
             self.query_one("#reg-name-input", Input).value = ""
             self.query_one("#reg-url-input", Input).value = ""
             self.query_one("#reg-priority-input", Input).value = "100"
-        except Exception:
+        except NoMatches:
             pass
 
     def _do_remove_registry(self) -> None:
         """Remove registry by name from the name input field."""
         try:
             name = self.query_one("#reg-name-input", Input).value.strip()
-        except Exception:
+        except NoMatches:
             return
         if not name:
             self.notify("Enter the registry name to remove", severity="warning")

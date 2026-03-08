@@ -19,6 +19,8 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, RichLog, Static, TextArea
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 # ── Workflow discovery helpers ────────────────────────────────────
@@ -76,7 +78,7 @@ def _discover_yaml_workflows() -> List[Dict[str, Any]]:
                     if isinstance(data, dict) and data.get("name"):
                         data.setdefault("_source", str(fpath))
                         results.append(data)
-                except Exception:
+                except (yaml.YAMLError, OSError):
                     logger.debug("Failed to parse workflow YAML: %s", fpath, exc_info=True)
     return results
 
@@ -94,7 +96,7 @@ def _discover_skill_workflows() -> List[Dict[str, Any]]:
                 mgr = SkillManager(skills_dir=str(p))
                 mgr.discover()
                 return mgr.get_all_workflows()
-    except Exception:
+    except (ImportError, OSError, ValueError):
         logger.debug("Skill workflow discovery failed", exc_info=True)
     return []
 
@@ -173,13 +175,11 @@ class WorkflowsPanel(Widget):
             )
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#wf-table", DataTable)
+        table = safe_query(self, "#wf-table", DataTable)
+        if table:
             table.add_columns("Name", "Steps", "Last Run", "Status")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
         # Auto-discover workflows from YAML files and skills
         self.call_later(self._load_discovered_workflows)
@@ -204,68 +204,65 @@ class WorkflowsPanel(Widget):
     def update_workflows(self, workflows: List[Dict[str, Any]]) -> None:
         """Refresh the workflows table."""
         self._workflows = workflows
-        try:
-            table = self.query_one("#wf-table", DataTable)
-            table.clear()
+        table = safe_query(self, "#wf-table", DataTable)
+        if not table:
+            return
+        table.clear()
 
-            running = 0
-            completed = 0
+        running = 0
+        completed = 0
 
-            for wf in workflows:
-                name = wf.get("name", "?")
-                steps = wf.get("steps", [])
-                step_count = len(steps) if isinstance(steps, list) else steps
-                last_run = wf.get("last_run", "—")
-                status = wf.get("status", "idle")
+        for wf in workflows:
+            name = wf.get("name", "?")
+            steps = wf.get("steps", [])
+            step_count = len(steps) if isinstance(steps, list) else steps
+            last_run = wf.get("last_run", "—")
+            status = wf.get("status", "idle")
 
-                if status == "running":
-                    running += 1
-                    status_display = "[green]⟳ running[/green]"
-                elif status == "completed":
-                    completed += 1
-                    status_display = "[green]✓ completed[/green]"
-                elif status == "failed":
-                    status_display = "[red]✕ failed[/red]"
-                else:
-                    status_display = "[dim]idle[/dim]"
+            if status == "running":
+                running += 1
+                status_display = "[green]⟳ running[/green]"
+            elif status == "completed":
+                completed += 1
+                status_display = "[green]✓ completed[/green]"
+            elif status == "failed":
+                status_display = "[red]✕ failed[/red]"
+            else:
+                status_display = "[dim]idle[/dim]"
 
-                if isinstance(last_run, str) and "T" in last_run:
-                    last_run = last_run.split("T")[1][:8]
+            if isinstance(last_run, str) and "T" in last_run:
+                last_run = last_run.split("T")[1][:8]
 
-                table.add_row(name, str(step_count), str(last_run), status_display)
+            table.add_row(name, str(step_count), str(last_run), status_display)
 
-            summary = (
-                f"Workflows: {len(workflows)}  │  Running: {running}  │  Completed: {completed}"
-            )
-            self.query_one("#wf-status", Static).update(summary)
-        except Exception:
-            logger.debug("Cannot update workflows", exc_info=True)
+        summary = f"Workflows: {len(workflows)}  │  Running: {running}  │  Completed: {completed}"
+        if status_w := safe_query(self, "#wf-status", Static):
+            status_w.update(summary)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Show workflow detail when a row is selected."""
-        try:
-            idx = event.cursor_row
-            if 0 <= idx < len(self._workflows):
-                wf = self._workflows[idx]
-                steps = wf.get("steps", [])
-                name = wf.get("name", "?")
-                description = wf.get("description", "")
+        idx = event.cursor_row
+        if not (0 <= idx < len(self._workflows)):
+            return
+        wf = self._workflows[idx]
+        steps = wf.get("steps", [])
+        name = wf.get("name", "?")
+        description = wf.get("description", "")
 
-                lines = [f"[b]{name}[/b]"]
-                if description:
-                    lines.append(f"  {description}")
-                lines.append("")
-                for i, step in enumerate(steps, 1):
-                    if isinstance(step, dict):
-                        tool = step.get("tool", "?")
-                        server = step.get("server", step.get("backend", "?"))
-                        lines.append(f"  {i}. {tool} → {server}")
-                    else:
-                        lines.append(f"  {i}. {step}")
+        lines = [f"[b]{name}[/b]"]
+        if description:
+            lines.append(f"  {description}")
+        lines.append("")
+        for i, step in enumerate(steps, 1):
+            if isinstance(step, dict):
+                tool = step.get("tool", "?")
+                server = step.get("server", step.get("backend", "?"))
+                lines.append(f"  {i}. {tool} → {server}")
+            else:
+                lines.append(f"  {i}. {step}")
 
-                self.query_one("#wf-detail", Static).update("\n".join(lines))
-        except Exception:
-            pass
+        if detail := safe_query(self, "#wf-detail", Static):
+            detail.update("\n".join(lines))
 
     # ── Button handlers ──────────────────────────────────────────────
 
@@ -283,11 +280,8 @@ class WorkflowsPanel(Widget):
 
     def _log_output(self, text: str | Text) -> None:
         """Write a line to the execution output log."""
-        try:
-            log_widget = self.query_one("#wf-output-log", RichLog)
+        if log_widget := safe_query(self, "#wf-output-log", RichLog):
             log_widget.write(text)
-        except Exception:
-            pass
 
     def _log_step(
         self,
@@ -355,19 +349,17 @@ class WorkflowsPanel(Widget):
             self.app.notify(f"Workflow saved: {dest.name}", severity="information")
             self._load_discovered_workflows()
 
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             logger.debug("Failed to save workflow", exc_info=True)
             self.app.notify(f"Save failed: {exc}", severity="error")
 
     def _get_selected_index(self) -> Optional[int]:
         """Return the currently highlighted row index, or None."""
-        try:
-            table = self.query_one("#wf-table", DataTable)
+        table = safe_query(self, "#wf-table", DataTable)
+        if table:
             idx = table.cursor_row
             if 0 <= idx < len(self._workflows):
                 return idx
-        except Exception:
-            pass
         return None
 
     def _action_run_workflow(self) -> None:
@@ -382,11 +374,8 @@ class WorkflowsPanel(Widget):
         self.app.notify(f"Running workflow '{name}'…")
 
         # Clear previous output
-        try:
-            log_widget = self.query_one("#wf-output-log", RichLog)
+        if log_widget := safe_query(self, "#wf-output-log", RichLog):
             log_widget.clear()
-        except Exception:
-            pass
 
         panel = self  # capture for closure
 
@@ -456,7 +445,7 @@ class WorkflowsPanel(Widget):
             start_time = time.monotonic()
             try:
                 results = await executor.execute(wf, inputs={})
-            except Exception as exc:
+            except (RuntimeError, ValueError, OSError) as exc:
                 panel._log_step(
                     "executor",
                     f"FAILED: {exc}",
@@ -533,7 +522,7 @@ class WorkflowsPanel(Widget):
                 if p.is_file():
                     p.unlink()
                     logger.info("Deleted workflow file: %s", p)
-            except Exception:
+            except OSError:
                 logger.debug("Could not delete source file: %s", source, exc_info=True)
 
         self._workflows.pop(idx)

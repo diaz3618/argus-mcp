@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Label, Static
 
@@ -140,7 +141,9 @@ class BackendDetailModal(ModalScreen[Optional[str]]):
                 h_color = (
                     "green"
                     if h_status == "healthy"
-                    else "red" if h_status == "unhealthy" else "yellow"
+                    else "red"
+                    if h_status == "unhealthy"
+                    else "yellow"
                 )
                 h_lines = [
                     f"[b]Health:[/b] [{h_color}]{h_status}[/{h_color}]",
@@ -181,7 +184,7 @@ class BackendDetailModal(ModalScreen[Optional[str]]):
                 if len(msg) > 60:
                     msg = msg[:57] + "…"
                 table.add_row(ts, ctype, cstatus, msg)
-        except Exception:
+        except NoMatches:
             pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

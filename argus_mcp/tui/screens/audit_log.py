@@ -12,6 +12,7 @@ from typing import Any, Dict, List
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
 from argus_mcp.tui.screens.base import ArgusScreen
@@ -77,7 +78,7 @@ class AuditLogScreen(ArgusScreen):
             table.add_columns("Time", "User", "Method", "Tool", "Server", "ms", "Status")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
+        except NoMatches:
             pass
 
     def on_show(self) -> None:
@@ -125,7 +126,7 @@ class AuditLogScreen(ArgusScreen):
 
             stats = f"Events: {len(filtered)}  │  Errors: {errors}  │  Denied: {denied}"
             self.query_one("#audit-stats", Static).update(stats)
-        except Exception:
+        except NoMatches:
             logger.debug("Cannot refresh audit table", exc_info=True)
 
     def _apply_filters(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -138,7 +139,7 @@ class AuditLogScreen(ArgusScreen):
             method_val = method_sel.value
             if method_val and method_val != "all":
                 result = [e for e in result if e.get("method", e.get("type")) == method_val]
-        except Exception:
+        except NoMatches:
             pass
 
         # User filter
@@ -187,7 +188,7 @@ class AuditLogScreen(ArgusScreen):
     def action_focus_search(self) -> None:
         try:
             self.query_one("#audit-user-filter", Input).focus()
-        except Exception:
+        except NoMatches:
             pass
 
     def action_go_back(self) -> None:
@@ -198,7 +199,7 @@ class AuditLogScreen(ArgusScreen):
         try:
             btn = self.query_one("#btn-audit-pause", Button)
             btn.label = "▶ Resume" if self._paused else "⏸ Pause"
-        except Exception:
+        except NoMatches:
             pass
 
     def action_toggle_filter(self) -> None:
@@ -214,5 +215,5 @@ class AuditLogScreen(ArgusScreen):
             self.notify(
                 f"Exported {len(filtered)} events to {path}", title="Export", severity="information"
             )
-        except Exception as exc:
+        except OSError as exc:
             self.notify(f"Export failed: {exc}", title="Error", severity="error")

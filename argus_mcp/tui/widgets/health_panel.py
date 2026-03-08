@@ -16,6 +16,8 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 # Map circuit state to display
@@ -115,13 +117,10 @@ class HealthPanel(Widget):
             yield Static("", id="circuit-breaker-info")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#health-table", DataTable)
+        if table := safe_query(self, "#health-table", DataTable):
             table.add_columns("Server", "State", "Circuit", "Last Ping", "Latency")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     # ── Button handlers ──────────────────────────────────────────
 
@@ -145,81 +144,105 @@ class HealthPanel(Widget):
 
     def _get_selected_backend(self) -> Optional[str]:
         """Return the backend name at the currently highlighted row."""
-        try:
-            table = self.query_one("#health-table", DataTable)
+        if table := safe_query(self, "#health-table", DataTable):
             idx = table.cursor_row
             if 0 <= idx < len(self._backend_names):
                 return self._backend_names[idx]
-        except Exception:
-            pass
         return None
 
     def set_action_status(self, text: str) -> None:
         """Update the action status line below the buttons."""
-        try:
-            self.query_one("#health-action-status", Static).update(text)
-        except Exception:
-            pass
+        if w := safe_query(self, "#health-action-status", Static):
+            w.update(text)
 
     # ── Data update ──────────────────────────────────────────────
 
+    @staticmethod
+    def _classify_backend(b: Dict[str, Any]) -> tuple:
+        """Return (name, state_display, category, circuit_display, last_check, lat_str, circuit_info)."""
+        name = b.get("name", "?")
+        phase = b.get("phase", "unknown").lower()
+        health = b.get("health", {})
+        health_status = health.get("status", "unknown") if health else "unknown"
+        last_check = health.get("last_check", "—") if health else "—"
+        latency = health.get("latency_ms") if health else None
+        lat_str = f"{latency:.0f}ms" if latency else "—"
+        circuit = b.get("circuit_state", "closed")
+
+        if phase == "ready" or health_status == "healthy":
+            category = "healthy"
+            state_display = "[green]● healthy[/green]"
+        elif phase == "degraded" or health_status == "degraded":
+            category = "degraded"
+            state_display = "[yellow]◑ degraded[/yellow]"
+        else:
+            category = "unhealthy"
+            state_display = "[red]✕ unhealthy[/red]"
+
+        circuit_display = _CIRCUIT_DISPLAY.get(circuit, f"[dim]{circuit}[/dim]")
+
+        if isinstance(last_check, str) and "T" in last_check:
+            last_check = last_check.split("T")[1][:8]
+
+        circuit_info = None
+        if circuit and circuit != "closed":
+            failures = b.get("failure_count", "?")
+            cooldown = b.get("cooldown_remaining", "?")
+            circuit_info = (
+                f"  {name}: {circuit.upper()} — {failures} failures, cooldown: {cooldown}s"
+            )
+
+        return (
+            name,
+            state_display,
+            category,
+            circuit_display,
+            str(last_check),
+            lat_str,
+            circuit_info,
+        )
+
     def update_from_backends(self, backends: List[Dict[str, Any]]) -> None:
         """Refresh the health table from backend data."""
-        try:
-            table = self.query_one("#health-table", DataTable)
-            table.clear()
-            self._backend_names.clear()
+        table = safe_query(self, "#health-table", DataTable)
+        if table is None:
+            return
+        table.clear()
+        self._backend_names.clear()
 
-            healthy = degraded = unhealthy = 0
-            circuit_info_lines = []
+        healthy = degraded = unhealthy = 0
+        circuit_info_lines = []
 
-            for b in backends:
-                name = b.get("name", "?")
-                self._backend_names.append(name)
-                phase = b.get("phase", "unknown").lower()
-                health = b.get("health", {})
-                health_status = health.get("status", "unknown") if health else "unknown"
-                last_check = health.get("last_check", "—") if health else "—"
-                latency = health.get("latency_ms") if health else None
-                lat_str = f"{latency:.0f}ms" if latency else "—"
-                circuit = b.get("circuit_state", "closed")
+        for b in backends:
+            (
+                name,
+                state_display,
+                category,
+                circuit_display,
+                last_check,
+                lat_str,
+                circuit_info,
+            ) = self._classify_backend(b)
+            self._backend_names.append(name)
 
-                # Count by health status
-                if phase == "ready" or health_status == "healthy":
-                    healthy += 1
-                    state_display = "[green]● healthy[/green]"
-                elif phase == "degraded" or health_status == "degraded":
-                    degraded += 1
-                    state_display = "[yellow]◑ degraded[/yellow]"
-                else:
-                    unhealthy += 1
-                    state_display = "[red]✕ unhealthy[/red]"
-
-                circuit_display = _CIRCUIT_DISPLAY.get(circuit, f"[dim]{circuit}[/dim]")
-
-                # Trim timestamps
-                if isinstance(last_check, str) and "T" in last_check:
-                    last_check = last_check.split("T")[1][:8]
-
-                table.add_row(name, state_display, circuit_display, str(last_check), lat_str)
-
-                # Circuit breaker detail for open/half-open
-                if circuit and circuit != "closed":
-                    failures = b.get("failure_count", "?")
-                    cooldown = b.get("cooldown_remaining", "?")
-                    circuit_info_lines.append(
-                        f"  {name}: {circuit.upper()} — {failures} failures, cooldown: {cooldown}s"
-                    )
-
-            summary = f"Healthy: {healthy}   Degraded: {degraded}   Unhealthy: {unhealthy}"
-            self.query_one("#health-summary", Static).update(summary)
-
-            if circuit_info_lines:
-                self.query_one("#circuit-breaker-info", Static).update(
-                    "[b]Circuit Breakers:[/b]\n" + "\n".join(circuit_info_lines)
-                )
+            if category == "healthy":
+                healthy += 1
+            elif category == "degraded":
+                degraded += 1
             else:
-                self.query_one("#circuit-breaker-info", Static).update("")
+                unhealthy += 1
 
-        except Exception:
-            logger.debug("Cannot update health panel", exc_info=True)
+            table.add_row(name, state_display, circuit_display, last_check, lat_str)
+
+            if circuit_info:
+                circuit_info_lines.append(circuit_info)
+
+        summary = f"Healthy: {healthy}   Degraded: {degraded}   Unhealthy: {unhealthy}"
+        if sw := safe_query(self, "#health-summary", Static):
+            sw.update(summary)
+
+        if cw := safe_query(self, "#circuit-breaker-info", Static):
+            if circuit_info_lines:
+                cw.update("[b]Circuit Breakers:[/b]\n" + "\n".join(circuit_info_lines))
+            else:
+                cw.update("")

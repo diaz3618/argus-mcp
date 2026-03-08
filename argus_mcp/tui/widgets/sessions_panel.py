@@ -15,6 +15,8 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,52 +53,49 @@ class SessionsPanel(Widget):
             yield DataTable(id="sessions-table")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#sessions-table", DataTable)
+        if table := safe_query(self, "#sessions-table", DataTable):
             table.add_columns("Session ID", "User", "Tools", "Created", "TTL")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_sessions(self, sessions: List[Dict[str, Any]], ttl_default: str = "30m") -> None:
         """Refresh the sessions table from session data."""
-        try:
-            table = self.query_one("#sessions-table", DataTable)
-            table.clear()
+        table = safe_query(self, "#sessions-table", DataTable)
+        if table is None:
+            return
+        table.clear()
 
-            active = 0
-            expired = 0
+        active = 0
+        expired = 0
 
-            for s in sessions:
-                sid = s.get("session_id", "?")
-                # Truncate session ID for display
-                if len(sid) > 16:
-                    sid = sid[:16] + "…"
-                user = s.get("user", "—")
-                tools = s.get("tool_count", s.get("tools", "—"))
-                created = s.get("created_at", s.get("created", ""))
-                if isinstance(created, str) and "T" in created:
-                    created = created.split("T")[1][:8]
-                ttl = s.get("ttl_remaining", "—")
-                is_active = s.get("active", True)
+        for s in sessions:
+            sid = s.get("session_id", "?")
+            # Truncate session ID for display
+            if len(sid) > 16:
+                sid = sid[:16] + "…"
+            user = s.get("user", "—")
+            tools = s.get("tool_count", s.get("tools", "—"))
+            created = s.get("created_at", s.get("created", ""))
+            if isinstance(created, str) and "T" in created:
+                created = created.split("T")[1][:8]
+            ttl = s.get("ttl_remaining", "—")
+            is_active = s.get("active", True)
 
-                if is_active:
-                    active += 1
-                    if isinstance(ttl, (int, float)) and ttl < 120:
-                        ttl_display = f"[yellow]{ttl:.0f}s ⚠[/yellow]"
-                    else:
-                        ttl_display = str(ttl)
+            if is_active:
+                active += 1
+                if isinstance(ttl, (int, float)) and ttl < 120:
+                    ttl_display = f"[yellow]{ttl:.0f}s ⚠[/yellow]"
                 else:
-                    expired += 1
-                    ttl_display = "[dim]expired[/dim]"
+                    ttl_display = str(ttl)
+            else:
+                expired += 1
+                ttl_display = "[dim]expired[/dim]"
 
-                table.add_row(sid, user, str(tools), str(created), ttl_display)
+            table.add_row(sid, user, str(tools), str(created), ttl_display)
 
-            summary = f"Active: {active}    Expired (1h): {expired}    TTL: {ttl_default}"
-            self.query_one("#sessions-summary", Static).update(summary)
-        except Exception:
-            logger.debug("Cannot update sessions panel", exc_info=True)
+        summary = f"Active: {active}    Expired (1h): {expired}    TTL: {ttl_default}"
+        if w := safe_query(self, "#sessions-summary", Static):
+            w.update(summary)
 
 
 class SessionDetailModal(ModalScreen[Optional[str]]):
@@ -176,8 +175,7 @@ class SessionDetailModal(ModalScreen[Optional[str]]):
                 yield Button("Close", variant="default", id="btn-session-close")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#sdm-routing-table", DataTable)
+        if table := safe_query(self, "#sdm-routing-table", DataTable):
             table.add_columns("Tool", "→ Backend", "Affinity")
             table.cursor_type = "row"
             table.zebra_stripes = True
@@ -188,8 +186,6 @@ class SessionDetailModal(ModalScreen[Optional[str]]):
                 backend = r.get("backend", "?")
                 affinity = r.get("affinity", "sticky")
                 table.add_row(tool, backend, affinity)
-        except Exception:
-            pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-session-kill":

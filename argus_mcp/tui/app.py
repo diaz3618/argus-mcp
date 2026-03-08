@@ -11,6 +11,7 @@ from typing import Any, Iterable, Optional, Set
 
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
@@ -280,7 +281,7 @@ class ArgusApp(App):
                 f"[b]Log level:[/b]   {srv.log_level}",
             ]
             self.notify("\n".join(lines), title="Server Details", timeout=8)
-        except Exception:
+        except NoMatches:
             self.notify("Switch to Dashboard to view server details.", timeout=4)
 
     def action__tb_server_details(self) -> None:
@@ -298,7 +299,7 @@ class ArgusApp(App):
                 f"[b]Status:[/b]     {srv.status_text}",
             ]
             self.notify("\n".join(lines), title="Connection Info", timeout=8)
-        except Exception:
+        except NoMatches:
             self.notify("Switch to Dashboard to view connection info.", timeout=4)
 
     # ── Lifecycle ───────────────────────────────────────────────
@@ -339,7 +340,7 @@ class ArgusApp(App):
 
             self._start_remote_mode(info, event_log)
             self._dashboard_init_done = True
-        except Exception as exc:
+        except (NoMatches, AttributeError) as exc:
             logger.warning("Dashboard initialization deferred: %s", exc)
 
     def _ensure_server_manager(self) -> None:
@@ -405,7 +406,7 @@ class ArgusApp(App):
         # Stop capturing print()
         try:
             self.screen.query_one(EventLogWidget).stop_capture()
-        except Exception:
+        except NoMatches:
             pass
 
     # ── Remote-mode polling ─────────────────────────────────────
@@ -452,7 +453,7 @@ class ArgusApp(App):
 
                 events = await client.get_events(limit=100)
                 self._apply_events_response(events)
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 logger.warning("Initial data fetch failed: %s", exc)
                 self.post_message(ConnectionLost(reason=f"Cannot reach server: {exc}"))
         else:
@@ -487,7 +488,7 @@ class ArgusApp(App):
             try:
                 await mgr.connect(name)
                 client = mgr.active_client
-            except Exception:
+            except (OSError, ConnectionError):
                 return
 
         if client is None:
@@ -515,10 +516,10 @@ class ArgusApp(App):
             try:
                 backends_resp = await client.get_backends()
                 self._apply_backends_response(backends_resp)
-            except Exception:
+            except (OSError, ConnectionError):
                 pass  # Non-critical — status poll already covers basics
 
-        except Exception as exc:
+        except (OSError, ConnectionError) as exc:
             was_connected = self._connected
             self._connected = False
             self._caps_loaded = False
@@ -545,7 +546,7 @@ class ArgusApp(App):
                 srv_widget.transport_type = "streamable-http"
             srv_widget.status_text = status.service.state
             srv_widget.config_file = status.config.file_path or ""
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
         try:
@@ -555,7 +556,7 @@ class ArgusApp(App):
                 backend.connected = status.config.backend_count
             elif status.service.state == "error":
                 backend.connected = 0
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
     def _apply_backends_response(self, backends_resp: Any) -> None:
@@ -564,7 +565,7 @@ class ArgusApp(App):
             backend_widget = self.screen.query_one(BackendStatusWidget)
             details = [b.model_dump() for b in backends_resp.backends]
             backend_widget.update_from_backends(details)
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
     def _apply_capabilities_response(self, caps: Any) -> None:
@@ -580,7 +581,7 @@ class ArgusApp(App):
         try:
             cap_section = self.screen.query_one(CapabilitySection)
             cap_section.populate(tools, resources, prompts, route_map)
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
         try:
@@ -589,7 +590,7 @@ class ArgusApp(App):
                 "✅ Service Ready",
                 f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts loaded",
             )
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
     def _apply_events_response(self, events_resp: Any) -> None:
@@ -615,7 +616,7 @@ class ArgusApp(App):
                     timestamp=ev.timestamp,
                     extra_lines=extra if extra else None,
                 )
-            except Exception:
+            except NoMatches:
                 pass  # Widget not in active screen
 
             # Bridge config_sync events to SyncStatusWidget
@@ -650,7 +651,7 @@ class ArgusApp(App):
                     "details": event.details,
                 }
             )
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
     # ── Server selector ───────────────────────────────────────────
@@ -665,7 +666,7 @@ class ArgusApp(App):
 
         try:
             selector = self.screen.query_one("#srv-selector", ServerSelectorWidget)
-        except Exception:
+        except NoMatches:
             return  # widget not mounted yet
 
         servers = [
@@ -704,7 +705,7 @@ class ArgusApp(App):
                 srv_widget = self.screen.query_one(ServerInfoWidget)
                 srv_widget.sse_url = entry.url
                 srv_widget.status_text = "Connecting\u2026" if not entry.connected else "Connected"
-            except Exception:
+            except NoMatches:
                 pass
 
             try:
@@ -713,7 +714,7 @@ class ArgusApp(App):
                     "Server Switch",
                     f"Switched to '{name}' ({entry.url})",
                 )
-            except Exception:
+            except NoMatches:
                 pass
 
         # Force an immediate poll
@@ -739,7 +740,7 @@ class ArgusApp(App):
         try:
             srv_widget = self.screen.query_one(ServerInfoWidget)
             srv_widget.status_text = "Disconnected"
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
         try:
@@ -748,7 +749,7 @@ class ArgusApp(App):
                 "⚠️  Connection Lost",
                 event.reason,
             )
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
         self.notify(
             f"Connection lost: {event.reason}",
@@ -762,7 +763,7 @@ class ArgusApp(App):
         try:
             srv_widget = self.screen.query_one(ServerInfoWidget)
             srv_widget.status_text = "Connected"
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
         try:
@@ -771,7 +772,7 @@ class ArgusApp(App):
                 "✅ Reconnected",
                 "Connection to server restored.",
             )
-        except Exception:
+        except NoMatches:
             pass  # Widget not in active screen
 
     def on_backend_status_widget_backend_selected(
@@ -813,9 +814,9 @@ class ArgusApp(App):
             try:
                 event_log = self.screen.query_one(EventLogWidget)
                 event_log.add_event("🔄 Reconnect", f"Requested reconnect for '{name}'")
-            except Exception:
+            except NoMatches:
                 pass
-        except Exception as exc:
+        except (OSError, ConnectionError) as exc:
             self.notify(f"Reconnect failed: {exc}", title="Error", severity="error")
 
     # ── Key-bound actions ───────────────────────────────────────
@@ -827,7 +828,7 @@ class ArgusApp(App):
 
             tabs = self.screen.query_one("#cap-tabs", TabbedContent)
             tabs.active = "tab-tools"
-        except Exception:
+        except NoMatches:
             logger.debug("Could not switch to tools tab", exc_info=True)
 
     def action_show_resources(self) -> None:
@@ -837,7 +838,7 @@ class ArgusApp(App):
 
             tabs = self.screen.query_one("#cap-tabs", TabbedContent)
             tabs.active = "tab-resources"
-        except Exception:
+        except NoMatches:
             logger.debug("Could not switch to resources tab", exc_info=True)
 
     def action_show_prompts(self) -> None:
@@ -847,7 +848,7 @@ class ArgusApp(App):
 
             tabs = self.screen.query_one("#cap-tabs", TabbedContent)
             tabs.active = "tab-prompts"
-        except Exception:
+        except NoMatches:
             logger.debug("Could not switch to prompts tab", exc_info=True)
 
     def action_quit(self) -> None:
@@ -858,7 +859,7 @@ class ArgusApp(App):
             mgr = self._server_manager
             if mgr is not None:
                 backends_running = sum(1 for e in mgr.entries.values() if e.connected)
-        except Exception:
+        except (AttributeError, TypeError):
             pass
 
         def _on_exit_choice(result: str | None) -> None:
@@ -867,7 +868,7 @@ class ArgusApp(App):
             try:
                 event_log = self.screen.query_one(EventLogWidget)
                 event_log.add_event("🛑 Shutting Down", f"Exit mode: {result}")
-            except Exception:
+            except NoMatches:
                 pass
 
             if result == "stop-and-exit":
@@ -895,7 +896,7 @@ class ArgusApp(App):
             if client is not None:
                 try:
                     await client.post_shutdown()
-                except Exception as exc:
+                except (OSError, ConnectionError) as exc:
                     logger.warning("Shutdown request failed: %s", exc)
         from argus_mcp.tui.settings import load_settings, save_settings
 

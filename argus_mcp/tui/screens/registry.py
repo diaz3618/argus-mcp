@@ -18,8 +18,10 @@ from typing import Any, Dict, List, Optional
 import yaml  # type: ignore[import-untyped]
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import Static
 
+from argus_mcp.config.loader import find_config_file
 from argus_mcp.registry.cache import RegistryCache
 from argus_mcp.registry.client import RegistryClient
 from argus_mcp.registry.models import ServerEntry
@@ -62,6 +64,16 @@ class RegistryScreen(ArgusScreen):
         self._cache = RegistryCache()
         self._clients: List[RegistryClient] = []
         self._load_task: asyncio.Task[None] | None = asyncio.create_task(self._load_registry())
+        self._load_task.add_done_callback(self._on_load_task_done)
+
+    @staticmethod
+    def _on_load_task_done(task: asyncio.Task[None]) -> None:
+        """Log unhandled exceptions from the registry load task."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.error("Registry load failed: %s", exc)
 
     async def _load_registry(self) -> None:
         """Fetch servers from all configured registries."""
@@ -86,7 +98,7 @@ class RegistryScreen(ArgusScreen):
             try:
                 page = await client.list_servers()
                 all_entries.extend(page.servers)
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 logger.warning("Failed to fetch registry %s: %s", url, exc)
 
         browser.entries = all_entries
@@ -118,7 +130,7 @@ class RegistryScreen(ArgusScreen):
                 # Sort by priority (lower = first)
                 sorted_regs = sorted(cfg_registries, key=lambda r: r.get("priority", 100))
                 urls = [r["url"] for r in sorted_regs if r.get("url")]
-        except Exception:
+        except (KeyError, ValueError, OSError):
             logger.debug("Could not read registries from settings", exc_info=True)
 
         # 2. Also check if the ArgusConfig has registries via app state
@@ -128,7 +140,7 @@ class RegistryScreen(ArgusScreen):
                 if argus_cfg is not None:
                     sorted_regs = sorted(argus_cfg.registries, key=lambda r: r.priority)
                     urls = [r.url for r in sorted_regs]
-            except Exception:
+            except (AttributeError, KeyError):
                 logger.debug("Could not read registries from config", exc_info=True)
 
         return urls
@@ -137,7 +149,7 @@ class RegistryScreen(ArgusScreen):
         """Update the status bar below the header."""
         try:
             self.query_one("#registry-status-bar", Static).update(text)
-        except Exception:
+        except NoMatches:
             pass
 
     # ── event handlers ──────────────────────────────────────────────
@@ -204,13 +216,9 @@ class RegistryScreen(ArgusScreen):
             if path and os.path.isfile(path):
                 return path
 
-        # Fallback: search for config.yaml in CWD
-        for name in ("config.yaml", "config.yml"):
-            candidate = os.path.join(os.getcwd(), name)
-            if os.path.isfile(candidate):
-                return candidate
-
-        return None
+        # Fallback: use central config discovery
+        path = find_config_file()
+        return path if os.path.isfile(path) else None
 
     def _write_backend_to_config(
         self, config_path: str, backend_name: str, backend_config: Dict[str, Any]
@@ -236,7 +244,7 @@ class RegistryScreen(ArgusScreen):
             logger.info("Wrote backend '%s' to %s", backend_name, config_path)
             return True
 
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             logger.error("Failed to write config: %s", exc)
             self.notify(f"Failed to write config: {exc}", severity="error")
             return False
@@ -262,7 +270,7 @@ class RegistryScreen(ArgusScreen):
                     errors = "; ".join(result.errors) if result.errors else "unknown"
                     self._set_status(f"Reload failed: {errors}")
                     self.notify(f"Reload errors: {errors}", severity="warning")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 logger.warning("Reload request failed: %s", exc)
                 self._set_status(f"Reload failed: {exc}")
 

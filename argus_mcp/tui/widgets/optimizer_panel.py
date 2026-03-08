@@ -14,6 +14,8 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Input, Label, ProgressBar, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,13 +98,10 @@ class OptimizerPanel(Widget):
             yield DataTable(id="opt-results")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#opt-results", DataTable)
+        if table := safe_query(self, "#opt-results", DataTable):
             table.add_columns("#", "Tool", "Server", "Score")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_optimizer_status(
         self,
@@ -122,38 +121,31 @@ class OptimizerPanel(Widget):
             if enabled
             else "Optimizer: [dim]✗ Disabled[/dim]"
         )
-        try:
-            self.query_one("#opt-status", Static).update(status_text)
-        except Exception:
-            pass
+        if w := safe_query(self, "#opt-status", Static):
+            w.update(status_text)
 
         # Update savings bar
         if baseline_tokens > 0:
             savings_pct = ((baseline_tokens - optimized_tokens) / baseline_tokens) * 100
-            try:
-                bar = self.query_one("#opt-savings-bar", ProgressBar)
+            if bar := safe_query(self, "#opt-savings-bar", ProgressBar):
                 bar.update(progress=savings_pct)
                 detail = (
                     f"  Baseline: {total_tools} tools │ ~{baseline_tokens:,} tokens\n"
                     f"  Optimized: avg {self._optimized_avg} │ ~{optimized_tokens:,} tokens\n"
                     f"  Savings: {savings_pct:.1f}%"
                 )
-                self.query_one("#opt-savings-detail", Static).update(detail)
-            except Exception:
-                pass
+                if dw := safe_query(self, "#opt-savings-detail", Static):
+                    dw.update(detail)
 
     def update_search_results(self, results: List[Dict[str, Any]]) -> None:
         """Populate the test search results table."""
-        try:
-            table = self.query_one("#opt-results", DataTable)
+        if table := safe_query(self, "#opt-results", DataTable):
             table.clear()
             for i, r in enumerate(results, 1):
                 name = r.get("name", "?")
                 server = r.get("backend", r.get("server", "?"))
                 score = r.get("score", 0)
                 table.add_row(str(i), name, server, f"{score:.2f}")
-        except Exception:
-            pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-opt-search":
@@ -171,10 +163,11 @@ class OptimizerPanel(Widget):
                 return
 
             limit = 5
-            try:
-                limit = int(self.query_one("#opt-limit-input", Input).value)
-            except Exception:
-                pass
+            if lw := safe_query(self, "#opt-limit-input", Input):
+                try:
+                    limit = int(lw.value)
+                except (ValueError, TypeError):
+                    pass
 
             # Prefer the real ToolIndex from the optimizer
             from argus_mcp.server.app import mcp_server
@@ -211,5 +204,5 @@ class OptimizerPanel(Widget):
 
             matches.sort(key=lambda x: x["score"], reverse=True)
             self.update_search_results(matches[:limit])
-        except Exception:
-            logger.debug("Test search failed", exc_info=True)
+        except (AttributeError, KeyError, TypeError) as exc:
+            logger.debug("Test search failed: %s", exc, exc_info=True)

@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widgets import Input, Label, Static, Switch
 
@@ -148,6 +149,6 @@ class ParamEditorWidget(Static):
                             defaults[name] = float(raw)
                         else:
                             defaults[name] = raw
-            except Exception:
+            except (NoMatches, ValueError):
                 pass
         return defaults

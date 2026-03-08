@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, RadioButton, RadioSet, Static
 
@@ -94,7 +95,7 @@ class ExitModal(ModalScreen[Optional[str]]):
                 self.dismiss("stop-and-exit")
             else:
                 self.dismiss(None)
-        except Exception:
+        except NoMatches:
             self.dismiss("stop-and-exit")
 
     def action_cancel(self) -> None:

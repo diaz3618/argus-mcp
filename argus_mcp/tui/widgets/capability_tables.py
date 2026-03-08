@@ -10,6 +10,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import DataTable, TabbedContent, TabPane
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,14 +79,11 @@ class CapabilitySection(Widget):
         widget (the clickable button) rather than setting
         ``TabPane.label`` which does not propagate to the visible tab.
         """
-        try:
-            tabs = self.query_one("#cap-tabs", TabbedContent)
+        if tabs := safe_query(self, "#cap-tabs", TabbedContent):
             conflicts_note = f" ⚡{self._conflicts_count}" if self._conflicts_count else ""
             tabs.get_tab("tab-tools").label = f"Tools ({self.tools_count}){conflicts_note}"
             tabs.get_tab("tab-resources").label = f"Resources ({self.resources_count})"
             tabs.get_tab("tab-prompts").label = f"Prompts ({self.prompts_count})"
-        except Exception:
-            logger.debug("Tab labels not yet available", exc_info=True)
 
     def watch_tools_count(self) -> None:
         self._update_tab_labels()
@@ -97,21 +96,8 @@ class CapabilitySection(Widget):
 
     # ── Data population ─────────────────────────────────────────
 
-    def populate(
-        self,
-        tools: List[Any],
-        resources: List[Any],
-        prompts: List[Any],
-        route_map: Optional[Dict[str, Tuple[str, str]]] = None,
-    ) -> None:
-        """Fill all three tables from MCP type lists or API dicts.
-
-        Items may be either MCP SDK objects (with ``.name``, ``.description``
-        attributes) or plain dicts returned by the management API.
-        """
-        rmap = route_map or {}
-
-        # Tools
+    def _populate_tools_table(self, tools: List[Any], rmap: Dict[str, Tuple[str, str]]) -> int:
+        """Fill the Tools DataTable and return the conflict count."""
         dt_tools = self.query_one("#dt-tools", DataTable)
         dt_tools.clear()
         conflicts = 0
@@ -123,7 +109,6 @@ class CapabilitySection(Widget):
             server = _attr_or_key(t, "backend", "") or rmap.get(name, ("—", ""))[0]
             desc = _attr_or_key(t, "description")
 
-            # If renamed, show original with indicator
             if renamed and original and original != name:
                 original_display = f"[yellow]⚡ {original}[/yellow]"
                 conflicts += 1
@@ -132,17 +117,13 @@ class CapabilitySection(Widget):
             else:
                 original_display = "—"
 
-            dt_tools.add_row(
-                name,
-                original_display,
-                server,
-                _trunc(desc),
-                key=name,
-            )
-        self.tools_count = len(tools)
-        self._conflicts_count = conflicts
+            dt_tools.add_row(name, original_display, server, _trunc(desc), key=name)
+        return conflicts
 
-        # Resources
+    def _populate_resources_table(
+        self, resources: List[Any], rmap: Dict[str, Tuple[str, str]]
+    ) -> None:
+        """Fill the Resources DataTable."""
         dt_res = self.query_one("#dt-resources", DataTable)
         dt_res.clear()
         for r in resources:
@@ -151,16 +132,10 @@ class CapabilitySection(Widget):
             uri = _attr_or_key(r, "uri", name)
             mime = _attr_or_key(r, "mimeType") or _attr_or_key(r, "mime_type") or "—"
             desc = _attr_or_key(r, "description")
-            dt_res.add_row(
-                str(uri),
-                server,
-                _trunc(desc) if desc else "—",
-                mime,
-                key=name,
-            )
-        self.resources_count = len(resources)
+            dt_res.add_row(str(uri), server, _trunc(desc) if desc else "—", mime, key=name)
 
-        # Prompts
+    def _populate_prompts_table(self, prompts: List[Any], rmap: Dict[str, Tuple[str, str]]) -> None:
+        """Fill the Prompts DataTable."""
         dt_prompts = self.query_one("#dt-prompts", DataTable)
         dt_prompts.clear()
         for p in prompts:
@@ -169,16 +144,27 @@ class CapabilitySection(Widget):
             desc = _attr_or_key(p, "description")
             args_raw = _attr_or_key(p, "arguments") or []
             if args_raw:
-                # Handle both objects with .name and dicts with "name"
                 arg_names = [_attr_or_key(a, "name", str(a)) for a in args_raw]
                 args_str = ", ".join(arg_names)
             else:
                 args_str = "—"
-            dt_prompts.add_row(
-                name,
-                server,
-                _trunc(desc) if desc else "—",
-                args_str,
-                key=name,
-            )
+            dt_prompts.add_row(name, server, _trunc(desc) if desc else "—", args_str, key=name)
+
+    def populate(
+        self,
+        tools: List[Any],
+        resources: List[Any],
+        prompts: List[Any],
+        route_map: Optional[Dict[str, Tuple[str, str]]] = None,
+    ) -> None:
+        """Fill all three tables from MCP type lists or API dicts."""
+        rmap = route_map or {}
+
+        self._conflicts_count = self._populate_tools_table(tools, rmap)
+        self.tools_count = len(tools)
+
+        self._populate_resources_table(resources, rmap)
+        self.resources_count = len(resources)
+
+        self._populate_prompts_table(prompts, rmap)
         self.prompts_count = len(prompts)

@@ -9,6 +9,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.constants import SERVER_NAME, SERVER_VERSION
 
 logger = logging.getLogger(__name__)
@@ -53,11 +54,10 @@ class ServerInfoWidget(Widget):
         return "\n".join(lines)
 
     def _refresh_display(self) -> None:
-        try:
-            self.query_one("#title-row", Static).update(self._render_title())
-            self.query_one("#info-body", Static).update(self._render_body())
-        except Exception:
-            logger.debug("ServerInfoWidget not yet mounted", exc_info=True)
+        if w := safe_query(self, "#title-row", Static):
+            w.update(self._render_title())
+        if w := safe_query(self, "#info-body", Static):
+            w.update(self._render_body())
 
     # Watchers – auto-refresh on any reactive change
     def watch_server_name(self) -> None:

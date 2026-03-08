@@ -18,6 +18,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Static
 
+from argus_mcp._error_utils import safe_query
+from argus_mcp.config.loader import find_config_file
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.param_editor import ParamEditorWidget
 from argus_mcp.tui.widgets.tool_preview import ToolPreviewWidget
@@ -172,13 +174,10 @@ class ToolEditorScreen(ArgusScreen):
         rename.value = display_name
 
         # Update parameter editor with tool's input schema
-        try:
-            param_editor = self.query_one("#param-editor", ParamEditorWidget)
+        if param_editor := safe_query(self, "#param-editor", ParamEditorWidget):
             schema = tool_info.get("inputSchema", {})
             defaults = mods.get("defaults", {})
             param_editor.load_schema(schema, defaults)
-        except Exception:
-            pass  # ParamEditor not yet mounted
 
         # Update preview
         preview = self.query_one("#tool-preview", ToolPreviewWidget)
@@ -281,7 +280,7 @@ class ToolEditorScreen(ArgusScreen):
             # Trigger hot-reload
             self._trigger_reload()
 
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             logger.error("Failed to save tool overrides: %s", exc)
             self.notify(f"Save failed: {exc}", severity="error")
 
@@ -293,11 +292,8 @@ class ToolEditorScreen(ArgusScreen):
             path = getattr(status.config, "file_path", None)
             if path and os.path.isfile(path):
                 return path
-        for name in ("config.yaml", "config.yml"):
-            candidate = os.path.join(os.getcwd(), name)
-            if os.path.isfile(candidate):
-                return candidate
-        return None
+        path = find_config_file()
+        return path if os.path.isfile(path) else None
 
     def _trigger_reload(self) -> None:
         """Request a config reload from the active server."""
@@ -316,7 +312,7 @@ class ToolEditorScreen(ArgusScreen):
                 else:
                     errors = "; ".join(result.errors) if result.errors else "unknown"
                     self.notify(f"Reload warning: {errors}", severity="warning")
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 logger.warning("Reload after save failed: %s", exc)
 
         self.app.run_worker(_do_reload(), exclusive=True, name="editor-reload")
@@ -330,9 +326,8 @@ class ToolEditorScreen(ArgusScreen):
 
     def _update_diff_panel(self) -> None:
         """Render a summary of all pending modifications."""
-        try:
-            diff = self.query_one("#diff-panel", Static)
-        except Exception:
+        diff = safe_query(self, "#diff-panel", Static)
+        if diff is None:
             return
         if not self._modifications:
             diff.update("[dim]No pending changes[/]")

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import Input, Static
 
 from argus_mcp.tui.screens.base import ArgusScreen
@@ -80,7 +81,7 @@ class ToolsScreen(ArgusScreen):
                 self._cached_prompts,
                 self._cached_route_map,
             )
-        except Exception:
+        except NoMatches:
             logger.debug("Cannot populate tools cap section", exc_info=True)
         self._update_status_bar(tools)
 
@@ -108,8 +109,13 @@ class ToolsScreen(ArgusScreen):
             parts.append("[C] Conflicts only")
         try:
             self.query_one("#tools-status-bar", Static).update("  │  ".join(parts))
-        except Exception:
+        except NoMatches:
             pass
+
+    @staticmethod
+    def _item_matches(item: Dict[str, Any], query: str, fields: tuple) -> bool:
+        """Return True if *query* appears in any of the named *fields*."""
+        return any(query in (item.get(f, "") or "").lower() for f in fields)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Live-filter capability tables based on search text."""
@@ -127,29 +133,22 @@ class ToolsScreen(ArgusScreen):
         filtered_tools = [
             t
             for t in base_tools
-            if query in (t.get("name", "") or "").lower()
-            or query in (t.get("description", "") or "").lower()
-            or query in (t.get("original_name", "") or "").lower()
+            if self._item_matches(t, query, ("name", "description", "original_name"))
         ]
         filtered_resources = [
             r
             for r in self._cached_resources
-            if query in (r.get("name", "") or "").lower()
-            or query in (r.get("uri", "") or "").lower()
-            or query in (r.get("description", "") or "").lower()
+            if self._item_matches(r, query, ("name", "uri", "description"))
         ]
         filtered_prompts = [
-            p
-            for p in self._cached_prompts
-            if query in (p.get("name", "") or "").lower()
-            or query in (p.get("description", "") or "").lower()
+            p for p in self._cached_prompts if self._item_matches(p, query, ("name", "description"))
         ]
         try:
             cap = self.query_one("#tools-cap-section", CapabilitySection)
             cap.populate(
                 filtered_tools, filtered_resources, filtered_prompts, self._cached_route_map
             )
-        except Exception:
+        except NoMatches:
             pass
         self._update_status_bar(filtered_tools)
 
@@ -166,7 +165,7 @@ class ToolsScreen(ArgusScreen):
         """Focus the search input."""
         try:
             self.query_one("#tools-search", Input).focus()
-        except Exception:
+        except NoMatches:
             pass
 
     def action_clear_search(self) -> None:
@@ -178,7 +177,7 @@ class ToolsScreen(ArgusScreen):
             else:
                 # If already empty, let escape propagate
                 pass
-        except Exception:
+        except NoMatches:
             pass
 
     def action_toggle_conflicts(self) -> None:

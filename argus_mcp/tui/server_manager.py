@@ -175,7 +175,7 @@ class ServerManager:
         if entry.client is not None:
             try:
                 await entry.client.close()
-            except Exception:
+            except (OSError, ConnectionError):
                 logger.debug("Error closing client for '%s'", name, exc_info=True)
 
         entry.client = None
@@ -189,7 +189,7 @@ class ServerManager:
             try:
                 await self.connect(name)
                 results[name] = None
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
                 logger.warning("Failed to connect to '%s': %s", name, exc)
                 results[name] = exc
         return results
@@ -226,7 +226,7 @@ class ServerManager:
         except FileNotFoundError:
             logger.debug("No servers.json found at %s — starting empty", self._config_path)
             return
-        except Exception:
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError):
             logger.warning("Could not read servers.json, starting empty", exc_info=True)
             return
 
@@ -271,7 +271,7 @@ class ServerManager:
             with open(self._config_path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2)
             logger.debug("Saved %d server(s) to %s", len(servers_list), self._config_path)
-        except Exception:
+        except OSError:
             logger.warning("Could not save servers.json", exc_info=True)
 
     # ── Convenience constructors ────────────────────────────────

@@ -16,6 +16,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import DataTable, Input, Label, Static
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
 
 logger = logging.getLogger(__name__)
@@ -113,10 +114,8 @@ class RegistryBrowserWidget(Widget):
 
     def set_status(self, text: str) -> None:
         """Update the status bar text."""
-        try:
-            self.query_one("#registry-status", Static).update(text)
-        except Exception:
-            pass
+        if w := safe_query(self, "#registry-status", Static):
+            w.update(text)
 
     # ── internal ────────────────────────────────────────────────────
 
@@ -127,9 +126,8 @@ class RegistryBrowserWidget(Widget):
         return [e for e in self.entries if q in e.name.lower() or q in e.description.lower()]
 
     def _refresh_table(self) -> None:
-        try:
-            table = self.query_one("#registry-table", DataTable)
-        except Exception:
+        table = safe_query(self, "#registry-table", DataTable)
+        if table is None:
             return
         table.clear()
         for entry in self._filtered_entries():

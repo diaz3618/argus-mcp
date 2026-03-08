@@ -11,6 +11,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import DataTable, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 # Phase → (icon, color)
@@ -67,13 +69,10 @@ class BackendStatusWidget(Widget):
 
     def on_mount(self) -> None:
         """Set up the backends DataTable columns."""
-        try:
-            table = self.query_one("#backend-table", DataTable)
+        if table := safe_query(self, "#backend-table", DataTable):
             table.add_columns("", "Name", "Transport", "Phase", "Latency")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
         self._refresh_display()
 
     def update_from_backends(self, backends: List[Dict[str, Any]]) -> None:
@@ -93,84 +92,86 @@ class BackendStatusWidget(Widget):
             if backend:
                 self.post_message(self.BackendSelected(backend))
 
+    def _populate_backend_table(self, details: List[Dict[str, Any]], table: DataTable) -> None:
+        """Fill the backend table with rows from *details*."""
+        table.clear()
+        for b in details:
+            phase = b.get("phase", "pending")
+            icon, color = _PHASE_STYLE.get(phase, ("?", "$text-muted"))
+            name = b.get("name", "?")
+            transport = b.get("type", "?")
+            transport_plain = {
+                "stdio": "stdio",
+                "sse": "SSE",
+                "streamable-http": "StreamableHTTP",
+                "streamable_http": "StreamableHTTP",
+            }.get(transport, transport)
+            latency = b.get("last_latency_ms")
+            if latency is None:
+                health = b.get("health", {})
+                latency = health.get("latency_ms") if isinstance(health, dict) else None
+            lat_str = f"{latency:.0f}ms" if latency else "—"
+            table.add_row(
+                f"[{color}]{icon}[/{color}]",
+                name,
+                transport_plain,
+                phase.title(),
+                lat_str,
+                key=name,
+            )
+
+    @staticmethod
+    def _build_phase_summary(details: List[Dict[str, Any]]) -> str:
+        """Return a Rich-formatted phase summary string."""
+        counts: Dict[str, int] = {}
+        for b in details:
+            p = b.get("phase", "pending")
+            counts[p] = counts.get(p, 0) + 1
+        parts: list[str] = []
+        for phase_key in ("ready", "degraded", "failed", "pending", "initializing"):
+            cnt = counts.get(phase_key, 0)
+            if cnt > 0:
+                icon_char = _PHASE_SUMMARY.get(phase_key, "?")
+                _, color = _PHASE_STYLE.get(phase_key, ("?", "dim"))
+                parts.append(f"[{color}]{icon_char} {phase_key.title()}={cnt}[/{color}]")
+        return "  ".join(parts)
+
+    def _compute_connection_detail(self) -> tuple[str, str]:
+        """Return ``(detail_text, color)`` describing connection status."""
+        if self.total == 0:
+            return "No backends configured", "$text-muted"
+        if self.connected == self.total:
+            return f"All {self.total} connected", "green"
+        if self.connected == 0:
+            return f"0 / {self.total} connected", "red"
+        return f"{self.connected} / {self.total} connected", "yellow"
+
     def _refresh_display(self) -> None:
-        try:
-            details = self.backend_details
-            table = self.query_one("#backend-table", DataTable)
+        table = safe_query(self, "#backend-table", DataTable)
+        if table is None:
+            return
+        details = self.backend_details
 
-            if details:
-                table.clear()
-                for b in details:
-                    phase = b.get("phase", "pending")
-                    icon, color = _PHASE_STYLE.get(phase, ("?", "$text-muted"))
-                    name = b.get("name", "?")
-                    transport = b.get("type", "?")
-                    # Strip Rich markup for table cell — use plain text
-                    transport_plain = {
-                        "stdio": "stdio",
-                        "sse": "SSE",
-                        "streamable-http": "StreamableHTTP",
-                        "streamable_http": "StreamableHTTP",
-                    }.get(transport, transport)
-                    latency = b.get("last_latency_ms")
-                    if latency is None:
-                        health = b.get("health", {})
-                        latency = health.get("latency_ms") if isinstance(health, dict) else None
-                    lat_str = f"{latency:.0f}ms" if latency else "—"
-                    table.add_row(
-                        f"[{color}]{icon}[/{color}]",
-                        name,
-                        transport_plain,
-                        phase.title(),
-                        lat_str,
-                        key=name,
-                    )
+        if details:
+            self._populate_backend_table(details, table)
+            summary = self._build_phase_summary(details)
+        else:
+            bar_parts: list[str] = []
+            for i in range(self.total):
+                if i < self.connected:
+                    bar_parts.append("[green]●[/green]")
+                else:
+                    bar_parts.append("[red]○[/red]")
+            summary = " ".join(bar_parts) if bar_parts else "—"
 
-                # Phase summary footer
-                counts: Dict[str, int] = {}
-                for b in details:
-                    p = b.get("phase", "pending")
-                    counts[p] = counts.get(p, 0) + 1
-                summary_parts: list[str] = []
-                for phase_key in ("ready", "degraded", "failed", "pending", "initializing"):
-                    cnt = counts.get(phase_key, 0)
-                    if cnt > 0:
-                        icon_char = _PHASE_SUMMARY.get(phase_key, "?")
-                        _, color = _PHASE_STYLE.get(phase_key, ("?", "dim"))
-                        summary_parts.append(
-                            f"[{color}]{icon_char} {phase_key.title()}={cnt}[/{color}]"
-                        )
-                summary = "  ".join(summary_parts)
-            else:
-                # Fallback: simple connected / total
-                bar_parts: list[str] = []
-                for i in range(self.total):
-                    if i < self.connected:
-                        bar_parts.append("[green]●[/green]")
-                    else:
-                        bar_parts.append("[red]○[/red]")
-                summary = " ".join(bar_parts) if bar_parts else "—"
+        detail, color = self._compute_connection_detail()
 
-            if self.total == 0:
-                detail = "No backends configured"
-                color = "$text-muted"
-            elif self.connected == self.total:
-                detail = f"All {self.total} connected"
-                color = "green"
-            elif self.connected == 0:
-                detail = f"0 / {self.total} connected"
-                color = "red"
-            else:
-                detail = f"{self.connected} / {self.total} connected"
-                color = "yellow"
-
-            if details:
-                detail_text = f"[{color}]{detail}[/{color}]  │  {summary}"
-            else:
-                detail_text = f"[{color}]{detail}[/{color}]"
-            self.query_one("#backend-detail", Static).update(detail_text)
-        except Exception:
-            logger.debug("BackendStatusWidget not yet mounted", exc_info=True)
+        if details:
+            detail_text = f"[{color}]{detail}[/{color}]  │  {summary}"
+        else:
+            detail_text = f"[{color}]{detail}[/{color}]"
+        if w := safe_query(self, "#backend-detail", Static):
+            w.update(detail_text)
 
     def watch_connected(self) -> None:
         self._refresh_display()

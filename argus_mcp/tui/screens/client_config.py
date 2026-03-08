@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label, OptionList, Static, TextArea
 
@@ -126,7 +127,7 @@ class ClientConfigModal(ModalScreen[Optional[str]]):
                 option_list.add_option(f"{status} {client['name']}  {client['path']}")
             if self._detected:
                 self._update_preview(0)
-        except Exception:
+        except NoMatches:
             pass
 
     def _detect_clients(self) -> None:
@@ -164,7 +165,7 @@ class ClientConfigModal(ModalScreen[Optional[str]]):
             snippet = self._generate_config(client)
             try:
                 self.query_one("#client-preview", TextArea).load_text(snippet)
-            except Exception:
+            except NoMatches:
                 pass
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
@@ -212,7 +213,7 @@ class ClientConfigModal(ModalScreen[Optional[str]]):
                 severity="information",
             )
             self.dismiss("written")
-        except Exception as exc:
+        except OSError as exc:
             self.notify(f"Write failed: {exc}", title="Error", severity="error")
 
     def action_copy_config(self) -> None:
@@ -235,7 +236,7 @@ class ClientConfigModal(ModalScreen[Optional[str]]):
                 self.notify("Copied to clipboard!", title="Copy", severity="information")
             else:
                 self.notify("Copy to clipboard failed — xclip not available", severity="warning")
-        except Exception:
+        except (FileNotFoundError, subprocess.SubprocessError, OSError):
             self.notify("Clipboard not available. Config shown in preview.", severity="warning")
 
     def action_cancel(self) -> None:

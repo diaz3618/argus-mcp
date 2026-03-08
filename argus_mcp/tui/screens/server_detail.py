@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Label, Static
 
@@ -150,7 +151,7 @@ class ServerDetailModal(ModalScreen[Optional[Dict[str, Any]]]):
                     tool.description[:60] + "…" if len(tool.description) > 60 else tool.description
                 )
                 table.add_row(tool.name, desc, key=tool.name)
-        except Exception:
+        except NoMatches:
             pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

@@ -25,6 +25,8 @@ from textual.widgets import (
     Static,
 )
 
+from argus_mcp._error_utils import safe_query
+from argus_mcp.config.loader import find_config_file
 from argus_mcp.tui.screens.base import ArgusScreen
 
 logger = logging.getLogger(__name__)
@@ -114,7 +116,7 @@ class SkillsScreen(ArgusScreen):
                     break
             else:
                 self._skill_manager = SkillManager(skills_dir=_DEFAULT_SKILLS_DIR)
-        except Exception as exc:
+        except (ImportError, OSError) as exc:
             logger.warning("Could not create SkillManager: %s", exc)
 
     # ── Data Loading ─────────────────────────────────────────────
@@ -159,11 +161,8 @@ class SkillsScreen(ArgusScreen):
         options: list[tuple[str, str]] = [("All Categories", "all")]
         for c in self._categories:
             options.append((c.title(), c))
-        try:
-            sel = self.query_one("#skills-category-select", Select)
+        if sel := safe_query(self, "#skills-category-select", Select):
             sel.set_options(options)
-        except Exception:
-            pass
 
     def _refresh_from_manager(self) -> None:
         """Reload skills list from the manager."""
@@ -193,7 +192,7 @@ class SkillsScreen(ArgusScreen):
                         }
                     )
                 self.load_skills(skills)
-        except Exception as exc:
+        except (ImportError, AttributeError, OSError) as exc:
             logger.error("Failed to refresh skills from manager: %s", exc)
             self._set_status(f"Error loading skills: {exc}")
 
@@ -213,14 +212,10 @@ class SkillsScreen(ArgusScreen):
 
     def _apply_filter(self) -> None:
         """Filter skills by search text and category."""
-        try:
-            query = self.query_one("#skills-search", Input).value.strip().lower()
-        except Exception:
-            query = ""
-        try:
-            cat = self.query_one("#skills-category-select", Select).value
-        except Exception:
-            cat = "all"
+        w = safe_query(self, "#skills-search", Input)
+        query = w.value.strip().lower() if w else ""
+        sel = safe_query(self, "#skills-category-select", Select)
+        cat = sel.value if sel else "all"
 
         filtered = self._all_skills
         if query:
@@ -242,10 +237,8 @@ class SkillsScreen(ArgusScreen):
         self._render_table(filtered)
 
     def action_focus_search(self) -> None:
-        try:
-            self.query_one("#skills-search", Input).focus()
-        except Exception:
-            pass
+        if w := safe_query(self, "#skills-search", Input):
+            w.focus()
 
     # ── Selection & Detail ───────────────────────────────────────
 
@@ -314,7 +307,7 @@ class SkillsScreen(ArgusScreen):
                             self.notify(f"Enabled '{self._selected_skill}'")
                         self._refresh_from_manager()
                         return
-            except Exception as exc:
+            except (ImportError, AttributeError) as exc:
                 self.notify(f"Error toggling skill: {exc}", severity="error")
                 return
 
@@ -323,13 +316,48 @@ class SkillsScreen(ArgusScreen):
             severity="information",
         )
 
-    def action_apply_skill(self) -> None:
-        """Apply the selected skill — write backend configs and reload.
+    @staticmethod
+    def _collect_skill_backends(tools: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """Extract unique backend configs from a skill's tool list."""
+        backends: Dict[str, Dict[str, Any]] = {}
+        for tool in tools:
+            backend_name = tool.get("backend", "")
+            if backend_name and backend_name not in backends:
+                backends[backend_name] = {
+                    "command": f"python -m {backend_name.replace('-', '_')}",
+                    "transport": "stdio",
+                }
+        return backends
 
-        For each tool in the skill manifest that references a backend,
-        writes a backend entry to the config file, then triggers
-        hot-reload so the server picks them up.
+    def _apply_backends_to_config(
+        self, config_path: str, backends_needed: Dict[str, Dict[str, Any]]
+    ) -> tuple[List[str], List[str]]:
+        """Merge *backends_needed* into the YAML config file.
+
+        Returns ``(added, skipped)`` backend name lists.
         """
+        with open(config_path, "r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+
+        backends_section: Dict[str, Any] = data.setdefault("backends", {})
+        added: List[str] = []
+        skipped: List[str] = []
+
+        for name, cfg in backends_needed.items():
+            if name in backends_section:
+                skipped.append(name)
+            else:
+                backends_section[name] = cfg
+                added.append(name)
+
+        if added:
+            with open(config_path, "w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+
+        return added, skipped
+
+    def action_apply_skill(self) -> None:
+        """Apply the selected skill — write backend configs and reload."""
         if not self._selected_skill:
             self.notify("No skill selected", severity="warning")
             return
@@ -347,21 +375,11 @@ class SkillsScreen(ArgusScreen):
             self.notify("Skill has no tools to apply", severity="information")
             return
 
-        # Collect unique backends from the skill's tools
-        backends_needed: Dict[str, Dict[str, Any]] = {}
-        for tool in tools:
-            backend_name = tool.get("backend", "")
-            if backend_name and backend_name not in backends_needed:
-                backends_needed[backend_name] = {
-                    "command": f"python -m {backend_name.replace('-', '_')}",
-                    "transport": "stdio",
-                }
-
+        backends_needed = self._collect_skill_backends(tools)
         if not backends_needed:
             self.notify("No backend requirements found in skill", severity="information")
             return
 
-        # Write to config
         config_path = self._resolve_config_path()
         if config_path is None:
             self.notify(
@@ -371,23 +389,7 @@ class SkillsScreen(ArgusScreen):
             return
 
         try:
-            with open(config_path, "r", encoding="utf-8") as fh:
-                data = yaml.safe_load(fh) or {}
-
-            backends_section: Dict[str, Any] = data.setdefault("backends", {})
-            added: List[str] = []
-            skipped: List[str] = []
-
-            for name, cfg in backends_needed.items():
-                if name in backends_section:
-                    skipped.append(name)
-                else:
-                    backends_section[name] = cfg
-                    added.append(name)
-
-            if added:
-                with open(config_path, "w", encoding="utf-8") as fh:
-                    yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+            added, skipped = self._apply_backends_to_config(config_path, backends_needed)
 
             msg_parts: List[str] = []
             if added:
@@ -407,7 +409,7 @@ class SkillsScreen(ArgusScreen):
                     f"added {len(added)} backend(s), triggering reload…"
                 )
 
-        except Exception as exc:
+        except (OSError, yaml.YAMLError, KeyError) as exc:
             logger.error("Failed to apply skill: %s", exc)
             self.notify(f"Apply failed: {exc}", severity="error")
 
@@ -426,7 +428,7 @@ class SkillsScreen(ArgusScreen):
                     self._selected_skill = None
                     self._refresh_from_manager()
                     return
-            except Exception as exc:
+            except (ImportError, AttributeError) as exc:
                 self.notify(f"Error uninstalling skill: {exc}", severity="error")
                 return
 
@@ -451,10 +453,8 @@ class SkillsScreen(ArgusScreen):
     # ── Helpers ──────────────────────────────────────────────────
 
     def _set_status(self, text: str) -> None:
-        try:
-            self.query_one("#skills-status-bar", Static).update(text)
-        except Exception:
-            pass
+        if w := safe_query(self, "#skills-status-bar", Static):
+            w.update(text)
 
     def _resolve_config_path(self) -> Optional[str]:
         """Find the config file path from server status or defaults."""
@@ -464,11 +464,8 @@ class SkillsScreen(ArgusScreen):
             path = getattr(status.config, "file_path", None)
             if path and os.path.isfile(path):
                 return path
-        for name in ("config.yaml", "config.yml"):
-            candidate = os.path.join(os.getcwd(), name)
-            if os.path.isfile(candidate):
-                return candidate
-        return None
+        path = find_config_file()
+        return path if os.path.isfile(path) else None
 
     def _trigger_reload(self) -> None:
         """Post a config reload request to the server."""
@@ -489,7 +486,7 @@ class SkillsScreen(ArgusScreen):
                 else:
                     errors = "; ".join(result.errors) if result.errors else "unknown"
                     self._set_status(f"Reload failed: {errors}")
-            except Exception as exc:
+            except (OSError, AttributeError) as exc:
                 logger.warning("Reload failed: %s", exc)
 
         self.app.run_worker(_do_reload(), exclusive=True, name="skills-reload")

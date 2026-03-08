@@ -77,7 +77,7 @@ def load_settings() -> Dict[str, Any]:
         return data
     except FileNotFoundError:
         return defaults
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         logger.debug("Could not load settings, using defaults", exc_info=True)
         return defaults
 
@@ -88,5 +88,5 @@ def save_settings(settings: Dict[str, Any]) -> None:
         os.makedirs(_SETTINGS_DIR, exist_ok=True)
         with open(_SETTINGS_FILE, "w", encoding="utf-8") as fh:
             json.dump(settings, fh, indent=2)
-    except Exception:
+    except OSError:
         logger.debug("Could not save settings", exc_info=True)

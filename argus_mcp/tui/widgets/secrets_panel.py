@@ -15,6 +15,8 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,28 +78,24 @@ class SecretsPanel(Widget):
                 yield Button("Rotate", id="btn-secret-rotate", variant="warning")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#secrets-table", DataTable)
+        if table := safe_query(self, "#secrets-table", DataTable):
             table.add_columns("Name", "Source", "Used By", "Last Set")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
 
     def update_secrets(self, secrets: List[Dict[str, Any]]) -> None:
         """Refresh the secrets table."""
         self._secrets = secrets
-        try:
-            table = self.query_one("#secrets-table", DataTable)
-            table.clear()
-            for s in secrets:
-                name = s.get("name", "?")
-                source = s.get("source", "encrypted")
-                used_by = s.get("used_by", "—")
-                last_set = s.get("last_set", "—")
-                table.add_row(name, source, used_by, str(last_set))
-        except Exception:
-            logger.debug("Cannot update secrets", exc_info=True)
+        table = safe_query(self, "#secrets-table", DataTable)
+        if table is None:
+            return
+        table.clear()
+        for s in secrets:
+            name = s.get("name", "?")
+            source = s.get("source", "encrypted")
+            used_by = s.get("used_by", "—")
+            last_set = s.get("last_set", "—")
+            table.add_row(name, source, used_by, str(last_set))
 
 
 class SecretEditorModal(ModalScreen[Optional[Dict[str, str]]]):
@@ -193,16 +191,19 @@ class SecretEditorModal(ModalScreen[Optional[Dict[str, str]]]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-se-save":
-            try:
-                name = self.query_one("#se-name-input", Input).value.strip()
-                value = self.query_one("#se-value-input", Input).value
-                source = self.query_one("#se-source-select", Select).value
-                if not name:
-                    self.notify("Secret name is required", severity="warning")
-                    return
-                self.dismiss({"name": name, "value": value, "source": str(source)})
-            except Exception:
+            name_input = safe_query(self, "#se-name-input", Input)
+            value_input = safe_query(self, "#se-value-input", Input)
+            source_select = safe_query(self, "#se-source-select", Select)
+            if name_input is None or value_input is None or source_select is None:
                 self.dismiss(None)
+                return
+            name = name_input.value.strip()
+            value = value_input.value
+            source = source_select.value
+            if not name:
+                self.notify("Secret name is required", severity="warning")
+                return
+            self.dismiss({"name": name, "value": value, "source": str(source)})
         elif event.button.id == "btn-se-cancel":
             self.dismiss(None)
 

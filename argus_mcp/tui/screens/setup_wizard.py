@@ -17,6 +17,7 @@ from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -30,6 +31,8 @@ from textual.widgets import (
     TextArea,
 )
 
+from argus_mcp._error_utils import safe_query
+from argus_mcp.config.loader import find_config_file
 from argus_mcp.tui.screens.base import ArgusScreen
 
 logger = logging.getLogger(__name__)
@@ -111,10 +114,9 @@ def _find_config_path() -> Path:
     Argus MCP uses YAML configuration exclusively.  JSON config
     files are not supported.
     """
-    for name in ("config.yaml", "config.yml"):
-        p = _PROJECT_ROOT / name
-        if p.is_file():
-            return p
+    resolved = Path(find_config_file())
+    if resolved.is_file():
+        return resolved
     return _PROJECT_ROOT / "config.yaml"
 
 
@@ -139,7 +141,7 @@ def _validate_yaml(text: str) -> str | None:
         return None
     except ImportError:
         return None  # Can't validate without pyyaml
-    except Exception as exc:
+    except yaml.YAMLError as exc:
         return f"YAML parse error: {exc}"
 
 
@@ -237,22 +239,16 @@ class _ConfigEditorPanel(Static):
             self._reset()
 
     def _get_editor_text(self) -> str:
-        try:
-            return self.query_one("#wizard-editor-area", TextArea).text
-        except Exception:
-            return ""
+        w = safe_query(self, "#wizard-editor-area", TextArea)
+        return w.text if w else ""
 
     def _set_validation(self, msg: str) -> None:
-        try:
-            self.query_one("#wizard-validation", Static).update(msg)
-        except Exception:
-            pass
+        if w := safe_query(self, "#wizard-validation", Static):
+            w.update(msg)
 
     def _set_path_label(self) -> None:
-        try:
-            self.query_one("#wizard-editor-path", Static).update(f"File: {self._current_path}")
-        except Exception:
-            pass
+        if w := safe_query(self, "#wizard-editor-path", Static):
+            w.update(f"File: {self._current_path}")
 
     def _validate(self) -> None:
         text = self._get_editor_text()
@@ -280,7 +276,7 @@ class _ConfigEditorPanel(Static):
                 f"Configuration saved to {self._current_path}",
                 severity="information",
             )
-        except Exception as exc:
+        except OSError as exc:
             self._set_validation(f"[red]✕ Save failed: {exc}[/red]")
             self.app.notify(f"Save failed: {exc}", severity="error")
 
@@ -303,7 +299,7 @@ class _ConfigEditorPanel(Static):
                 self._set_path_label()
                 self._set_validation(f"[green]✓ Saved to {dest.name}[/green]")
                 self.app.notify(f"Saved to {dest}", severity="information")
-            except Exception as exc:
+            except OSError as exc:
                 self.app.notify(f"Save failed: {exc}", severity="error")
 
         self.app.push_screen(
@@ -335,7 +331,7 @@ class _ConfigEditorPanel(Static):
                 self._set_path_label()
                 self._set_validation(f"[green]✓ Imported from {src.name}[/green]")
                 self.app.notify(f"Imported: {src}", severity="information")
-            except Exception as exc:
+            except OSError as exc:
                 self.app.notify(f"Import failed: {exc}", severity="error")
 
         self.app.push_screen(
@@ -359,7 +355,7 @@ class _ConfigEditorPanel(Static):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_text(text, encoding="utf-8")
                 self.app.notify(f"Exported to {dest}", severity="information")
-            except Exception as exc:
+            except OSError as exc:
                 self.app.notify(f"Export failed: {exc}", severity="error")
 
         self.app.push_screen(
@@ -374,14 +370,12 @@ class _ConfigEditorPanel(Static):
     def _reset(self) -> None:
         """Reload from disk, discarding editor changes."""
         text = _load_config_text()
-        try:
-            self.query_one("#wizard-editor-area", TextArea).load_text(text)
+        if w := safe_query(self, "#wizard-editor-area", TextArea):
+            w.load_text(text)
             self._current_path = _find_config_path()
             self._set_path_label()
             self._set_validation("[dim]Reset to saved version[/dim]")
             self.app.notify("Editor reset to saved config.", severity="information")
-        except Exception:
-            pass
 
 
 # ── Backend Builder Panel ────────────────────────────────────────────────
@@ -499,17 +493,15 @@ class _BackendBuilderPanel(Static):
             url = cmd_or_url or "http://127.0.0.1:8000/mcp"
             snippet = _HTTP_TEMPLATE.format(name=name, url=url)
 
-        try:
-            self.query_one("#bb-preview", TextArea).load_text(snippet)
-        except Exception:
-            pass
+        if w := safe_query(self, "#bb-preview", TextArea):
+            w.load_text(snippet)
 
     def _copy_to_editor(self) -> None:
         """Append the generated snippet to the config editor's backends section."""
-        try:
-            preview = self.query_one("#bb-preview", TextArea).text
-        except Exception:
+        w = safe_query(self, "#bb-preview", TextArea)
+        if not w:
             return
+        preview = w.text
 
         if not preview.strip():
             self.app.notify("Generate a snippet first.", severity="warning")
@@ -552,24 +544,22 @@ class _BackendBuilderPanel(Static):
                 editor.load_text(current + "\nbackends:\n" + preview)
 
             self.app.notify("Snippet added to Config Editor.", severity="information")
-        except Exception as exc:
+        except (NoMatches, AttributeError) as exc:
             self.app.notify(
                 f"Could not copy — switch to Config Editor tab first. ({exc})",
                 severity="warning",
             )
 
     def _val(self, widget_id: str) -> str:
-        try:
-            return self.query_one(f"#{widget_id}", Input).value.strip()
-        except Exception:
-            return ""
+        w = safe_query(self, f"#{widget_id}", Input)
+        return w.value.strip() if w else ""
 
     def _select_val(self, widget_id: str) -> str:
-        try:
-            v = self.query_one(f"#{widget_id}", Select).value
-            return str(v) if v is not None and v != Select.BLANK else ""
-        except Exception:
+        w = safe_query(self, f"#{widget_id}", Select)
+        if not w:
             return ""
+        v = w.value
+        return str(v) if v is not None and v != Select.BLANK else ""
 
 
 # ── Quick Start Panel ────────────────────────────────────────────────────
@@ -620,8 +610,8 @@ class _QuickStartPanel(Static):
                 )
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#qs-templates", DataTable)
+        table = safe_query(self, "#qs-templates", DataTable)
+        if table:
             table.add_columns("Template", "Description", "Backends")
             table.cursor_type = "row"
             table.zebra_stripes = True
@@ -629,8 +619,6 @@ class _QuickStartPanel(Static):
             table.add_row("Minimal", "Bare minimum config — 0 backends", "0")
             table.add_row("Example", "Full example with all sections documented", "2")
             table.add_row("Current", "Currently active config.yaml", "varies")
-        except Exception:
-            pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn = event.button.id
@@ -642,18 +630,17 @@ class _QuickStartPanel(Static):
             self._load_selected()
 
     def _load_selected(self) -> None:
-        try:
-            table = self.query_one("#qs-templates", DataTable)
-            idx = table.cursor_row
-            if idx == 0:
-                self._load_template(_MINIMAL_CONFIG, "Minimal")
-            elif idx == 1:
-                self._load_template_from_file(_PROJECT_ROOT / "example_config.yaml", "Example")
-            elif idx == 2:
-                text = _load_config_text()
-                self._load_template(text, "Current")
-        except Exception:
-            pass
+        table = safe_query(self, "#qs-templates", DataTable)
+        if not table:
+            return
+        idx = table.cursor_row
+        if idx == 0:
+            self._load_template(_MINIMAL_CONFIG, "Minimal")
+        elif idx == 1:
+            self._load_template_from_file(_PROJECT_ROOT / "example_config.yaml", "Example")
+        elif idx == 2:
+            text = _load_config_text()
+            self._load_template(text, "Current")
 
     def _load_template(self, text: str, name: str) -> None:
         try:
@@ -664,7 +651,7 @@ class _QuickStartPanel(Static):
                 f"Loaded '{name}' template into editor.",
                 severity="information",
             )
-        except Exception as exc:
+        except (NoMatches, AttributeError) as exc:
             self.app.notify(
                 f"Switch to Config Editor tab first. ({exc})",
                 severity="warning",

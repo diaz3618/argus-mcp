@@ -14,6 +14,8 @@ from textual.containers import Vertical
 from textual.widget import Widget
 from textual.widgets import DataTable, Label, Static
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 # Default middleware layers in order
@@ -77,13 +79,10 @@ class MiddlewarePipelineWidget(Widget):
             yield Static("", id="mw-summary")
 
     def on_mount(self) -> None:
-        try:
-            table = self.query_one("#mw-table", DataTable)
+        if table := safe_query(self, "#mw-table", DataTable):
             table.add_columns("#", "Layer", "Status", "Note")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        except Exception:
-            pass
         # Load defaults if no data provided
         if not self._layers:
             self.update_pipeline(_DEFAULT_LAYERS)
@@ -91,34 +90,34 @@ class MiddlewarePipelineWidget(Widget):
     def update_pipeline(self, layers: List[Dict[str, Any]]) -> None:
         """Refresh the pipeline table with layer data."""
         self._layers = layers
-        try:
-            table = self.query_one("#mw-table", DataTable)
-            table.clear()
+        table = safe_query(self, "#mw-table", DataTable)
+        if table is None:
+            return
+        table.clear()
 
-            active = 0
-            total = len(layers)
+        active = 0
+        total = len(layers)
 
-            for i, layer in enumerate(layers, 1):
-                name = layer.get("name", "?")
-                always_on = layer.get("always_on", False)
-                status = layer.get("status", "enabled")
-                note = layer.get("note", "")
+        for i, layer in enumerate(layers, 1):
+            name = layer.get("name", "?")
+            always_on = layer.get("always_on", False)
+            status = layer.get("status", "enabled")
+            note = layer.get("note", "")
 
-                if always_on:
-                    status_display = "[green][✓][/green] always on"
-                    active += 1
-                elif status == "enabled":
-                    status_display = "[green][✓][/green]"
-                    active += 1
-                    if note:
-                        status_display += f" {note}"
-                else:
-                    status_display = "[dim][ ] disabled[/dim]"
+            if always_on:
+                status_display = "[green][✓][/green] always on"
+                active += 1
+            elif status == "enabled":
+                status_display = "[green][✓][/green]"
+                active += 1
+                if note:
+                    status_display += f" {note}"
+            else:
+                status_display = "[dim][ ] disabled[/dim]"
 
-                table.add_row(str(i), name, status_display, note if not always_on else "")
+            table.add_row(str(i), name, status_display, note if not always_on else "")
 
-            custom = sum(1 for layer in layers if layer.get("custom", False))
-            summary = f"Active: {active}/{total} │ Custom middleware: {custom}"
-            self.query_one("#mw-summary", Static).update(summary)
-        except Exception:
-            logger.debug("Cannot update middleware pipeline", exc_info=True)
+        custom = sum(1 for layer in layers if layer.get("custom", False))
+        summary = f"Active: {active}/{total} │ Custom middleware: {custom}"
+        if w := safe_query(self, "#mw-summary", Static):
+            w.update(summary)

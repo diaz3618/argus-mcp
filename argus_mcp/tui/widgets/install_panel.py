@@ -17,6 +17,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, Static
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
 
 logger = logging.getLogger(__name__)
@@ -80,10 +81,9 @@ class InstallPanelWidget(Widget):
     # ── internal ────────────────────────────────────────────────────
 
     def _update_detail(self, entry: Optional[ServerEntry]) -> None:
-        try:
-            info = self.query_one("#install-info", Static)
-            btn = self.query_one("#install-btn", Button)
-        except Exception:
+        info = safe_query(self, "#install-info", Static)
+        btn = safe_query(self, "#install-btn", Button)
+        if info is None or btn is None:
             return
 
         if entry is None:

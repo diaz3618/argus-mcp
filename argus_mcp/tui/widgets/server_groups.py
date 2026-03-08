@@ -14,6 +14,8 @@ from textual.containers import Vertical
 from textual.widget import Widget
 from textual.widgets import Label, Tree
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,11 +50,8 @@ class ServerGroupsWidget(Widget):
             yield Tree("Servers", id="sg-tree")
 
     def on_mount(self) -> None:
-        try:
-            tree = self.query_one("#sg-tree", Tree)
+        if tree := safe_query(self, "#sg-tree", Tree):
             tree.root.expand()
-        except Exception:
-            pass
 
     def update_groups(
         self,
@@ -66,51 +65,48 @@ class ServerGroupsWidget(Widget):
             groups: Optional mapping of group name → list of backend names.
                     If None, backends are grouped by their 'group' field.
         """
-        try:
-            tree = self.query_one("#sg-tree", Tree)
-            tree.clear()
+        tree = safe_query(self, "#sg-tree", Tree)
+        if tree is None:
+            return
+        tree.clear()
 
-            # Build group mapping
-            if groups is None:
-                groups = {}
-                for b in backends:
-                    group_name = b.get("group", "ungrouped") or "ungrouped"
-                    groups.setdefault(group_name, []).append(b.get("name", "?"))
+        # Build group mapping
+        if groups is None:
+            groups = {}
+            for b in backends:
+                group_name = b.get("group", "ungrouped") or "ungrouped"
+                groups.setdefault(group_name, []).append(b.get("name", "?"))
 
-            self._groups = {}
-            backend_map = {b.get("name"): b for b in backends}
+        self._groups = {}
+        backend_map = {b.get("name"): b for b in backends}
 
-            for group_name, members in sorted(groups.items()):
-                total = len(members)
+        for group_name, members in sorted(groups.items()):
+            total = len(members)
 
-                group_label = f"{group_name} ({total})"
-                group_node = tree.root.add(group_label, expand=(group_name != "ungrouped"))
+            group_label = f"{group_name} ({total})"
+            group_node = tree.root.add(group_label, expand=(group_name != "ungrouped"))
 
-                group_backends = []
-                for member_name in members:
-                    b = backend_map.get(member_name, {})
-                    phase = b.get("phase", "unknown").lower()
-                    tools = (
-                        b.get("capabilities", {}).get("tools", 0) if b.get("capabilities") else "?"
-                    )
-                    transport = b.get("type", "?")
+            group_backends = []
+            for member_name in members:
+                b = backend_map.get(member_name, {})
+                phase = b.get("phase", "unknown").lower()
+                tools = b.get("capabilities", {}).get("tools", 0) if b.get("capabilities") else "?"
+                transport = b.get("type", "?")
 
-                    if phase == "ready":
-                        icon = "●"
-                    elif phase == "degraded":
-                        icon = "◑"
-                    elif phase == "failed":
-                        icon = "✕"
-                    elif phase == "pending":
-                        icon = "◌"
-                    elif phase == "initializing":
-                        icon = "⟳"
-                    else:
-                        icon = "?"
+                if phase == "ready":
+                    icon = "●"
+                elif phase == "degraded":
+                    icon = "◑"
+                elif phase == "failed":
+                    icon = "✕"
+                elif phase == "pending":
+                    icon = "◌"
+                elif phase == "initializing":
+                    icon = "⟳"
+                else:
+                    icon = "?"
 
-                    group_node.add_leaf(f"{icon} {member_name}  {transport}  {tools} tools")
-                    group_backends.append(b)
+                group_node.add_leaf(f"{icon} {member_name}  {transport}  {tools} tools")
+                group_backends.append(b)
 
-                self._groups[group_name] = group_backends
-        except Exception:
-            logger.debug("Cannot update server groups", exc_info=True)
+            self._groups[group_name] = group_backends

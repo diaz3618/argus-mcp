@@ -14,6 +14,8 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import Input, Label, Select, TextArea
 
+from argus_mcp._error_utils import safe_query
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,36 +96,39 @@ class NetworkIsolationPanel(Widget):
 
     def load_config(self, config: Dict[str, Any]) -> None:
         """Load network isolation settings from config dict."""
-        try:
-            mode = config.get("network_mode", "host")
-            self.query_one("#net-mode-select", Select).value = mode
+        mode = config.get("network_mode", "host")
+        if sel := safe_query(self, "#net-mode-select", Select):
+            sel.value = mode
 
-            hosts = config.get("allowed_hosts", [])
-            if hosts:
-                self.query_one("#net-hosts-area", TextArea).load_text("\n".join(hosts))
+        hosts = config.get("allowed_hosts", [])
+        if hosts:
+            if area := safe_query(self, "#net-hosts-area", TextArea):
+                area.load_text("\n".join(hosts))
 
-            proxy = config.get("http_proxy", "")
-            self.query_one("#net-proxy-input", Input).value = proxy
+        proxy = config.get("http_proxy", "")
+        if inp := safe_query(self, "#net-proxy-input", Input):
+            inp.value = proxy
 
-            noproxy = config.get("no_proxy", "localhost,127.0.0.1")
-            self.query_one("#net-noproxy-input", Input).value = noproxy
-        except Exception:
-            logger.debug("Cannot load network config", exc_info=True)
+        noproxy = config.get("no_proxy", "localhost,127.0.0.1")
+        if inp := safe_query(self, "#net-noproxy-input", Input):
+            inp.value = noproxy
 
     def get_config(self) -> Dict[str, Any]:
         """Collect current network isolation settings."""
         result: Dict[str, Any] = {}
-        try:
-            result["network_mode"] = self.query_one("#net-mode-select", Select).value
-            hosts_text = self.query_one("#net-hosts-area", TextArea).text
+        if sel := safe_query(self, "#net-mode-select", Select):
+            result["network_mode"] = sel.value
+        if area := safe_query(self, "#net-hosts-area", TextArea):
+            hosts_text = area.text
             result["allowed_hosts"] = [
                 h.strip()
                 for h in hosts_text.splitlines()
                 if h.strip() and not h.strip().startswith("#")
             ]
-            result["http_proxy"] = self.query_one("#net-proxy-input", Input).value
-            result["no_proxy"] = self.query_one("#net-noproxy-input", Input).value
-            result["dns"] = self.query_one("#net-dns-select", Select).value
-        except Exception:
-            logger.debug("Cannot read network config", exc_info=True)
+        if inp := safe_query(self, "#net-proxy-input", Input):
+            result["http_proxy"] = inp.value
+        if inp := safe_query(self, "#net-noproxy-input", Input):
+            result["no_proxy"] = inp.value
+        if sel := safe_query(self, "#net-dns-select", Select):
+            result["dns"] = sel.value
         return result

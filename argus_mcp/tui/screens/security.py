@@ -10,6 +10,7 @@ import logging
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.widgets import (
     Button,
     Input,
@@ -163,7 +164,7 @@ class SecurityScreen(ArgusScreen):
         options = [(name, name) for name in sorted(route_map.keys())]
         try:
             self.query_one("#sec-backend-select", Select).set_options(options)
-        except Exception:
+        except NoMatches:
             pass
 
     # ── Button handlers ──────────────────────────────────────────
@@ -196,7 +197,7 @@ class SecurityScreen(ArgusScreen):
                     "YAML parser not available — install PyYAML",
                     severity="error",
                 )
-            except Exception as exc:
+            except yaml.YAMLError as exc:
                 self.notify(f"Invalid YAML: {exc}", severity="error")
-        except Exception:
+        except NoMatches:
             logger.debug("Could not apply policies", exc_info=True)
