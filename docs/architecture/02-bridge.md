@@ -135,6 +135,126 @@ path uses the middleware chain's `RoutingMiddleware` which:
 - Degrades gracefully — unhealthy backends are marked but not removed
 - Health status visible via management API and TUI
 
+## Container Isolation
+
+`argus_mcp/bridge/container/` provides automatic container isolation for
+stdio backends. Every stdio backend runs inside a hardened container by
+default — no manual configuration required.
+
+### Architecture
+
+```
+wrap_backend() ← called by ClientManager for each stdio backend
+  │
+  ├── RuntimeFactory.detect()  → Docker or Podman
+  ├── is_already_containerised()  → pass through if command=docker
+  ├── classify_command()  → "uvx", "npx", "go", or None
+  ├── ensure_image()  → build or reuse cached Docker image
+  │     ├── TemplateData + RuntimeConfig  → typed template context
+  │     ├── render_template()  → Jinja2 Dockerfile generation
+  │     └── docker build  → image tagged argus-<backend>:latest
+  ├── _create_container()  → docker create (pre-creation)
+  └── return wrapped StdioServerParameters
+        command="docker", args=["start", "-ai", <container_id>]
+```
+
+### Image Building Pipeline
+
+The template engine renders per-transport Jinja2 Dockerfile templates:
+
+| Transport | Template | Base Image |
+|-----------|----------|------------|
+| `uvx` (Python) | `uvx.dockerfile.j2` | `python:3.13-slim` |
+| `npx` (Node.js) | `npx.dockerfile.j2` | `node:22-alpine` |
+| `go` (Go binary) | `go.dockerfile.j2` | `golang:1.24-alpine` |
+
+Templates are parameterized with `TemplateData` — a typed dataclass that
+provides package name, binary path, builder image, system dependencies, and
+container user identity fields. No raw `**kwargs` or untyped dicts.
+
+### Container User Identity
+
+All Argus-built images use the industry-standard non-root identity:
+
+| Field | Value | Source |
+|-------|-------|--------|
+| UID | `65532` | distroless/Chainguard "nonroot" standard |
+| Username | `nonroot` | Created in each Dockerfile template |
+| Home | `/home/nonroot` | Dedicated writable home directory |
+
+These are defined as constants in `templates/models.py` — the **single source
+of truth** consumed by both templates and the runtime wrapper.
+
+### Security Hardening
+
+Every container runs with these security defaults:
+
+| Control | Setting |
+|---------|---------|
+| Filesystem | `--read-only` root FS |
+| Capabilities | `--cap-drop ALL` |
+| Privilege escalation | `--security-opt no-new-privileges` |
+| SELinux | `--security-opt label=disable` (for stdio I/O compatibility) |
+| Process management | `--init` (proper signal propagation) |
+| Memory limit | `--memory 512m` (configurable) |
+| CPU limit | `--cpus 1` (configurable) |
+| Writable tmpfs | `/tmp` and `/home/nonroot` with `mode=1777` (sticky bit) |
+| Network | `--network bridge` for built images (configurable) |
+| Environment | `HOME` and `TMPDIR` injected before user env vars |
+
+### Two-Step Container Lifecycle
+
+Argus uses `docker create` + `docker start -ai` instead of `docker run`
+to avoid stdio attach hangs observed on certain Docker + storage-driver +
+SELinux combinations:
+
+1. **Pre-create** — `docker create --rm -i <flags> <image>` → returns container ID
+2. **Attach** — MCP SDK launches `docker start -ai <container_id>` as subprocess
+
+This decouples image pulling/layer setup from the stdio attach, producing
+reliable stdin/stdout streams.
+
+### Graceful Fallback
+
+Container isolation degrades gracefully at every step:
+
+- No runtime (Docker/Podman) → bare subprocess + warning
+- Runtime unhealthy → bare subprocess
+- Unknown command type → bare subprocess
+- Image build fails → bare subprocess
+- Container create fails → bare subprocess
+- Per-backend `container_isolation: false` → bare subprocess
+- `ARGUS_CONTAINER_ISOLATION=false` → all backends run bare
+
+### Pre-Building Images
+
+The `argus-mcp build` CLI command pre-builds all container images and
+pre-creates containers, avoiding cold-start delays at server launch:
+
+```bash
+argus-mcp build --config config.yaml
+```
+
+### Cleanup
+
+`cleanup_all_containers()` is called during server shutdown to remove
+all tracked pre-created containers. Individual backends can be cleaned
+up via `cleanup_container(svr_name)`.
+
+### Container Module Structure
+
+| Module | Purpose |
+|--------|---------|
+| `wrapper.py` | Main entry point — `wrap_backend()`, `cleanup_all_containers()` |
+| `image_builder.py` | Image build orchestration, command classification |
+| `runtime.py` | Container runtime detection (Docker, Podman) via `RuntimeFactory` |
+| `network.py` | Network mode resolution (`bridge`, `none`, custom) |
+| `templates/models.py` | `TemplateData`, `RuntimeConfig`, UID/user/home constants |
+| `templates/engine.py` | Jinja2 template rendering with identity defaults |
+| `templates/_generators.py` | Per-transport image build logic |
+| `templates/validation.py` | Rendered Dockerfile validation |
+| `templates/*.j2` | Jinja2 Dockerfile templates (uvx, npx, go) |
+
 ## Tool Optimizer
 
 `argus_mcp/bridge/optimizer/` implements the `ToolIndex`:

@@ -100,8 +100,8 @@ def _resolve_string(
         from argus_mcp.display.logging_config import secret_redaction_filter
 
         secret_redaction_filter.register(resolved)
-    except Exception:
-        pass  # logging may not be configured yet
+    except Exception as exc:
+        logger.warning("Secret resolution logging failed: %s", exc)
 
     # nosemgrep: python-logger-credential-disclosure (logs secret name, not value)
     logger.debug("Resolved secret '%s' at %s", secret_name, path)

@@ -71,6 +71,12 @@ backends:
 
 See [Configuration](configuration.md) for the full reference.
 
+> **Container isolation**: When Docker or Podman is available on the host,
+> Argus automatically builds and runs each stdio backend inside a hardened
+> container. No extra config is needed — it happens transparently at startup.
+> See [Configuration — Container Isolation](configuration.md#automatic-container-isolation)
+> for details.
+
 ### 2. Start the Server
 
 ```bash

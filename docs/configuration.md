@@ -147,49 +147,86 @@ Argus automatically wraps every stdio backend in an isolated container
 **No configuration is needed** — container isolation is transparent and
 applied by default with secure settings:
 
-- **Network**: `--network none` (fully offline by default)
-- **Filesystem**: `--read-only` root filesystem
-- **Privileges**: `--cap-drop ALL`
+- **Filesystem**: `--read-only` root filesystem + tmpfs for `/tmp` and `/home/nonroot`
+- **Privileges**: `--cap-drop ALL`, `--security-opt no-new-privileges`
 - **Resources**: `--memory 512m --cpus 1`
+- **User**: UID 65532 (`nonroot`), matching distroless/Chainguard standards
+- **Init**: `--init` for proper signal handling
 
-Argus auto-resolves the container image from the backend command:
+#### Image Building Pipeline
 
-| Command | Default Image |
-|---------|---------------|
-| `npx`, `node`, `tsx` | `node:22-slim` |
-| `python`, `python3`, `uvx`, `uv` | `python:3.13-slim` |
-| `bun` | `oven/bun:slim` |
-| `deno` | `denoland/deno:latest` |
+Argus builds a purpose-built Docker image for each backend using Jinja2
+templates. The command determines which template is used:
 
-If no container runtime is available, or the command has no known image
-mapping, Argus falls back to running the backend as a bare subprocess
-(with a log warning).
+| Command | Template | Base Image |
+|---------|----------|------------|
+| `uvx`, `uv`, `python`, `python3` | `uvx.dockerfile.j2` | `python:3.13-slim` |
+| `npx`, `node`, `tsx` | `npx.dockerfile.j2` | `node:22-alpine` |
+| `go` | `go.dockerfile.j2` | `golang:1.24-alpine` |
 
-To **disable** container isolation, set the environment variable:
+Each template creates a non-root user (UID 65532), installs the required
+packages, and sets `HOME=/home/nonroot` and `TMPDIR=/tmp`.
+
+If no container runtime is available, or the command has no recognized
+template mapping, Argus falls back to running the backend as a bare
+subprocess (with a log warning).
+
+#### Per-Backend Container Options
+
+Individual backends can customize their container:
+
+```yaml
+backends:
+  my-backend:
+    type: stdio
+    command: npx
+    args: ["-y", "my-mcp-server"]
+    container_isolation: true          # default: inherits global flag
+    builder_image: "node:22-alpine"    # override base image
+    system_deps: ["curl", "jq"]        # additional OS packages
+    additional_packages: []            # extra language-level packages
+```
+
+#### Disabling Container Isolation
+
+Globally via environment variable:
 
 ```bash
 ARGUS_CONTAINER_ISOLATION=false
 ```
 
-Or set the feature flag in your config:
+Or the feature flag in your config:
 
 ```yaml
 feature_flags:
   container_isolation: false
 ```
 
-#### `build_if_missing`
+Or per-backend:
 
-By default Argus builds the container image from its `Dockerfile` the first
-time it encounters a command whose image is not yet available locally. To
-**skip the build** and fail fast if the image is absent, set:
+```yaml
+backends:
+  my-backend:
+    container_isolation: false
+```
+
+#### Pre-Building Images
+
+By default Argus builds the container image automatically the first
+time it encounters each backend. To pre-build all images ahead of time:
+
+```bash
+argus-mcp build --config config.yaml
+```
+
+To **skip the build** and fail fast if the image is absent:
 
 ```bash
 ARGUS_CONTAINER_BUILD_IF_MISSING=false
 ```
 
-This is useful in production deployments where images should be pre-built and
-pushed to a registry, not built on demand.
+This is useful in production deployments where images should be pre-built
+and pushed to a registry, not built on demand.
 
 ### SSE Backend
 

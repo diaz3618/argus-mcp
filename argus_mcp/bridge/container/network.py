@@ -7,7 +7,10 @@ helpers to build ``docker run`` network flags.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from argus_mcp.bridge.container.runtime import ContainerRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,10 @@ logger = logging.getLogger(__name__)
 # "<name>" — a named Docker network (created externally).
 
 DEFAULT_NETWORK = "bridge"  # safe default — most MCP servers need net
+
+# Dedicated Argus network for container-to-container communication.
+# Created lazily the first time a backend uses it.
+ARGUS_NETWORK = "argus-mcp"
 
 
 def effective_network(configured: Optional[str]) -> str:
@@ -42,3 +49,23 @@ def build_network_args(network: str) -> List[str]:
     ``["--network", "none"]``.
     """
     return ["--network", network]
+
+
+async def ensure_managed_network(
+    runtime: "ContainerRuntime",
+    network_name: str = ARGUS_NETWORK,
+) -> bool:
+    """Create the managed Argus network if it doesn't already exist.
+
+    Returns ``True`` if the network is ready (already existed or
+    was created successfully), ``False`` on failure.
+    """
+    try:
+        return await runtime.create_network(network_name)
+    except Exception:
+        logger.warning(
+            "Failed to create managed network '%s'.",
+            network_name,
+            exc_info=True,
+        )
+        return False

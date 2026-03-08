@@ -13,6 +13,7 @@ import time
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
 
+from argus_mcp._task_utils import _log_task_exception
 from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker, CircuitState
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,7 @@ class HealthChecker:
             return
         self._stopped.clear()
         self._task = asyncio.create_task(self._run(), name="health-checker")
+        self._task.add_done_callback(_log_task_exception)
         logger.info(
             "Health checker started (interval=%.0fs, probe_timeout=%.0fs)",
             self._interval,
@@ -302,6 +304,7 @@ class HealthChecker:
             self._registry.discover_single_backend(name, session),
             name=f"restore-caps-{name}",
         )
+        task.add_done_callback(_log_task_exception)
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
         logger.info("[%s] Recovered — scheduling capability re-discovery", name)

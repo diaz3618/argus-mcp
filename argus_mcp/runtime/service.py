@@ -100,6 +100,7 @@ class ArgusService:
         # Event system
         self._events: deque[Dict[str, Any]] = deque(maxlen=500)
         self._event_subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
+        # _event_id_counter kept for backwards compat but unused
         self._event_id_counter: int = 0
 
         logger.info("ArgusService initialized (state=%s).", self._state.value)
@@ -234,7 +235,7 @@ class ArgusService:
                 )
             except Exception:
                 logger.warning(
-                    "Failed to load conflict strategy/filters from config; " "using defaults.",
+                    "Failed to load conflict strategy/filters from config; using defaults.",
                     exc_info=True,
                 )
         return CapabilityRegistry()
@@ -326,9 +327,7 @@ class ArgusService:
             )
 
             # Wrap progress_callback to also emit events for TUI visibility
-            def _event_progress_cb(
-                name: str, phase: str, message: str | None = None
-            ) -> None:
+            def _event_progress_cb(name: str, phase: str, message: str | None = None) -> None:
                 """Bridge backend progress to the event system."""
                 severity = "info"
                 if phase == "failed":
@@ -572,6 +571,7 @@ class ArgusService:
     async def _on_config_file_changed(self) -> None:
         """Callback for :class:`ConfigWatcher` — triggers a reload."""
         import hashlib
+        from pathlib import Path
 
         logger.info("Config file change detected by watcher, invoking reload...")
 
@@ -579,8 +579,8 @@ class ArgusService:
         config_hash = ""
         if self._config_path:
             try:
-                with open(self._config_path, "rb") as fh:
-                    config_hash = hashlib.sha256(fh.read()).hexdigest()
+                raw = await asyncio.to_thread(Path(self._config_path).read_bytes)
+                config_hash = hashlib.sha256(raw).hexdigest()
             except OSError:
                 pass
 

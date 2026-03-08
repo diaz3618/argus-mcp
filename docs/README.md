@@ -88,6 +88,7 @@ docs/
 | **Capability** | A tool, resource, or prompt exposed by a backend |
 | **Bridge** | Internal layer that connects to backends and aggregates capabilities |
 | **Middleware** | Pluggable request pipeline (auth → authz → telemetry → audit → recovery → routing) |
+| **Container Isolation** | Automatic per-backend hardened containers for stdio backends (Docker/Podman) |
 | **Management API** | REST interface at `/manage/v1/` for monitoring and control |
 | **TUI** | Textual-based terminal UI that connects to the management API |
 | **Optimizer** | Replaces full tool catalog with `find_tool` + `call_tool` meta-tools |

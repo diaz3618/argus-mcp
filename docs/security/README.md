@@ -19,6 +19,9 @@ MCP Client
 │  4. Secret Redaction     │  Scrub secrets from all log output
 ├──────────────────────────┤
 │  5. Outgoing Auth        │  Authenticate to backends (OAuth2, static)
+├──────────────────────────┤
+│  6. Container Isolation  │  Hardened per-backend containers (read-only,
+│                          │  non-root, cap-drop ALL, resource limits)
 └──────────────────────────┘
   │
   ▼
@@ -44,3 +47,4 @@ Backend MCP Server
 | Audit logging | enabled | Keep enabled |
 | Secret provider | `file` (Fernet) | `file` or `keyring` |
 | Log redaction | automatic | Automatic when secrets are resolved |
+| Container isolation | auto (when runtime available) | Pre-build images; keep enabled |

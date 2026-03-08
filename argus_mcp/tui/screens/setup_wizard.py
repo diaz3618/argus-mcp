@@ -21,8 +21,6 @@ from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
     DataTable,
-    Footer,
-    Header,
     Input,
     Label,
     Select,
@@ -252,9 +250,7 @@ class _ConfigEditorPanel(Static):
 
     def _set_path_label(self) -> None:
         try:
-            self.query_one("#wizard-editor-path", Static).update(
-                f"File: {self._current_path}"
-            )
+            self.query_one("#wizard-editor-path", Static).update(f"File: {self._current_path}")
         except Exception:
             pass
 
@@ -279,9 +275,7 @@ class _ConfigEditorPanel(Static):
         try:
             self._current_path.parent.mkdir(parents=True, exist_ok=True)
             self._current_path.write_text(text, encoding="utf-8")
-            self._set_validation(
-                f"[green]✓ Saved to {self._current_path.name}[/green]"
-            )
+            self._set_validation(f"[green]✓ Saved to {self._current_path.name}[/green]")
             self.app.notify(
                 f"Configuration saved to {self._current_path}",
                 severity="information",
@@ -339,9 +333,7 @@ class _ConfigEditorPanel(Static):
                 self.query_one("#wizard-editor-area", TextArea).load_text(text)
                 self._current_path = src
                 self._set_path_label()
-                self._set_validation(
-                    f"[green]✓ Imported from {src.name}[/green]"
-                )
+                self._set_validation(f"[green]✓ Imported from {src.name}[/green]")
                 self.app.notify(f"Imported: {src}", severity="information")
             except Exception as exc:
                 self.app.notify(f"Import failed: {exc}", severity="error")
@@ -542,7 +534,12 @@ class _BackendBuilderPanel(Static):
                     end_idx = insert_idx
                     for j in range(insert_idx, len(lines)):
                         stripped = lines[j].strip()
-                        if stripped and not stripped.startswith("#") and not stripped.startswith(" ") and ":" in stripped:
+                        if (
+                            stripped
+                            and not stripped.startswith("#")
+                            and not stripped.startswith(" ")
+                            and ":" in stripped
+                        ):
                             end_idx = j
                             break
                     else:
@@ -640,9 +637,7 @@ class _QuickStartPanel(Static):
         if btn == "btn-qs-minimal":
             self._load_template(_MINIMAL_CONFIG, "Minimal")
         elif btn == "btn-qs-example":
-            self._load_template_from_file(
-                _PROJECT_ROOT / "example_config.yaml", "Example"
-            )
+            self._load_template_from_file(_PROJECT_ROOT / "example_config.yaml", "Example")
         elif btn == "btn-qs-load":
             self._load_selected()
 
@@ -653,9 +648,7 @@ class _QuickStartPanel(Static):
             if idx == 0:
                 self._load_template(_MINIMAL_CONFIG, "Minimal")
             elif idx == 1:
-                self._load_template_from_file(
-                    _PROJECT_ROOT / "example_config.yaml", "Example"
-                )
+                self._load_template_from_file(_PROJECT_ROOT / "example_config.yaml", "Example")
             elif idx == 2:
                 text = _load_config_text()
                 self._load_template(text, "Current")

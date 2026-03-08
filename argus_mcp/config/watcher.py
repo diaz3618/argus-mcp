@@ -14,6 +14,8 @@ import logging
 import os
 from typing import Any, Awaitable, Callable, Optional
 
+from argus_mcp._task_utils import _log_task_exception
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_POLL_INTERVAL: float = 2.0
@@ -64,6 +66,7 @@ class ConfigWatcher:
         self._stop_event.clear()
         self._last_mtime = self._current_mtime()
         self._task = asyncio.create_task(self._poll_loop(), name="config-watcher")
+        self._task.add_done_callback(_log_task_exception)
         logger.info("Config watcher started: %s", self._path)
 
     async def stop(self) -> None:

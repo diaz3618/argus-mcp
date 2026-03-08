@@ -13,7 +13,15 @@ managing backend connections, and coordinating subsystems.
 1. Load and validate config file
 2. Resolve secret:name references via SecretStore
 3. Initialize ClientManager with backend configs
-4. Start all backend connections (parallel)
+4. Start all backend connections (parallel):
+   a. For stdio backends:
+      - Detect container runtime (Docker/Podman)
+      - Classify command (uvx/npx/go/docker/unknown)
+      - Build or reuse container image
+      - Pre-create container (docker create)
+      - Wrap StdioServerParameters to use "docker start -ai"
+   b. For SSE/HTTP backends:
+      - Connect directly to remote endpoint
 5. Build CapabilityRegistry from connected backends
 6. Apply conflict resolution, filters, renames
 7. Initialize subsystems:
@@ -30,8 +38,9 @@ managing backend connections, and coordinating subsystems.
 ```
 1. Stop health checker
 2. Disconnect all backends gracefully
-3. Close audit logger
-4. Clean up resources
+3. Clean up all pre-created containers (cleanup_all_containers)
+4. Close audit logger
+5. Clean up resources
 ```
 
 ### Hot-Reload (`service.reload()`)
@@ -94,6 +103,7 @@ The service coordinates these subsystems:
 | Subsystem | Module | Role |
 |-----------|--------|------|
 | ClientManager | `bridge/client_manager.py` | Backend connections |
+| ContainerWrapper | `bridge/container/wrapper.py` | Container isolation for stdio backends |
 | CapabilityRegistry | `bridge/capability_registry.py` | Capability aggregation |
 | AuditLogger | `audit/logger.py` | Audit event recording |
 | HealthChecker | `bridge/health/` | Backend health monitoring |

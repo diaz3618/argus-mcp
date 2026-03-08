@@ -115,12 +115,8 @@ class PKCEAuthConfig(BaseModel):
     """
 
     type: Literal["pkce"]
-    authorization_endpoint: str = Field(
-        ..., min_length=1, description="OAuth authorization URL."
-    )
-    token_endpoint: str = Field(
-        ..., min_length=1, description="OAuth token exchange URL."
-    )
+    authorization_endpoint: str = Field(..., min_length=1, description="OAuth authorization URL.")
+    token_endpoint: str = Field(..., min_length=1, description="OAuth token exchange URL.")
     client_id: str = Field(..., min_length=1, description="OAuth client ID.")
     client_secret: str = Field(
         default="", description="Optional client secret. Supports ${ENV_VAR}."
@@ -138,15 +134,23 @@ AuthConfig = Annotated[
 
 
 class ContainerConfig(BaseModel):
-    """Optional per-backend container tuning.
+    """Per-backend container isolation configuration.
 
-    The automatic container isolation system builds and caches images
-    for supported commands (*uvx*, *npx*) without any user
-    configuration.  This model exposes **optional** knobs for advanced
-    users who want to override the defaults (network mode, resource
-    limits, extra volumes, etc.).
+    Container isolation is **enabled by default** for all stdio backends
+    with supported commands (``uvx``, ``npx``).  All local backends run
+    inside containers unless explicitly opted out.
 
-    Add a ``container`` section to a stdio backend to customise::
+    To **disable** container isolation for a specific backend::
+
+        backends:
+          my-server:
+            type: stdio
+            command: uvx
+            args: ["my-mcp-server"]
+            container:
+              enabled: false
+
+    To **customise** container settings::
 
         backends:
           my-server:
@@ -156,8 +160,24 @@ class ContainerConfig(BaseModel):
             container:
               network: none
               memory: 1g
+              runtime: docker
     """
 
+    enabled: bool = Field(
+        default=True,
+        description=(
+            "Whether container isolation is active for this backend. "
+            "Set to false to run as a bare subprocess instead."
+        ),
+    )
+    runtime: Optional[Literal["docker", "podman", "kubernetes"]] = Field(
+        default=None,
+        description=(
+            "Container runtime override for this backend. "
+            "When unset, auto-detects (Docker preferred). "
+            "Can also be set globally via ARGUS_RUNTIME env var."
+        ),
+    )
     network: Optional[str] = Field(
         default=None,
         description=(
@@ -185,6 +205,58 @@ class ContainerConfig(BaseModel):
         default_factory=list,
         description="Additional raw arguments passed to 'docker run'.",
     )
+    system_deps: List[str] = Field(
+        default_factory=list,
+        description=(
+            "System packages to install in the container image "
+            "(e.g. ['ripgrep', 'git']). For alpine-based images (npx), "
+            "packages are installed via 'apk add'. For debian-based "
+            "images (uvx), packages are installed via 'apt-get install'."
+        ),
+    )
+    builder_image: Optional[str] = Field(
+        default=None,
+        description=(
+            "Override the base Docker image for building the container. "
+            "Defaults: uvx → 'python:3.13-slim', npx → 'node:22-alpine'. "
+            "Must be a valid OCI image reference."
+        ),
+    )
+    additional_packages: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Extra runtime packages to install in the final image stage "
+            "(beyond system_deps). These are installed after system_deps."
+        ),
+    )
+    transport: Optional[str] = Field(
+        default=None,
+        description=(
+            "Explicit transport type override ('uvx', 'npx', 'go'). "
+            "When set, bypasses auto-detection from the command name. "
+            "Required for Go MCP servers whose binary name doesn't "
+            "match a known command (e.g. 'mcp-k8s')."
+        ),
+    )
+    go_package: Optional[str] = Field(
+        default=None,
+        description=(
+            "Go module import path for the 'go' transport "
+            "(e.g. 'github.com/strowk/mcp-k8s-go'). "
+            "Required when transport is 'go'. The module is compiled "
+            "inside a multi-stage build using 'go install'."
+        ),
+    )
+
+    @field_validator("transport")
+    @classmethod
+    def _validate_transport(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip().lower()
+            valid = {"uvx", "npx", "go"}
+            if v not in valid:
+                raise ValueError(f"Invalid transport '{v}'. Must be one of: {sorted(valid)}")
+        return v
 
     @field_validator("network")
     @classmethod
@@ -204,13 +276,13 @@ class StdioBackendConfig(BaseModel):
     command: str = Field(..., min_length=1, description="Executable to run")
     args: List[str] = Field(default_factory=list)
     env: Optional[Dict[str, str]] = None
-    container: Optional[ContainerConfig] = Field(
-        default=None,
+    container: ContainerConfig = Field(
+        default_factory=ContainerConfig,
         description=(
-            "Optional container isolation overrides. "
-            "Container isolation is automatic for supported commands "
-            "(uvx, npx) — this section is only needed to customise "
-            "network, memory, CPU limits, or add volumes."
+            "Container isolation configuration. "
+            "Container isolation is enabled by default for supported "
+            "commands (uvx, npx). Set 'enabled: false' to disable, "
+            "or customise network, memory, CPU limits, volumes, etc."
         ),
     )
     group: str = Field(default="default", description="Logical server group name.")
@@ -220,6 +292,14 @@ class StdioBackendConfig(BaseModel):
         description="Per-tool rename and description overrides.",
     )
     timeouts: TimeoutConfig = Field(default_factory=TimeoutConfig)
+
+    @field_validator("container", mode="before")
+    @classmethod
+    def _ensure_container_config(cls, v: object) -> object:
+        """Coerce ``null`` / missing container section to defaults."""
+        if v is None:
+            return {}  # Pydantic will populate ContainerConfig defaults
+        return v
 
     @field_validator("command")
     @classmethod

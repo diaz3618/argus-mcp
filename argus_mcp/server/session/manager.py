@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
+from argus_mcp._task_utils import _log_task_exception
 from argus_mcp.server.session.models import MCPSession
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class SessionManager:
         """Start the background cleanup loop."""
         if self._cleanup_task is None or self._cleanup_task.done():
             self._cleanup_task = asyncio.create_task(self._cleanup_loop(), name="session-cleanup")
+            self._cleanup_task.add_done_callback(_log_task_exception)
             logger.info(
                 "Session cleanup started (interval=%.0fs, default_ttl=%.0fs).",
                 self._cleanup_interval,
@@ -154,7 +156,7 @@ class SessionManager:
                     self._remove(sid)
                 if expired:
                     logger.info(
-                        "Session cleanup: removed %d expired session(s), " "%d remaining.",
+                        "Session cleanup: removed %d expired session(s), %d remaining.",
                         len(expired),
                         len(self._sessions),
                     )

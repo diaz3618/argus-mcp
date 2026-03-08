@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -235,7 +235,7 @@ class WorkflowsPanel(Widget):
                 table.add_row(name, str(step_count), str(last_run), status_display)
 
             summary = (
-                f"Workflows: {len(workflows)}  │  " f"Running: {running}  │  Completed: {completed}"
+                f"Workflows: {len(workflows)}  │  Running: {running}  │  Completed: {completed}"
             )
             self.query_one("#wf-status", Static).update(summary)
         except Exception:
@@ -400,11 +400,13 @@ class WorkflowsPanel(Widget):
             steps = wf.steps
 
             panel._log_header(f"Workflow: {name}")
-            panel._log_output(Text(
-                f"  Steps: {len(steps)}  |  Mode: dry-run  |  "
-                f"Started: {datetime.now().strftime('%H:%M:%S')}",
-                style="dim",
-            ))
+            panel._log_output(
+                Text(
+                    f"  Steps: {len(steps)}  |  Mode: dry-run  |  "
+                    f"Started: {datetime.now().strftime('%H:%M:%S')}",
+                    style="dim",
+                )
+            )
             panel._log_output(Text(""))
 
             # Build a logging invoker that reports each step to the output panel
@@ -438,7 +440,7 @@ class WorkflowsPanel(Widget):
                 }
                 panel._log_step(
                     tool_name,
-                    f"Returned (dry-run) ✓",
+                    "Returned (dry-run) ✓",
                     prefix="✓",
                     style="green",
                 )
@@ -491,12 +493,14 @@ class WorkflowsPanel(Widget):
                     panel._log_step(step_id, f"{status}{dur}", prefix="?", style="yellow")
 
             panel._log_output(Text(""))
-            panel._log_output(Text(
-                f"  Total: {len(results)} steps  |  "
-                f"✓ {completed}  ✕ {failed}  ⊘ {skipped}  |  "
-                f"{elapsed:.0f}ms",
-                style="bold",
-            ))
+            panel._log_output(
+                Text(
+                    f"  Total: {len(results)} steps  |  "
+                    f"✓ {completed}  ✕ {failed}  ⊘ {skipped}  |  "
+                    f"{elapsed:.0f}ms",
+                    style="bold",
+                )
+            )
 
             severity = "information" if failed == 0 else "warning"
             self.app.notify(

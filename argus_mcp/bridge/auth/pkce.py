@@ -39,7 +39,6 @@ import asyncio
 import base64
 import hashlib
 import logging
-import os
 import secrets
 import webbrowser
 from dataclasses import dataclass, field
@@ -147,8 +146,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
                 "state": state,
             }
             logger.info(
-                "OAuth callback received authorization code "
-                "(code=%s…, state=%s…)",
+                "OAuth callback received authorization code (code=%s…, state=%s…)",
                 code[:8] if len(code) > 8 else code,
                 state[:8] if len(state) > 8 else state,
             )
@@ -160,16 +158,11 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         else:
             self.__class__.error = "missing_code"
             logger.warning("OAuth callback received no code or error.")
-            self._send_html(
-                "<h2>Unexpected Response</h2>"
-                "<p>No authorization code received.</p>"
-            )
+            self._send_html("<h2>Unexpected Response</h2><p>No authorization code received.</p>")
 
         # Signal the async waiter
         if self.__class__.loop and self.__class__.ready_event:
-            self.__class__.loop.call_soon_threadsafe(
-                self.__class__.ready_event.set
-            )
+            self.__class__.loop.call_soon_threadsafe(self.__class__.ready_event.set)
 
     def _send_html(self, body: str) -> None:
         """Send an HTML response and auto-close script."""
@@ -251,12 +244,11 @@ class PKCEFlow:
             return self._redirect_uri
 
         self._server = HTTPServer(
-            (_CALLBACK_HOST, self._port), _CallbackHandler,
+            (_CALLBACK_HOST, self._port),
+            _CallbackHandler,
         )
         actual_port = self._server.server_address[1]
-        self._redirect_uri = (
-            f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
-        )
+        self._redirect_uri = f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
         logger.debug(
             "PKCE callback server pre-bound on %s:%d",
             _CALLBACK_HOST,
@@ -295,9 +287,7 @@ class PKCEFlow:
         else:
             server = HTTPServer((_CALLBACK_HOST, self._port), _CallbackHandler)
             actual_port = server.server_address[1]
-            redirect_uri = (
-                f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
-            )
+            redirect_uri = f"http://{_CALLBACK_HOST}:{actual_port}{_CALLBACK_PATH}"
 
         server_thread = Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
@@ -338,9 +328,7 @@ class PKCEFlow:
 
             # Check for errors
             if _CallbackHandler.error:
-                raise RuntimeError(
-                    f"OAuth authorization failed: {_CallbackHandler.error}"
-                )
+                raise RuntimeError(f"OAuth authorization failed: {_CallbackHandler.error}")
 
             result = _CallbackHandler.result
             if not result or "code" not in result:
@@ -348,9 +336,7 @@ class PKCEFlow:
 
             # Verify state
             if result.get("state") != state:
-                raise RuntimeError(
-                    "OAuth state mismatch — possible CSRF attack."
-                )
+                raise RuntimeError("OAuth state mismatch — possible CSRF attack.")
 
             # Exchange code for tokens
             return await self._exchange_code(
@@ -386,10 +372,7 @@ class PKCEFlow:
             data["client_secret"] = self._client_secret
 
         logger.debug(
-            "Token exchange request → %s\n"
-            "  redirect_uri: %s\n"
-            "  client_id: %s\n"
-            "  code: %s…",
+            "Token exchange request → %s\n  redirect_uri: %s\n  client_id: %s\n  code: %s…",
             self._token_endpoint,
             redirect_uri,
             self._client_id,
@@ -420,8 +403,7 @@ class PKCEFlow:
             raw=payload,
         )
         logger.info(
-            "OAuth token exchange succeeded (expires_in=%.0fs, "
-            "refresh=%s).",
+            "OAuth token exchange succeeded (expires_in=%.0fs, refresh=%s).",
             tokens.expires_in,
             bool(tokens.refresh_token),
         )

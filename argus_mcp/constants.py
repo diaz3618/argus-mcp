@@ -24,9 +24,10 @@ DEFAULT_LOG_LEVEL = "INFO"
 
 # Backend connection timeouts
 SSE_LOCAL_START_DELAY = 5  # seconds to wait for local SSE server startup
-MCP_INIT_TIMEOUT = 15  # seconds for MCP session initialization
+MCP_INIT_TIMEOUT = 15  # seconds for MCP session initialization (remote backends only)
 CAP_FETCH_TIMEOUT = 10.0  # seconds for capability list fetch
-STARTUP_TIMEOUT = 90  # overall per-backend connection timeout (spawn + init)
+STARTUP_TIMEOUT = 90  # overall per-backend connection timeout (spawn + init) for remote backends
+STDIO_MCP_INIT_TIMEOUT = 60  # seconds for MCP session.initialize() after stdio build completes
 IMAGE_BUILD_TIMEOUT = 600  # seconds allowed for container image builds (first-run cold builds)
 
 # Staggered startup – limit how many backends connect concurrently to

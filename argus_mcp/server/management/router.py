@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route, Router
 
+from argus_mcp._task_utils import _log_task_exception
 from argus_mcp.constants import SERVER_VERSION, SSE_PATH, STREAMABLE_HTTP_PATH
 from argus_mcp.runtime.service import ArgusService
 from argus_mcp.server.management.schemas import (
@@ -41,6 +42,9 @@ from argus_mcp.server.management.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Strong references to background tasks to prevent GC before completion
+_background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
 
 SSE_HEARTBEAT_INTERVAL = 30  # seconds
 
@@ -110,8 +114,9 @@ async def handle_status(request: Request) -> JSONResponse:
     service = _get_service(request)
     svc_status = service.get_status()
 
-    host = getattr(request.app.state, "host", "127.0.0.1")
-    port = getattr(request.app.state, "port", 0)
+    # host/port are set during server startup from CLI args (not user request data)
+    host = getattr(request.app.state, "host", "127.0.0.1")  # nosec: not user-controlled
+    port = getattr(request.app.state, "port", 0)  # nosec: not user-controlled
     sse_url = f"http://{host}:{port}{SSE_PATH}"
     streamable_http_url = f"http://{host}:{port}{STREAMABLE_HTTP_PATH}"
 
@@ -499,7 +504,9 @@ async def handle_shutdown(request: Request) -> JSONResponse:
         body = await request.json()
         timeout = int(body.get("timeout_seconds", 30))
     except Exception:
-        pass  # Use default timeout
+        logger.debug(
+            "Failed to parse shutdown timeout from request body, using default", exc_info=True
+        )
 
     resp = ShutdownResponse(shutting_down=True)
     # Schedule shutdown in background so we can return the response first
@@ -507,12 +514,10 @@ async def handle_shutdown(request: Request) -> JSONResponse:
         _deferred_shutdown(service, timeout),
         name="management_shutdown",
     )
-    # Store strong reference on the event loop to prevent GC
-    loop = asyncio.get_running_loop()
-    if not hasattr(loop, "_argus_bg_tasks"):
-        loop._argus_bg_tasks = set()  # type: ignore[attr-defined]
-    loop._argus_bg_tasks.add(task)  # type: ignore[attr-defined]
-    task.add_done_callback(loop._argus_bg_tasks.discard)  # type: ignore[attr-defined]
+    # Strong reference prevents GC before task completes
+    task.add_done_callback(_log_task_exception)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return JSONResponse(resp.model_dump())
 
 

@@ -21,6 +21,7 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -59,7 +60,7 @@ class TokenStore:
         self._dir = Path(token_dir or _DEFAULT_TOKEN_DIR)
         self._ensure_dir()
 
-    def save(self, backend_name: str, tokens: TokenSet) -> None:
+    async def save(self, backend_name: str, tokens: TokenSet) -> None:
         """Persist *tokens* for *backend_name*."""
         path = self._path_for(backend_name)
         data = {
@@ -71,10 +72,14 @@ class TokenStore:
             "saved_at": time.time(),
         }
         try:
-            path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            content = json.dumps(data, indent=2)
+            await asyncio.to_thread(path.write_text, content, "utf-8")
             # Restrict permissions — owner-only read/write
             os.chmod(path, 0o600)
-            logger.debug("Token saved for backend '%s' → %s", backend_name, path)
+            logger.debug(  # intentionally debug-level for troubleshooting
+                "Token saved for backend '%s'",
+                backend_name,
+            )
         except OSError as exc:
             logger.warning(
                 "Failed to save token for '%s': %s",
@@ -82,7 +87,7 @@ class TokenStore:
                 exc,
             )
 
-    def load(self, backend_name: str) -> Optional[TokenSet]:
+    async def load(self, backend_name: str) -> Optional[TokenSet]:
         """Load stored tokens for *backend_name*.
 
         Returns ``None`` if no token file exists or the access token
@@ -93,7 +98,8 @@ class TokenStore:
             return None
 
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            raw = await asyncio.to_thread(path.read_text, "utf-8")
+            data = json.loads(raw)
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning(
                 "Failed to read token for '%s': %s",
@@ -149,11 +155,7 @@ class TokenStore:
         """List backend names that have stored tokens."""
         if not self._dir.exists():
             return []
-        return [
-            p.stem
-            for p in self._dir.glob("*.json")
-            if p.is_file()
-        ]
+        return [p.stem for p in self._dir.glob("*.json") if p.is_file()]
 
     # ── Internal ─────────────────────────────────────────────────────
 

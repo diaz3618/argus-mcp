@@ -73,9 +73,9 @@ def _backend_to_dict(
             env=cfg.env,
         )
         entry: Dict[str, Any] = {"type": "stdio", "params": params}
-        # Pass optional container overrides to client_manager
-        if cfg.container is not None:
-            entry["container"] = cfg.container.model_dump(exclude_none=True)
+        # Always pass container config — isolation is on by default.
+        # The ``enabled`` field controls whether wrapping happens.
+        entry["container"] = cfg.container.model_dump(exclude_none=True)
     elif isinstance(cfg, StreamableHttpBackendConfig):
         entry = {"type": "streamable-http", "url": cfg.url}
         if cfg.headers:
@@ -199,7 +199,7 @@ def load_and_validate_config(cfg_fpath: str) -> Dict[str, Dict[str, Any]]:
     except ValidationError as exc:
         error_summary = _format_validation_errors(exc)
         raise ConfigurationError(
-            f"Configuration validation failed ({len(exc.errors())} error(s)):\n" f"{error_summary}"
+            f"Configuration validation failed ({len(exc.errors())} error(s)):\n{error_summary}"
         ) from exc
 
     # ── Convert to downstream format ─────────────────────────────────
@@ -242,5 +242,5 @@ def load_argus_config(cfg_fpath: str) -> ArgusConfig:
     except ValidationError as exc:
         error_summary = _format_validation_errors(exc)
         raise ConfigurationError(
-            f"Configuration validation failed ({len(exc.errors())} error(s)):\n" f"{error_summary}"
+            f"Configuration validation failed ({len(exc.errors())} error(s)):\n{error_summary}"
         ) from exc

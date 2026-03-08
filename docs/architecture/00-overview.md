@@ -8,21 +8,21 @@ operational visibility — all through a single connection point.
 
 ```
                      ┌──────────────────────────────────────────┐
-                     │              Argus MCP                │
+                     │              Argus MCP                   │
                      │                                          │
   MCP Clients        │  ┌─────────┐   ┌───────────────────┐     │
   ─────────────────► │  │Transport│──►│  Middleware Chain │     │
   (Claude, Cursor,   │  │ Layer   │   │                   │     │      Backend MCP Servers
    VS Code, etc.)    │  │         │   │  Auth             │     │
-                     │  │ SSE     │   │  AuthZ            │     │      ┌──────────────┐
-  ◄───────────────── │  │         │   │  Telemetry        │     │  ┌──►│ stdio server │
-  Aggregated tools,  │  │ Stream- │   │  Audit            │     │  │   └──────────────┘
-  resources, prompts │  │ able    │   │  Recovery         │     │  │   ┌──────────────┐
-                     │  │ HTTP    │   │  Routing ─────────┼─────┼──┼──►│ SSE server   │
-                     │  └─────────┘   └───────────────────┘     │  │   └──────────────┘
-                     │                                          │  │   ┌──────────────┐
-                     │  ┌──────────────┐  ┌──────────────────┐  │  └──►│ HTTP server  │
-                     │  │ Management   │  │ Bridge           │  │      └──────────────┘
+                     │  │ SSE     │   │  AuthZ            │     │      ┌───────────────────┐
+  ◄───────────────── │  │         │   │  Telemetry        │     │  ┌──►│ stdio (container) │
+  Aggregated tools,  │  │ Stream- │   │  Audit            │     │  │   └───────────────────┘
+  resources, prompts │  │ able    │   │  Recovery         │     │  │   ┌─────────────┐
+                     │  │ HTTP    │   │  Routing ─────────┼─────┼──┼──►│ SSE server  │
+                     │  └─────────┘   └───────────────────┘     │  │   └─────────────┘
+                     │                                          │  │   ┌─────────────┐
+                     │  ┌──────────────┐  ┌──────────────────┐  │  └──►│ HTTP server │
+                     │  │ Management   │  │ Bridge           │  │      └─────────────┘
                      │  │ API          │  │                  │  │
                      │  │ /manage/v1/  │  │ Registry         │  │
                      │  │              │  │ ClientManager    │  │
@@ -31,7 +31,8 @@ operational visibility — all through a single connection point.
                      │  │ Backends     │  │ ConflictResolver │  │
                      │  │ Events       │  │ Filters          │  │
                      │  │ Hot-reload   │  │ GroupManager     │  │
-                     │  └──────────────┘  └──────────────────┘  │
+                     │  └──────────────┘  │ ContainerWrapper │  │
+                     │                    └──────────────────┘  │
                      │                                          │
                      │  ┌──────────┐ ┌────────┐  ┌───────────┐  │
                      │  │ Secrets  │ │ Audit  │  │ Telemetry │  │
@@ -87,6 +88,19 @@ argus_mcp/
 │   ├── elicitation.py   # MCP elicitation support
 │   ├── version_checker.py  # Version drift detection
 │   ├── auth/            # Outgoing authentication
+│   ├── container/       # Container isolation for stdio backends
+│   │   ├── wrapper.py       # Main entry point — wrap_backend()
+│   │   ├── image_builder.py # Docker image build orchestration
+│   │   ├── runtime.py       # Container runtime detection (Docker/Podman)
+│   │   ├── network.py       # Network mode resolution
+│   │   └── templates/       # Jinja2 Dockerfile templates
+│   │       ├── models.py        # TemplateData, RuntimeConfig, UID constants
+│   │       ├── engine.py        # Template rendering engine
+│   │       ├── _generators.py   # Per-transport build logic
+│   │       ├── validation.py    # Template output validation
+│   │       ├── uvx.dockerfile.j2  # Python/uvx backend Dockerfile
+│   │       ├── npx.dockerfile.j2  # Node.js/npx backend Dockerfile
+│   │       └── go.dockerfile.j2   # Go binary backend Dockerfile
 │   ├── health/          # Health checking
 │   ├── middleware/       # Request middleware chain
 │   └── optimizer/       # Tool optimizer (meta-tools)
@@ -147,6 +161,11 @@ CLI (main)
       → Resolve secrets (secret:name → values)
       → Create ArgusService
         → ClientManager: connect to all backends
+          → For each stdio backend:
+            → Container wrapper: detect runtime, build image, pre-create container
+            → Wrap params: command becomes "docker start -ai <container_id>"
+          → For each SSE/HTTP backend:
+            → Connect directly (no container isolation)
         → CapabilityRegistry: discover & aggregate capabilities
         → Apply conflict resolution, filters, renames
         → Build middleware chain
@@ -200,8 +219,9 @@ ArgusApp (Textual)
 | **Single connection point** | Clients connect once; Argus routes to N backends |
 | **Protocol-native** | Speaks MCP natively — no protocol translation |
 | **Transport-agnostic** | Supports stdio, SSE, and Streamable HTTP backends |
+| **Container-first isolation** | stdio backends run in hardened containers by default |
 | **Middleware pipeline** | Pluggable chain for cross-cutting concerns |
 | **Config-driven** | All behavior controlled via YAML config |
-| **Defense in depth** | Auth → AuthZ → Audit → Recovery layers |
+| **Defense in depth** | Auth → AuthZ → Audit → Recovery → Container isolation |
 | **Graceful degradation** | Backend failures don't crash the gateway |
 | **Operational visibility** | Management API + TUI + audit logs + health checks |

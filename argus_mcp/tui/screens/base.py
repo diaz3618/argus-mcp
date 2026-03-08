@@ -24,5 +24,4 @@ class ArgusScreen(Screen):
 
     def compose_content(self) -> ComposeResult:
         """Override in subclasses to add mode-specific content."""
-        return
-        yield  # pragma: no cover — makes this a generator
+        yield from ()

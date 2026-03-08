@@ -36,8 +36,8 @@ registry client).
 │                               │  [Install]                     │ │
 │                               └────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
-         │                           │
-         ▼                           ▼
+         │                          │
+         ▼                          ▼
   RegistryClient ──────────── RegistryCache
     (httpx)          miss?     (~/.cache/argus-mcp/registry/)
          │
@@ -79,7 +79,7 @@ described below. Any HTTP server returning the correct JSON shapes will work.
 {
   "name": "example-server",
   "description": "An example MCP server",
-  "transport": "stdio",           // "stdio" | "sse" | "streamable-http"
+  "transport": "stdio",            // "stdio" | "sse" | "streamable-http"
   "command": "uvx example-server", // for stdio
   "args": ["--flag"],              // optional, for stdio
   "url": "",                       // for sse / streamable-http

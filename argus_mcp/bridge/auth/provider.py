@@ -211,7 +211,7 @@ class PKCEAuthProvider(AuthProvider):
         store = TokenStore(self._token_dir)
 
         # 2. Disk store
-        stored = store.load(self._backend_name)
+        stored = await store.load(self._backend_name)
         if stored and stored.access_token:
             self._cache.set(stored.access_token, stored.expires_in)
             logger.info(
@@ -230,7 +230,7 @@ class PKCEAuthProvider(AuthProvider):
                     client_secret=self._client_secret,
                 )
                 self._cache.set(refreshed.access_token, refreshed.expires_in)
-                store.save(self._backend_name, refreshed)
+                await store.save(self._backend_name, refreshed)
                 logger.info(
                     "[%s] OAuth token refreshed via refresh_token.",
                     self._backend_name,
@@ -257,7 +257,7 @@ class PKCEAuthProvider(AuthProvider):
         )
         tokens = await flow.execute()
         self._cache.set(tokens.access_token, tokens.expires_in)
-        store.save(self._backend_name, tokens)
+        await store.save(self._backend_name, tokens)
         return tokens.access_token
 
     def redacted_repr(self) -> str:

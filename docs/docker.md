@@ -129,9 +129,78 @@ docker run -p 9000:9000 -v ./config.yaml:/app/config.yaml argus-mcp
 
 - **Base:** `python:3.13-slim`
 - **Node.js:** LTS (22.x) included for `npx`-based stdio backends
-- **User:** Runs as non-root `argus` user
+- **User:** Runs as non-root user
 - **Entrypoint:** `argus-mcp` — pass any subcommand (`server`, `tui`, `secret`) as arguments
 - **Default command:** `server --host 0.0.0.0 --port 9000`
+
+## Backend Container Isolation
+
+Argus automatically builds and runs each **stdio backend** inside its own
+hardened container. This provides process-level isolation, resource limits,
+and a read-only filesystem for every backend — with no manual Docker
+configuration required.
+
+### How It Works
+
+When the server starts (or when `argus-mcp build` is run), Argus:
+
+1. **Detects** a container runtime (Docker or Podman) on the host
+2. **Classifies** each backend's command (`uvx`, `npx`, `go`, etc.)
+3. **Builds** a purpose-built Docker image from a Jinja2 template
+4. **Pre-creates** a container with security hardening flags
+5. **Attaches** via `docker start -ai` for stdio communication
+
+### Security Defaults
+
+Every backend container runs with:
+
+- `--read-only` filesystem + tmpfs for `/tmp` and `/home/nonroot`
+- `--cap-drop ALL` — no Linux capabilities
+- `--security-opt no-new-privileges`
+- `--memory 512m --cpus 1` (configurable per backend)
+- Non-root user (UID 65532, the distroless/Chainguard standard)
+
+### Pre-Building Images
+
+To avoid cold-start delays, pre-build all backend images:
+
+```bash
+argus-mcp build --config config.yaml
+```
+
+This builds images and pre-creates containers for all configured stdio
+backends. The server then starts instantly by attaching to pre-created
+containers.
+
+### Relationship to Argus Server Image
+
+The Argus **server image** (`diaz3618/argus-mcp`) runs the gateway itself.
+Backend container isolation is a separate layer: the gateway process builds
+and manages individual backend containers on the Docker host. When running
+the Argus server inside Docker, the server container needs access to the
+Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock`) to manage
+backend containers.
+
+### Disabling Container Isolation
+
+Set the environment variable or config flag:
+
+```bash
+ARGUS_CONTAINER_ISOLATION=false
+```
+
+```yaml
+feature_flags:
+  container_isolation: false
+```
+
+Individual backends can also opt out:
+
+```yaml
+backends:
+  my-backend:
+    container_isolation: false
+```
 
 ## Pinning a Version
 

@@ -33,11 +33,11 @@ from urllib.parse import urljoin, urlparse
 logger = logging.getLogger(__name__)
 
 
-# ── Metadata cache (follows ContextForge's DcrService pattern) ───────────
+# ── Metadata cache ───────────
 
 # In-memory cache for AS metadata keyed by MCP server URL.
 # Format: {url: {"metadata": OAuthMetadata, "cached_at": float}}
-# Default TTL: 3600s (same as ContextForge's dcr_metadata_cache_ttl).
+# Default TTL: 3600s.
 _METADATA_CACHE_TTL: float = 3600.0
 _metadata_cache: Dict[str, Dict[str, Any]] = {}
 
@@ -84,8 +84,7 @@ async def discover_oauth_metadata(
     1. RFC 9728 protected-resource metadata on the MCP server.
     2. RFC 8414 / OIDC discovery on the authorization server URL.
 
-    Results are cached for ``_METADATA_CACHE_TTL`` seconds (following
-    ContextForge's ``dcr_metadata_cache_ttl`` pattern) to avoid
+    Results are cached for ``_METADATA_CACHE_TTL`` seconds to avoid
     redundant network calls on retries.
 
     Returns ``None`` if discovery fails entirely (server does not
@@ -257,11 +256,6 @@ async def _discover_oidc(
     (``registration_endpoint``, ``code_challenge_methods_supported``,
     ``scopes_supported``).  When RFC 8414 succeeds but is missing key
     fields, the OIDC document is fetched as well and used to fill gaps.
-
-    This two-pass approach follows the pattern used by ContextForge's
-    ``DcrService.discover_as_metadata`` and addresses servers like
-    Semgrep whose OIDC endpoint omits DCR and PKCE metadata while the
-    RFC 8414 endpoint includes them.
     """
     parsed = urlparse(auth_server_url)
     base = f"{parsed.scheme}://{parsed.netloc}"
@@ -314,7 +308,6 @@ async def _discover_oidc(
         return None
 
     # Merge: RFC 8414 takes precedence, OIDC fills gaps.
-    # This mirrors ContextForge's pattern of preferring the more
     # OAuth-specific metadata while still leveraging OIDC for fields
     # like userinfo_endpoint that only OIDC publishes.
     merged: Dict[str, Any] = {}
@@ -333,19 +326,14 @@ async def _discover_oidc(
         registration_endpoint=merged.get("registration_endpoint", ""),
         scopes_supported=merged.get("scopes_supported", []),
         response_types_supported=merged.get("response_types_supported", []),
-        code_challenge_methods_supported=merged.get(
-            "code_challenge_methods_supported", []
-        ),
+        code_challenge_methods_supported=merged.get("code_challenge_methods_supported", []),
         raw=merged,
     )
     logger.info(
-        "OAuth discovery succeeded: issuer=%s, pkce=%s, registration=%s, "
-        "source=%s",
+        "OAuth discovery succeeded: issuer=%s, pkce=%s, registration=%s, source=%s",
         meta.issuer,
         meta.supports_pkce,
         meta.supports_dynamic_registration,
-        "rfc8414+oidc" if rfc8414_data and oidc_data
-        else "rfc8414" if rfc8414_data
-        else "oidc",
+        "rfc8414+oidc" if rfc8414_data and oidc_data else "rfc8414" if rfc8414_data else "oidc",
     )
     return meta

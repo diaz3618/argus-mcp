@@ -248,6 +248,17 @@ async def _attach_to_mcp_server(
         os.environ.setdefault("ARGUS_CONTAINER_ISOLATION", "false")
         logger.info("Container isolation disabled via feature flag.")
 
+    # Propagate build_on_startup flag — when False (the default),
+    # server startup will NOT attempt to build missing container images;
+    # backends gracefully fall back to bare subprocess.  Users should
+    # run ``argus-mcp build`` first to pre-build images.
+    if not mcp_svr_instance.feature_flags.is_enabled("build_on_startup"):
+        os.environ.setdefault("ARGUS_BUILD_ON_STARTUP", "false")
+        logger.info(
+            "Container image builds during startup disabled "
+            "(build_on_startup=false). Run 'argus-mcp build' to pre-build images."
+        )
+
     # ── Version Drift Detection (Task 5.4 wiring) ────────────────────
     from argus_mcp.bridge.version_checker import VersionChecker
 
@@ -269,6 +280,7 @@ async def _attach_to_mcp_server(
 # ──────────────────────────────────────────────────────────────────────
 # Startup-Phase Signal Override
 # ──────────────────────────────────────────────────────────────────────
+
 
 def _install_startup_signal_override(
     service: "ArgusService",
@@ -310,6 +322,7 @@ def _install_startup_signal_override(
 
         # Tell uvicorn to exit once the lifespan returns
         import argus_mcp.cli as _cli_mod
+
         uvicorn_svr = getattr(_cli_mod, "uvicorn_svr_inst", None)
         if uvicorn_svr is not None:
             uvicorn_svr.should_exit = True
@@ -334,10 +347,10 @@ def _install_startup_signal_override(
         _cancel_startup()
 
     # Legacy-style signal handlers (fallback for Windows / non-Unix loops).
-    def _startup_sigint_legacy(signum: int, frame: Any) -> None:
+    def _startup_sigint_legacy(_signum: int, _frame: Any) -> None:
         _handle_sigint()
 
-    def _startup_sigterm_legacy(signum: int, frame: Any) -> None:
+    def _startup_sigterm_legacy(_signum: int, _frame: Any) -> None:
         _handle_sigterm()
 
     # Save originals so we can restore them later.
@@ -467,13 +480,13 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
                 from argus_mcp.config.loader import load_and_validate_config
 
                 raw_config = load_and_validate_config(config_path)
-                installer_display = InstallerDisplay(raw_config)
+                installer_display = InstallerDisplay(raw_config, verbose=True)
                 installer_display.render_initial()
                 progress_callback = installer_display.make_callback()
             except Exception:
                 # Non-fatal — fall back to normal (non-verbose) output
                 logger.debug(
-                    "Could not initialise installer display; " "falling back to standard output.",
+                    "Could not initialise installer display; falling back to standard output.",
                     exc_info=True,
                 )
                 installer_display = None
@@ -502,9 +515,10 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         # This must happen *after* handlers are attached so that
         # mcp_server.run() (called internally per session) can serve
         # tools/resources/prompts.
-        # Uses AsyncExitStack for robust cleanup (pattern from mcp-context-forge).
-        import argus_mcp.server.app as app_module
+        # Uses AsyncExitStack for robust cleanup
         from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+        import argus_mcp.server.app as app_module
 
         sm_http = StreamableHTTPSessionManager(app=mcp_server)
         app_module.streamable_session_manager = sm_http
@@ -596,9 +610,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
                 await asyncio.wait_for(_exit_stack.aclose(), timeout=10.0)
                 logger.info("SDK StreamableHTTPSessionManager stopped.")
             except asyncio.TimeoutError:
-                logger.warning(
-                    "StreamableHTTPSessionManager aclose() timed out after 10s."
-                )
+                logger.warning("StreamableHTTPSessionManager aclose() timed out after 10s.")
             except RuntimeError as e_rt:
                 logger.debug(
                     "Cancel scope error during session manager shutdown: %s",
@@ -615,7 +627,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
 
                 app_module.streamable_session_manager = None
             except Exception:
-                pass
+                logger.debug("Module reference cleanup failed", exc_info=True)
 
         # Stop Argus session manager before stopping backends
         sm = getattr(mcp_server, "session_manager", None)

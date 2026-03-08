@@ -110,6 +110,9 @@ async def _run_server(
         app_s.transport_type = _argus_cfg.server.transport
     except Exception:
         app_s.transport_type = "streamable-http"
+        module_logger.debug(
+            "Transport type detection failed, defaulting to streamable-http", exc_info=True
+        )
 
     module_logger.debug("Configuration parameters stored in app.state.")
 
@@ -525,7 +528,7 @@ def _cmd_tui(args: argparse.Namespace) -> None:
 
             client_cfg = load_argus_config(cfg_path).client
         except Exception:
-            pass  # fall through — use defaults
+            module_logger.debug("Client config load failed, using defaults", exc_info=True)
 
     # CLI flag → env var → config.yaml → default
     token: Optional[str] = args.token or os.environ.get("ARGUS_MGMT_TOKEN") or client_cfg.token
@@ -595,7 +598,14 @@ def _cmd_tui(args: argparse.Namespace) -> None:
 
 
 def _restore_terminal(saved_termios: object | None) -> None:
-    """Best-effort terminal restoration after Textual exits."""
+    """Best-effort terminal restoration after Textual exits.
+
+    Terminal restoration is inherently best-effort -- catch broadly
+    to avoid masking the real exit reason.  See cli.py docstring.
+    """
+    module_logger.debug(
+        "Attempting terminal restoration (saved_termios=%s)", saved_termios is not None
+    )
     sys.stdout = sys.__stdout__
     sys.stderr = sys.__stderr__
 
@@ -619,10 +629,7 @@ def _restore_terminal(saved_termios: object | None) -> None:
             timeout=2,
         )
     except Exception:
-        try:
-            os.system("stty sane 2>/dev/null")
-        except Exception:
-            pass
+        pass
 
     try:
         import termios
@@ -641,6 +648,94 @@ def _restore_terminal(saved_termios: object | None) -> None:
 
 
 # ── CLI parser construction ──────────────────────────────────────────────
+
+
+# ── ``argus-mcp build`` ──────────────────────────────────────────────
+
+
+def _cmd_build(args: argparse.Namespace) -> None:
+    """Pre-build container images for all stdio backends.
+
+    Builds images **sequentially** (one at a time) so Docker/Podman
+    are not overwhelmed with concurrent pulls + layer installs.
+
+    This should be run once before ``argus-mcp server`` when container
+    isolation is enabled (the default).
+    """
+    config_path = getattr(args, "config", None) or _find_config_file()
+    setup_logging("info")
+
+    log = logging.getLogger("argus_mcp.build")
+    log.info("Loading config from %s", config_path)
+
+    from argus_mcp.config.loader import load_and_validate_config
+
+    backend_map = load_and_validate_config(config_path)
+
+    # Identify stdio backends
+    stdio_backends = {
+        name: conf for name, conf in backend_map.items() if conf.get("type") == "stdio"
+    }
+
+    if not stdio_backends:
+        print("No stdio backends found in config — nothing to build.")
+        return
+
+    print(f"Building container images for {len(stdio_backends)} stdio backend(s)...\n")
+
+    async def _build_all() -> None:
+        from mcp import StdioServerParameters
+
+        from argus_mcp.bridge.container import wrap_backend
+
+        ok, skip, fail = 0, 0, 0
+        for name, conf in stdio_backends.items():
+            params = conf.get("params")
+            if not isinstance(params, StdioServerParameters):
+                log.warning("[%s] Invalid params — skipping.", name)
+                skip += 1
+                continue
+
+            container_cfg = conf.get("container") or {}
+            net_override = container_cfg.get("network") or (
+                (conf.get("network") or {}).get("network_mode")
+            )
+
+            print(f"  [{name}] Building image for '{params.command}' ...", end=" ", flush=True)
+            try:
+                _wrapped, was_isolated = await wrap_backend(
+                    name,
+                    params,
+                    enabled=container_cfg.get("enabled", True),
+                    runtime_override=container_cfg.get("runtime"),
+                    network=net_override,
+                    memory=container_cfg.get("memory"),
+                    cpus=container_cfg.get("cpus"),
+                    volumes=container_cfg.get("volumes"),
+                    extra_args=container_cfg.get("extra_args"),
+                    build_if_missing=True,
+                    system_deps=container_cfg.get("system_deps"),
+                    builder_image=container_cfg.get("builder_image"),
+                    additional_packages=container_cfg.get("additional_packages"),
+                    transport_override=container_cfg.get("transport"),
+                    go_package=container_cfg.get("go_package"),
+                )
+                if was_isolated:
+                    print("OK (containerised)")
+                    ok += 1
+                else:
+                    print("skipped (not wrappable or disabled)")
+                    skip += 1
+            except Exception as exc:
+                print(f"FAILED ({exc})")
+                log.error("[%s] Build failed: %s", name, exc, exc_info=True)
+                fail += 1
+
+        print(f"\nDone: {ok} built, {skip} skipped, {fail} failed.")
+        if fail > 0:
+            sys.exit(1)
+
+    asyncio.run(_build_all())
 
 
 # ── ``argus-mcp secret`` ─────────────────────────────────────────────
@@ -702,7 +797,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # ── server ──────────────────────────────────────────────────
     sp_server = subparsers.add_parser(
         "server",
-        help="Run the headless Argus server (Uvicorn + MCP bridge)",
+        help="Run the headless Argus server (Uvicorn + MCP bridge, with container isolation)",
     )
     sp_server.add_argument(
         "--host",
@@ -728,7 +823,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         metavar="PATH",
-        help=("Path to configuration file (YAML). " "Default: auto-detect config.yaml/config.yml"),
+        help=("Path to configuration file (YAML). Default: auto-detect config.yaml/config.yml"),
     )
     sp_server.add_argument(
         "-d",
@@ -754,11 +849,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0,
         help=(
             "Increase startup verbosity. "
-            "-v shows connection progress; "
+            "-v shows connection progress and streaming docker build output; "
             "-vv adds full subprocess/debug output."
         ),
     )
     sp_server.set_defaults(func=_cmd_server)
+
+    # ── build ────────────────────────────────────────────────────
+    sp_build = subparsers.add_parser(
+        "build",
+        help="Pre-build container images for all stdio backends",
+    )
+    sp_build.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Path to configuration file (YAML). Default: auto-detect.",
+    )
+    sp_build.set_defaults(func=_cmd_build)
 
     # ── stop ─────────────────────────────────────────────────────
     sp_stop = subparsers.add_parser(
@@ -805,8 +914,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help=(
-            "Path to servers.json for multi-server mode. "
-            "Default: ~/.config/argus-mcp/servers.json"
+            "Path to servers.json for multi-server mode. Default: ~/.config/argus-mcp/servers.json"
         ),
     )
     sp_tui.set_defaults(func=_cmd_tui)

@@ -39,7 +39,11 @@ backends:
       PYTHONUNBUFFERED: "1"
     group: default                  # logical server group
     timeouts:
-      init: 15                      # MCP session init timeout (seconds)
+      # Stdio backends have NO overall startup timeout — builds and
+      # container launches take as long as they need (Ctrl+C to cancel).
+      # After the process is running, session.initialize() gets a 60s
+      # timeout (STDIO_MCP_INIT_TIMEOUT).  Override it here:
+      # init: 60                    # MCP session init timeout (seconds, default: 60 for stdio)
       cap_fetch: 10                 # capability fetch timeout
     filters:
       tools:
@@ -92,16 +96,28 @@ backends:
   #     scopes: ["openid", "profile"]
 
   # Stdio backend with container isolation overrides
-  # Container isolation is automatic for stdio backends; these
-  # settings override the defaults (memory, cpu, network).
+  # Container isolation is automatic for stdio backends (uvx, npx).
+  # Images are built during server startup by default (build_on_startup: true).
+  # Set ``build_on_startup: false`` in feature_flags to skip auto-build;
+  # then run ``argus-mcp build`` manually to pre-build them.
+  #
+  # Per-backend container settings (all optional):
   # isolated_server:
   #   type: stdio
   #   command: npx
   #   args: ["-y", "my-mcp-server"]
   #   container:
-  #     memory: "256m"
-  #     cpus: 0.5
-  #     network: "none"
+  #     enabled: true              # default: true — set false to disable for this backend
+  #     runtime: "docker"          # "docker", "podman", or "kubernetes" (default: auto-detect)
+  #     memory: "256m"             # container memory limit (default: "512m")
+  #     cpus: "0.5"               # cpu limit (default: "1.0")
+  #     network: "none"            # docker network mode (default: "bridge")
+  #     volumes:                   # optional volume mounts
+  #       - "/host/path:/container/path:ro"
+  #     extra_args:                # extra docker run flags
+  #       - "--read-only"
+  #     system_deps:               # system packages to install in the container image
+  #       - "ripgrep"              # example: mcp-ripgrep needs the 'rg' binary
 
 # ── Conflict Resolution ─────────────────────────────────────────────────
 conflict_resolution:
@@ -185,6 +201,9 @@ feature_flags:
   hot_reload: true                  # default: true
   optimizer: false                  # default: false
   # container_isolation: true       # default: true — auto-wraps stdio backends in containers
+  # build_on_startup: true          # default: true — auto-builds container
+  #                                 #   images during server startup (slow on first run).
+  #                                 #   Set false to skip; run 'argus-mcp build' to pre-build.
   # outgoing_auth: true             # default: true
   # session_management: true        # default: true
   # yaml_config: true               # default: true

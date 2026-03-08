@@ -29,6 +29,7 @@ _DEFAULTS: Dict[str, bool] = {
     "session_management": True,
     "yaml_config": True,
     "container_isolation": True,
+    "build_on_startup": True,
 }
 
 

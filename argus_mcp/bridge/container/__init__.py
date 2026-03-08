@@ -1,14 +1,15 @@
 """Container isolation for MCP backend servers.
 
 This package provides automatic, per-server container isolation for
-stdio-based MCP backends.  The approach mirrors production container
+stdio-based MCP backends. The approach mirrors production container
 managers: custom OCI images are **built once** (with the MCP package
 pre-installed via multi-stage Dockerfiles) and then run repeatedly
 without needing to reinstall on every startup.
 
 Architecture
 ------------
-1. **Runtime detection** — discovers Docker or Podman on ``$PATH``.
+1. **Runtime detection** — discovers Docker or Podman on ``$PATH``
+   via the :class:`RuntimeFactory`.
 2. **Command parsing** — extracts the package name and runtime args
    from the backend's ``command`` + ``args``.
 3. **Image building** — generates a Dockerfile from a template for the
@@ -35,13 +36,31 @@ Servers that need internet access (most of them) run with
 an optional ``network`` section in the backend config.
 """
 
-from argus_mcp.bridge.container.wrapper import wrap_backend
+from argus_mcp.bridge.container.runtime import (
+    ContainerRuntime,
+    DockerRuntime,
+    RuntimeFactory,
+    RuntimeType,
+)
+from argus_mcp.bridge.container.wrapper import (
+    cleanup_all_containers,
+    cleanup_container,
+    container_cleanup_context,
+    wrap_backend,
+)
 
-__all__ = ["wrap_backend"]
+__all__ = [
+    "ContainerRuntime",
+    "DockerRuntime",
+    "RuntimeFactory",
+    "RuntimeType",
+    "cleanup_all_containers",
+    "cleanup_container",
+    "container_cleanup_context",
+    "wrap_backend",
+]
 
 
 def _reset_health_cache() -> None:
     """Reset the cached runtime health check result (for testing)."""
-    from argus_mcp.bridge.container import wrapper as _w
-
-    _w._runtime_healthy = None  # noqa: SLF001
+    RuntimeFactory.get().reset()
