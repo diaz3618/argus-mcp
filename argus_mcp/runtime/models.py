@@ -38,7 +38,7 @@ _VALID_TRANSITIONS: Dict[ServiceState, frozenset[ServiceState]] = {
     ServiceState.RUNNING: frozenset({ServiceState.STOPPING}),
     ServiceState.STOPPING: frozenset({ServiceState.STOPPED, ServiceState.ERROR}),
     ServiceState.STOPPED: frozenset(),
-    ServiceState.ERROR: frozenset({ServiceState.STARTING}),
+    ServiceState.ERROR: frozenset({ServiceState.STARTING, ServiceState.STOPPING}),
 }
 
 
