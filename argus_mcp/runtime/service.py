@@ -13,6 +13,7 @@ from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
+import yaml
 from mcp import types as mcp_types
 
 from argus_mcp.bridge.capability_registry import CapabilityRegistry
@@ -22,7 +23,7 @@ from argus_mcp.bridge.health import HealthChecker
 from argus_mcp.config import load_and_validate_config
 from argus_mcp.config.diff import compute_diff
 from argus_mcp.config.loader import load_argus_config
-from argus_mcp.constants import SERVER_NAME, SERVER_VERSION
+from argus_mcp.constants import SERVER_NAME, SERVER_VERSION, SHUTDOWN_TIMEOUT
 from argus_mcp.errors import BackendServerError
 from argus_mcp.runtime.models import (
     BackendInfo,
@@ -179,9 +180,6 @@ class ArgusService:
         """Create a new CapabilityRegistry with the current conflict strategy."""
         if self._config_path:
             try:
-                from argus_mcp.bridge.filter import CapabilityFilter
-                from argus_mcp.bridge.rename import RenameMap
-
                 full_cfg = load_argus_config(self._config_path)
                 cr = full_cfg.conflict_resolution
                 strategy = create_strategy(
@@ -190,42 +188,9 @@ class ArgusService:
                     priority_order=cr.order if cr.order else None,
                 )
 
-                # Build per-server, per-capability-type filters.
-                filters: Dict[str, Dict[str, CapabilityFilter]] = {}
-                for name, backend in full_cfg.backends.items():
-                    f = backend.filters
-                    svr_filters: Dict[str, CapabilityFilter] = {}
-                    if f.tools.allow or f.tools.deny:
-                        svr_filters["tools"] = CapabilityFilter(
-                            allow=f.tools.allow, deny=f.tools.deny
-                        )
-                    if f.resources.allow or f.resources.deny:
-                        svr_filters["resources"] = CapabilityFilter(
-                            allow=f.resources.allow, deny=f.resources.deny
-                        )
-                    if f.prompts.allow or f.prompts.deny:
-                        svr_filters["prompts"] = CapabilityFilter(
-                            allow=f.prompts.allow, deny=f.prompts.deny
-                        )
-                    if svr_filters:
-                        filters[name] = svr_filters
-
-                # Build per-server rename maps from tool_overrides.
-                rename_maps: Dict[str, RenameMap] = {}
-                for name, backend in full_cfg.backends.items():
-                    if backend.tool_overrides:
-                        rename_maps[name] = RenameMap(
-                            overrides={
-                                k: {"name": v.name or "", "description": v.description or ""}
-                                for k, v in backend.tool_overrides.items()
-                            }
-                        )
-
-                # Build per-server capability fetch timeouts.
-                cap_fetch_timeouts: Dict[str, float] = {}
-                for name, backend in full_cfg.backends.items():
-                    if backend.timeouts.cap_fetch is not None:
-                        cap_fetch_timeouts[name] = backend.timeouts.cap_fetch
+                filters = self._build_capability_filters(full_cfg)
+                rename_maps = self._build_rename_maps(full_cfg)
+                cap_fetch_timeouts = self._build_cap_fetch_timeouts(full_cfg)
 
                 return CapabilityRegistry(
                     conflict_strategy=strategy,
@@ -233,12 +198,62 @@ class ArgusService:
                     rename_maps=rename_maps if rename_maps else None,
                     cap_fetch_timeouts=cap_fetch_timeouts if cap_fetch_timeouts else None,
                 )
-            except Exception:
+            except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
                 logger.warning(
                     "Failed to load conflict strategy/filters from config; using defaults.",
                     exc_info=True,
                 )
         return CapabilityRegistry()
+
+    @staticmethod
+    def _build_capability_filters(
+        full_cfg: Any,
+    ) -> Dict[str, Any]:
+        """Build per-server, per-capability-type filters from config."""
+        from argus_mcp.bridge.filter import CapabilityFilter
+
+        filters: Dict[str, Dict[str, CapabilityFilter]] = {}
+        for name, backend in full_cfg.backends.items():
+            f = backend.filters
+            svr_filters: Dict[str, CapabilityFilter] = {}
+            if f.tools.allow or f.tools.deny:
+                svr_filters["tools"] = CapabilityFilter(allow=f.tools.allow, deny=f.tools.deny)
+            if f.resources.allow or f.resources.deny:
+                svr_filters["resources"] = CapabilityFilter(
+                    allow=f.resources.allow, deny=f.resources.deny
+                )
+            if f.prompts.allow or f.prompts.deny:
+                svr_filters["prompts"] = CapabilityFilter(
+                    allow=f.prompts.allow, deny=f.prompts.deny
+                )
+            if svr_filters:
+                filters[name] = svr_filters
+        return filters
+
+    @staticmethod
+    def _build_rename_maps(full_cfg: Any) -> Dict[str, Any]:
+        """Build per-server rename maps from tool_overrides."""
+        from argus_mcp.bridge.rename import RenameMap
+
+        rename_maps: Dict[str, RenameMap] = {}
+        for name, backend in full_cfg.backends.items():
+            if backend.tool_overrides:
+                rename_maps[name] = RenameMap(
+                    overrides={
+                        k: {"name": v.name or "", "description": v.description or ""}
+                        for k, v in backend.tool_overrides.items()
+                    }
+                )
+        return rename_maps
+
+    @staticmethod
+    def _build_cap_fetch_timeouts(full_cfg: Any) -> Dict[str, float]:
+        """Build per-server capability fetch timeouts."""
+        cap_fetch_timeouts: Dict[str, float] = {}
+        for name, backend in full_cfg.backends.items():
+            if backend.timeouts.cap_fetch is not None:
+                cap_fetch_timeouts[name] = backend.timeouts.cap_fetch
+        return cap_fetch_timeouts
 
     def _build_group_manager(self, config: Dict[str, Any]) -> object:
         """Build a :class:`GroupManager` from per-backend ``group`` fields."""
@@ -248,7 +263,7 @@ class ArgusService:
             try:
                 full_cfg = load_argus_config(self._config_path)
                 return GroupManager(full_cfg.backends)
-            except Exception:
+            except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
                 logger.warning(
                     "Failed to build GroupManager from config; using empty.",
                     exc_info=True,
@@ -304,7 +319,7 @@ class ArgusService:
             # --- Phase 1: Config ------------------------------------------
             logger.info("Loading configuration: %s", config_path)
             self.emit_event("config", f"Loading configuration: {config_path}")
-            config = load_and_validate_config(config_path)
+            config = await asyncio.to_thread(load_and_validate_config, config_path)
             self._config_data = config
             self._backends_total = len(config)
             logger.info("Configuration loaded: %d backend(s) defined.", self._backends_total)
@@ -407,7 +422,7 @@ class ArgusService:
 
             logger.info("ArgusService is RUNNING.")
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self._error_message = f"{type(exc).__name__}: {exc}"
             self._transition(ServiceState.ERROR)
             self._ready_event.clear()
@@ -458,7 +473,7 @@ class ArgusService:
             # anyio cancel-scope cross-task errors during forced shutdown
             logger.warning("Cancel scope error during shutdown (safe to ignore): %s", e_rt)
             self._transition(ServiceState.STOPPED)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self._error_message = f"Shutdown error: {type(exc).__name__}: {exc}"
             logger.exception("Error during shutdown: %s", exc)
             self._transition(ServiceState.ERROR)
@@ -504,8 +519,8 @@ class ArgusService:
 
             try:
                 self.emit_event("config_reloaded", "Reloading configuration...")
-                new_config = load_and_validate_config(self._config_path)
-            except Exception as exc:
+                new_config = await asyncio.to_thread(load_and_validate_config, self._config_path)
+            except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError) as exc:
                 msg = f"Config reload failed: {type(exc).__name__}: {exc}"
                 logger.error(msg)
                 result["errors"].append(msg)
@@ -663,7 +678,7 @@ class ArgusService:
                         "reconnected": False,
                         "error": f"Failed to reconnect backend '{name}'.",
                     }
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 msg = f"{type(exc).__name__}: {exc}"
                 logger.error("Reconnect '%s' failed: %s", name, msg)
                 return {"name": name, "reconnected": False, "error": msg}
@@ -672,7 +687,7 @@ class ArgusService:
     #  Lifecycle: shutdown (from API)
     # ------------------------------------------------------------------ #
 
-    async def shutdown(self, timeout_seconds: int = 30) -> None:
+    async def shutdown(self, timeout_seconds: int = SHUTDOWN_TIMEOUT) -> None:
         """Initiate graceful shutdown from the management API.
 
         Calls ``stop()`` with a timeout wrapper. If the stop doesn't
@@ -710,7 +725,7 @@ class ArgusService:
         try:
             success = await self._manager._start_backend_svr(name, config)
             return success
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.error("Failed to connect backend '%s': %s", name, exc)
             return False
 
