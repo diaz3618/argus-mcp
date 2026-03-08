@@ -330,13 +330,9 @@ class InstallerDisplay:
 
     # ── Public API ───────────────────────────────────────────────────
 
-    def render_initial(self) -> None:
-        """Print the header and start the Rich Progress live display."""
+    def _build_runtime_summary(self) -> str:
+        """Return a Rich-formatted summary of runtime-type counts."""
         total = len(self._ordered)
-        if total == 0:
-            return
-
-        # Count runtime types for the header summary
         npx_count = sum(
             1 for e in self._ordered if e.runtime in (RuntimeKind.NPX, RuntimeKind.NODE)
         )
@@ -358,13 +354,18 @@ class InstallerDisplay:
             parts.append(f"[white]{remote_count} remote[/white]")
         if other_count:
             parts.append(f"{other_count} other")
+        return ", ".join(parts)
 
-        summary = ", ".join(parts)
+    def render_initial(self) -> None:
+        """Print the header and start the Rich Progress live display."""
+        total = len(self._ordered)
+        if total == 0:
+            return
+
+        summary = self._build_runtime_summary()
         self._console.print(f"\n[bold]Backend operations:[/bold] {total} connections ({summary})\n")
 
         # Build the Rich Progress display with custom columns.
-        # Use a higher refresh rate in verbose mode so streaming docker
-        # build output updates smoothly (matching the prototype's 12 fps).
         fps = 12 if self._verbose else 4
         self._progress = _BuildAwareProgress(
             _StatusSpinnerColumn(),
@@ -386,7 +387,6 @@ class InstallerDisplay:
                 entry.name,
                 total=1,
                 completed=0,
-                # Custom fields consumed by our ProgressColumn subclasses
                 backend_name=entry.name,
                 spinner_style=style.spinner_style,
                 name_style=style.name_style,
@@ -422,6 +422,83 @@ class InstallerDisplay:
         else:
             self._progress._extra_renderables = []
 
+    def _apply_building_phase(self, name: str, entry: _BackendEntry) -> None:
+        """Handle BUILDING phase: stream docker build output."""
+        if entry.message:
+            lines = self._build_lines.setdefault(name, [])
+            if not lines:
+                lines.append(f"$ docker build -t argus-mcp-{name} .")
+                lines.append("")
+            lines.append(entry.message)
+            if len(lines) > 200:
+                del lines[:100]
+        if self._progress is not None:
+            self._progress.update(
+                entry.task_id,
+                status_msg="Building image\u2026",
+                current_status_style="bright_yellow",
+                spinner_style="bold bright_yellow",
+                desc_verb="Deploying",
+            )
+        self._update_live_renderable()
+
+    def _apply_phase_render(self, name: str, entry: _BackendEntry) -> None:
+        """Apply phase-specific progress bar updates for *entry*."""
+        assert self._progress is not None  # caller guarantees
+
+        style = entry.style
+
+        if entry.phase == DisplayPhase.READY:
+            self._progress.update(
+                entry.task_id,
+                completed=1,
+                status_msg="Ready",
+                current_status_style="green",
+                result_icon="\u2713",
+                result_style="bold bright_green",
+            )
+        elif entry.phase == DisplayPhase.FAILED:
+            msg = entry.message or "Failed"
+            self._progress.update(
+                entry.task_id,
+                completed=1,
+                status_msg=msg,
+                current_status_style="red",
+                result_icon="\u2717",
+                result_style="bold red",
+            )
+        elif entry.phase == DisplayPhase.BUILDING:
+            self._apply_building_phase(name, entry)
+        elif entry.phase == DisplayPhase.DOWNLOADING:
+            msg = entry.message or "Downloading..."
+            self._progress.update(
+                entry.task_id,
+                status_msg=msg,
+                current_status_style=style.status_style,
+            )
+        elif entry.phase == DisplayPhase.RETRYING:
+            msg = entry.message or "Retrying..."
+            self._progress.update(
+                entry.task_id,
+                completed=0,
+                status_msg=msg,
+                current_status_style="yellow",
+                spinner_style="bold yellow",
+            )
+        elif entry.phase == DisplayPhase.INITIALIZING:
+            msg = entry.message or "Initializing..."
+            self._progress.update(
+                entry.task_id,
+                status_msg=msg,
+                current_status_style=style.status_style,
+            )
+        else:
+            self._progress.update(
+                entry.task_id,
+                status_msg=entry.message or "Pending...",
+                current_status_style=style.status_style,
+            )
+
     def update(
         self,
         name: str,
@@ -451,75 +528,7 @@ class InstallerDisplay:
         if message is not None:
             entry.message = message
 
-        style = entry.style
-
-        if entry.phase == DisplayPhase.READY:
-            self._progress.update(
-                entry.task_id,
-                completed=1,  # marks task finished → spinner stops
-                status_msg="Ready",
-                current_status_style="green",
-                result_icon="\u2713",  # ✓
-                result_style="bold bright_green",
-            )
-        elif entry.phase == DisplayPhase.FAILED:
-            msg = entry.message or "Failed"
-            self._progress.update(
-                entry.task_id,
-                completed=1,
-                status_msg=msg,
-                current_status_style="red",
-                result_icon="\u2717",  # ✗
-                result_style="bold red",
-            )
-        elif entry.phase == DisplayPhase.BUILDING:
-            if entry.message:
-                lines = self._build_lines.setdefault(name, [])
-                # Emit a docker build command header as the first line
-                if not lines:
-                    lines.append(f"$ docker build -t argus-mcp-{name} .")
-                    lines.append("")
-                lines.append(entry.message)
-                if len(lines) > 200:
-                    del lines[:100]
-            self._progress.update(
-                entry.task_id,
-                status_msg="Building image\u2026",
-                current_status_style="bright_yellow",
-                spinner_style="bold bright_yellow",
-                desc_verb="Deploying",
-            )
-            self._update_live_renderable()
-        elif entry.phase == DisplayPhase.DOWNLOADING:
-            msg = entry.message or "Downloading..."
-            self._progress.update(
-                entry.task_id,
-                status_msg=msg,
-                current_status_style=style.status_style,
-            )
-        elif entry.phase == DisplayPhase.RETRYING:
-            msg = entry.message or "Retrying..."
-            # Reset completed so the spinner reappears
-            self._progress.update(
-                entry.task_id,
-                completed=0,
-                status_msg=msg,
-                current_status_style="yellow",
-                spinner_style="bold yellow",
-            )
-        elif entry.phase == DisplayPhase.INITIALIZING:
-            msg = entry.message or "Initializing..."
-            self._progress.update(
-                entry.task_id,
-                status_msg=msg,
-                current_status_style=style.status_style,
-            )
-        else:
-            self._progress.update(
-                entry.task_id,
-                status_msg=entry.message or "Pending...",
-                current_status_style=style.status_style,
-            )
+        self._apply_phase_render(name, entry)
 
     def finalize(self) -> None:
         """Stop the Rich live display and print a summary line."""

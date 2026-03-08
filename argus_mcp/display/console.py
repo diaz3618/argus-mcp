@@ -19,6 +19,13 @@ from argus_mcp.constants import (
 logger = logging.getLogger(__name__)
 
 
+def _state_attr(app_state: Optional[object], attr: str, default: Any = "N/A") -> Any:
+    """Safely read an attribute from *app_state*, returning *default* when absent."""
+    if app_state is None:
+        return default
+    return getattr(app_state, attr, default)
+
+
 def gen_status_info(
     app_state: Optional[object],
     status_msg: str,
@@ -31,34 +38,22 @@ def gen_status_info(
     route_map: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Generate a structured dictionary of status information."""
-    host = getattr(app_state, "host", "N/A") if app_state else "N/A"
-    port = getattr(app_state, "port", 0) if app_state else 0
+    host = _state_attr(app_state, "host")
+    port = _state_attr(app_state, "port", 0)
 
     info: Dict[str, Any] = {
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "status_msg": status_msg,
         "host": host,
         "port": port,
-        "log_fpath": (
-            getattr(app_state, "actual_log_file", DEFAULT_LOG_FILE)
-            if app_state
-            else DEFAULT_LOG_FILE
-        ),
-        "log_lvl_cfg": (
-            getattr(app_state, "file_log_level_configured", DEFAULT_LOG_LEVEL)
-            if app_state
-            else DEFAULT_LOG_LEVEL
-        ),
+        "log_fpath": _state_attr(app_state, "actual_log_file", DEFAULT_LOG_FILE),
+        "log_lvl_cfg": _state_attr(app_state, "file_log_level_configured", DEFAULT_LOG_LEVEL),
         "sse_url": f"http://{host}:{port}{SSE_PATH}" if port > 0 else "N/A",
         "streamable_http_url": (
             f"http://{host}:{port}{STREAMABLE_HTTP_PATH}" if port > 0 else "N/A"
         ),
-        "transport_type": (
-            getattr(app_state, "transport_type", "streamable-http")
-            if app_state
-            else "streamable-http"
-        ),
-        "cfg_fpath": (getattr(app_state, "config_file_path", "N/A") if app_state else "N/A"),
+        "transport_type": _state_attr(app_state, "transport_type", "streamable-http"),
+        "cfg_fpath": _state_attr(app_state, "config_file_path"),
         "err_msg": err_msg,
         "tools": tools or [],
         "resources": resources or [],
@@ -77,6 +72,18 @@ def gen_status_info(
     if route_map is not None:
         info["route_map"] = route_map
     return info
+
+
+def _print_init_details(status_info: Dict[str, Any]) -> None:
+    """Print initialization-stage details to the console."""
+    print(f"    Server Name: {SERVER_NAME}")
+    transport = status_info.get("transport_type", "streamable-http")
+    if transport == "streamable-http":
+        print(f"    Endpoint (streamable-http): {status_info['streamable_http_url']}")
+    else:
+        print(f"    Endpoint (sse): {status_info['sse_url']}")
+    print(f"    Config File: {os.path.basename(status_info['cfg_fpath'])}")
+    print(f"    Log File: {status_info['log_fpath']} (level: {status_info['log_lvl_cfg']})")
 
 
 def disp_console_status(stage: str, status_info: Dict[str, Any], is_final: bool = False) -> None:
@@ -98,14 +105,7 @@ def disp_console_status(stage: str, status_info: Dict[str, Any], is_final: bool 
     print(f"[{status_info['ts']}] {stage} Status: {status_info['status_msg']}")
 
     if not is_final and stage == "Initialization":
-        print(f"    Server Name: {SERVER_NAME}")
-        transport = status_info.get("transport_type", "streamable-http")
-        if transport == "streamable-http":
-            print(f"    Endpoint (streamable-http): {status_info['streamable_http_url']}")
-        else:
-            print(f"    Endpoint (sse): {status_info['sse_url']}")
-        print(f"    Config File: {os.path.basename(status_info['cfg_fpath'])}")
-        print(f"    Log File: {status_info['log_fpath']} " f"(level: {status_info['log_lvl_cfg']})")
+        _print_init_details(status_info)
 
     if "total_svrs_num" in status_info and "conn_svrs_num" in status_info:
         print(
@@ -156,7 +156,7 @@ def log_file_status(status_info: Dict[str, Any], log_lvl: int = logging.INFO) ->
         ("Prompts", "prompts_count", "prompts"),
     ]:
         if cap_key_count in status_info:
-            log_lines.append(f"  Loaded MCP {cap_type_plural} " f"({status_info[cap_key_count]}):")
+            log_lines.append(f"  Loaded MCP {cap_type_plural} ({status_info[cap_key_count]}):")
             cap_list = status_info.get(cap_list_key, [])
             if cap_list:
                 for item in cap_list:

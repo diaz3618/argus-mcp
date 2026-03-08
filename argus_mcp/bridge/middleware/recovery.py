@@ -21,7 +21,7 @@ class RecoveryMiddleware:
     async def __call__(self, ctx: RequestContext, next_handler: Any) -> Any:
         try:
             return await next_handler(ctx)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             ctx.error = exc
             logger.error(
                 "[%s] Recovery caught exception in %s/%s: %s",

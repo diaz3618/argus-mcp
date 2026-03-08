@@ -93,4 +93,5 @@ def build_chain(
             return await _mw(ctx, _next)
 
         chain = _wrap
-    return chain
+    final: Callable[[RequestContext], Awaitable[Any]] = chain
+    return final
