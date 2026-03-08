@@ -418,7 +418,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     """
     from argus_mcp.server.app import mcp_server
 
-    app_s = app.state
+    app_state = app.state
     logger.info(
         "Server '%s' v%s startup sequence started...",
         SERVER_NAME,
@@ -426,19 +426,19 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     )
     logger.debug(
         "Lifespan received host='%s', port=%s",
-        getattr(app_s, "host", "N/A"),
-        getattr(app_s, "port", 0),
+        getattr(app_state, "host", "N/A"),
+        getattr(app_state, "port", 0),
     )
     logger.info(
         "Configured file log level: %s",
-        getattr(app_s, "file_log_level_configured", DEFAULT_LOG_LVL),
+        getattr(app_state, "file_log_level_configured", DEFAULT_LOG_LVL),
     )
     logger.info(
         "Actual log file: %s",
-        getattr(app_s, "actual_log_file", DEFAULT_LOG_FPATH),
+        getattr(app_state, "actual_log_file", DEFAULT_LOG_FPATH),
     )
 
-    config_path: str = getattr(app_s, "config_file_path", "")
+    config_path: str = getattr(app_state, "config_file_path", "")
     if not config_path:
         # Fallback auto-detect (should rarely hit — CLI sets this)
         from argus_mcp.cli import _find_config_file
@@ -448,30 +448,30 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
 
     service = ArgusService()
     # Store service on app.state so management API can access it later (0.2).
-    app_s.argus_service = service  # type: ignore[attr-defined]
+    app_state.argus_service = service  # type: ignore[attr-defined]
 
     # Also propagate to the management sub-app so its request handlers see
     # argus_service on *their* request.app.state (the sub-app's state).
-    mgmt_app = getattr(app_s, "mgmt_app", None)
+    mgmt_app = getattr(app_state, "mgmt_app", None)
     if mgmt_app is not None:
         mgmt_app.state.argus_service = service  # type: ignore[attr-defined]
         # Forward host/port/transport so the status endpoint can build
         # correct URLs (the mgmt sub-app has its own State object).
-        mgmt_app.state.host = getattr(app_s, "host", "127.0.0.1")  # type: ignore[attr-defined]
-        mgmt_app.state.port = getattr(app_s, "port", 0)  # type: ignore[attr-defined]
-        mgmt_app.state.transport_type = getattr(app_s, "transport_type", "streamable-http")  # type: ignore[attr-defined]
+        mgmt_app.state.host = getattr(app_state, "host", "127.0.0.1")  # type: ignore[attr-defined]
+        mgmt_app.state.port = getattr(app_state, "port", 0)  # type: ignore[attr-defined]
+        mgmt_app.state.transport_type = getattr(app_state, "transport_type", "streamable-http")  # type: ignore[attr-defined]
 
     startup_ok = False
     err_detail_msg: Optional[str] = None
 
     try:
         # ── Display: initializing ────────────────────────────────────
-        status_info_init = gen_status_info(app_s, "Server is starting...")
+        status_info_init = gen_status_info(app_state, "Server is starting...")
         disp_console_status("Initialization", status_info_init)
         log_file_status(status_info_init)
 
         # ── Verbose installer display ────────────────
-        verbosity: int = getattr(app_s, "verbosity", 0)
+        verbosity: int = getattr(app_state, "verbosity", 0)
         installer_display: InstallerDisplay | None = None
         progress_callback = None
 
@@ -531,7 +531,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
 
         # ── Display: ready ───────────────────────────────────────────
         status_info_ready = gen_status_info(
-            app_s,
+            app_state,
             "Server started successfully and is ready.",
             tools=service.tools,
             resources=service.resources,
@@ -548,7 +548,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         logger.exception("Configuration error: %s", e_cfg)
         err_detail_msg = f"Configuration error: {e_cfg}"
         status_info_fail = gen_status_info(
-            app_s,
+            app_state,
             "Server startup failed.",
             err_msg=err_detail_msg,
             total_svrs_num=service.backends_total,
@@ -560,7 +560,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         logger.exception("Backend error: %s", e_backend)
         err_detail_msg = f"Backend error: {e_backend}"
         status_info_fail = gen_status_info(
-            app_s,
+            app_state,
             "Server startup failed.",
             err_msg=err_detail_msg,
             conn_svrs_num=service.backends_connected,
@@ -576,7 +576,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         )
         err_detail_msg = f"Unexpected error: {type(e_exc).__name__} - {e_exc}"
         status_info_fail = gen_status_info(
-            app_s,
+            app_state,
             "Server startup failed.",
             err_msg=err_detail_msg,
             conn_svrs_num=service.backends_connected,
@@ -591,7 +591,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
             SERVER_NAME,
         )
         status_info_shutdown = gen_status_info(
-            app_s,
+            app_state,
             "Server is shutting down...",
             tools=service.tools,
             resources=service.resources,
@@ -647,7 +647,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         final_log_lvl = logging.INFO if startup_ok else logging.ERROR
 
         status_info_final = gen_status_info(
-            app_s,
+            app_state,
             final_msg_short,
             err_msg=err_detail_msg if not startup_ok else None,
         )

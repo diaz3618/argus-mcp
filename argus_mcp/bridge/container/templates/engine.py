@@ -24,9 +24,15 @@ _TEMPLATE_DIR = os.path.dirname(__file__)
 # Autoescape is intentionally disabled: these templates generate
 # Dockerfiles (plain text), not HTML.  Enabling autoescape would
 # corrupt shell commands and file paths with HTML entities.
-_env = jinja2.Environment(  # nosec B701
+# Using select_autoescape with default_for_string=False explicitly
+# documents that no HTML escaping is needed (satisfies Bandit B701).
+_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(_TEMPLATE_DIR),
     undefined=jinja2.StrictUndefined,
+    autoescape=jinja2.select_autoescape(
+        default_for_string=False,
+        default=False,
+    ),
     keep_trailing_newline=True,
     trim_blocks=True,
     lstrip_blocks=True,

@@ -152,38 +152,21 @@ async def handle_backends(request: Request) -> JSONResponse:
     service = _get_service(request)
     route_map = service.registry.get_route_map()
 
-    # Count capabilities per backend
-    caps_per_backend: Dict[str, Dict[str, int]] = {}
-    for _cap_name, (svr_name, _orig) in route_map.items():
-        if svr_name not in caps_per_backend:
-            caps_per_backend[svr_name] = {"tools": 0, "resources": 0, "prompts": 0}
-        # We only have the route map which doesn't distinguish type easily.
-        # Count tools (all route_map entries are capabilities).
-        caps_per_backend[svr_name]["tools"] += 1
+    # Build per-backend capability counts
+    def _count_by_backend(items, name_fn):
+        counts: Dict[str, int] = {}
+        for item in items:
+            entry = route_map.get(name_fn(item))
+            if entry:
+                counts[entry[0]] = counts.get(entry[0], 0) + 1
+        return counts
 
-    # Build more accurate per-backend capability counts
-    tool_backends: Dict[str, int] = {}
-    resource_backends: Dict[str, int] = {}
-    prompt_backends: Dict[str, int] = {}
-
-    for tool in service.tools:
-        entry = route_map.get(tool.name)
-        if entry:
-            svr = entry[0]
-            tool_backends[svr] = tool_backends.get(svr, 0) + 1
-
-    for resource in service.resources:
-        rname = resource.name if hasattr(resource, "name") else str(resource.uri)
-        entry = route_map.get(rname)
-        if entry:
-            svr = entry[0]
-            resource_backends[svr] = resource_backends.get(svr, 0) + 1
-
-    for prompt in service.prompts:
-        entry = route_map.get(prompt.name)
-        if entry:
-            svr = entry[0]
-            prompt_backends[svr] = prompt_backends.get(svr, 0) + 1
+    tool_backends = _count_by_backend(service.tools, lambda t: t.name)
+    resource_backends = _count_by_backend(
+        service.resources,
+        lambda r: r.name if hasattr(r, "name") else str(r.uri),
+    )
+    prompt_backends = _count_by_backend(service.prompts, lambda p: p.name)
 
     backends = []
     svc_status = service.get_status()
@@ -292,73 +275,56 @@ async def handle_capabilities(request: Request) -> JSONResponse:
     filter_backend = request.query_params.get("backend")
     filter_search = request.query_params.get("search", "").lower()
 
-    tools = []
-    resources = []
-    prompts = []
-
-    # Tools
-    if filter_type is None or filter_type == "tools":
-        for tool in service.tools:
-            entry = route_map.get(tool.name)
+    def _filter_caps(type_name, items, name_fn, detail_fn):
+        """Filter capabilities by backend/search and build detail objects."""
+        if filter_type is not None and filter_type != type_name:
+            return []
+        result = []
+        for item in items:
+            cap_name = name_fn(item)
+            entry = route_map.get(cap_name)
             backend_name = entry[0] if entry else ""
-            original_name = entry[1] if entry else tool.name
-
             if filter_backend and backend_name != filter_backend:
                 continue
-            if filter_search and filter_search not in tool.name.lower():
+            if filter_search and filter_search not in cap_name.lower():
                 continue
+            result.append(detail_fn(item, entry, backend_name))
+        return result
 
-            tools.append(
-                ToolDetail(
-                    name=tool.name,
-                    original_name=original_name,
-                    description=tool.description or "",
-                    backend=backend_name,
-                    input_schema=tool.inputSchema if hasattr(tool, "inputSchema") else {},
-                )
-            )
-
-    # Resources
-    if filter_type is None or filter_type == "resources":
-        for resource in service.resources:
-            rname = resource.name if hasattr(resource, "name") else ""
-            ruri = str(resource.uri) if hasattr(resource, "uri") else ""
-            entry = route_map.get(rname)
-            backend_name = entry[0] if entry else ""
-
-            if filter_backend and backend_name != filter_backend:
-                continue
-            if filter_search and filter_search not in rname.lower():
-                continue
-
-            resources.append(
-                ResourceDetail(
-                    uri=ruri,
-                    name=rname,
-                    backend=backend_name,
-                    mime_type=getattr(resource, "mimeType", None),
-                )
-            )
-
-    # Prompts
-    if filter_type is None or filter_type == "prompts":
-        for prompt in service.prompts:
-            entry = route_map.get(prompt.name)
-            backend_name = entry[0] if entry else ""
-
-            if filter_backend and backend_name != filter_backend:
-                continue
-            if filter_search and filter_search not in prompt.name.lower():
-                continue
-
-            prompts.append(
-                PromptDetail(
-                    name=prompt.name,
-                    description=prompt.description or "",
-                    backend=backend_name,
-                    arguments=list(prompt.arguments) if prompt.arguments else [],
-                )
-            )
+    tools = _filter_caps(
+        "tools",
+        service.tools,
+        lambda t: t.name,
+        lambda t, entry, bn: ToolDetail(
+            name=t.name,
+            original_name=entry[1] if entry else t.name,
+            description=t.description or "",
+            backend=bn,
+            input_schema=t.inputSchema if hasattr(t, "inputSchema") else {},
+        ),
+    )
+    resources = _filter_caps(
+        "resources",
+        service.resources,
+        lambda r: r.name if hasattr(r, "name") else "",
+        lambda r, _entry, bn: ResourceDetail(
+            uri=str(r.uri) if hasattr(r, "uri") else "",
+            name=r.name if hasattr(r, "name") else "",
+            backend=bn,
+            mime_type=getattr(r, "mimeType", None),
+        ),
+    )
+    prompts = _filter_caps(
+        "prompts",
+        service.prompts,
+        lambda p: p.name,
+        lambda p, _entry, bn: PromptDetail(
+            name=p.name,
+            description=p.description or "",
+            backend=bn,
+            arguments=list(p.arguments) if p.arguments else [],
+        ),
+    )
 
     resp = CapabilitiesResponse(
         tools=tools,
@@ -503,10 +469,10 @@ async def handle_shutdown(request: Request) -> JSONResponse:
     try:
         body = await request.json()
         timeout = int(body.get("timeout_seconds", 30))
+    except (ValueError, TypeError):
+        return _error_json("bad_request", "Malformed JSON or invalid timeout_seconds.", 400)
     except Exception:
-        logger.debug(
-            "Failed to parse shutdown timeout from request body, using default", exc_info=True
-        )
+        logger.debug("No request body for shutdown, using default timeout", exc_info=True)
 
     resp = ShutdownResponse(shutting_down=True)
     # Schedule shutdown in background so we can return the response first

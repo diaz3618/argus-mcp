@@ -8,6 +8,7 @@ layer; status information is available via properties so that callers
 
 import asyncio
 import logging
+import uuid
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -100,8 +101,7 @@ class ArgusService:
         # Event system
         self._events: deque[Dict[str, Any]] = deque(maxlen=500)
         self._event_subscribers: List[asyncio.Queue[Dict[str, Any]]] = []
-        # _event_id_counter kept for backwards compat but unused
-        self._event_id_counter: int = 0
+        # Event IDs use uuid4 to avoid race conditions across concurrent callers
 
         logger.info("ArgusService initialized (state=%s).", self._state.value)
 
@@ -786,9 +786,8 @@ class ArgusService:
         details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Emit an event to the buffer and all subscribers."""
-        self._event_id_counter += 1
         event: Dict[str, Any] = {
-            "id": f"evt-{self._event_id_counter}",
+            "id": f"evt-{uuid.uuid4().hex[:12]}",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stage": stage,
             "message": message,

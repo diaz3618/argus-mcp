@@ -240,7 +240,7 @@ class PKCEAuthProvider(AuthProvider):
                 logger.warning(
                     "[%s] Token refresh failed, will re-authenticate: %s",
                     self._backend_name,
-                    exc,
+                    type(exc).__name__,
                 )
 
         # 4. Interactive PKCE flow (browser)

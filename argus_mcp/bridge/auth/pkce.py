@@ -372,11 +372,9 @@ class PKCEFlow:
             data["client_secret"] = self._client_secret
 
         logger.debug(
-            "Token exchange request → %s\n  redirect_uri: %s\n  client_id: %s\n  code: %s…",
-            self._token_endpoint,
+            "Token exchange request → [token_endpoint redacted]\n  redirect_uri: %s\n  code: %s…",
             redirect_uri,
-            self._client_id,
-            code[:8] if len(code) > 8 else code,
+            code[:4] + "***" if len(code) > 4 else "***",
         )
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -387,9 +385,8 @@ class PKCEFlow:
             )
             if resp.status_code >= 400:
                 logger.error(
-                    "Token exchange failed: HTTP %d\n  Body: %s",
+                    "Token exchange failed: HTTP %d",
                     resp.status_code,
-                    resp.text[:500],
                 )
             resp.raise_for_status()
 

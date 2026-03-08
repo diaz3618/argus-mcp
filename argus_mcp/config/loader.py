@@ -30,6 +30,29 @@ logger = logging.getLogger(__name__)
 # Recognised config file extensions.
 _YAML_EXTS = frozenset({".yaml", ".yml"})
 
+# Config file search order (first match wins).
+_CONFIG_SEARCH_ORDER = ("config.yaml", "config.yml")
+
+
+def find_config_file() -> str:
+    """Locate the config file by checking well-known directories in priority order.
+
+    Search order per directory: config.yaml -> config.yml
+    Directories checked: CWD first, then the argus_mcp package's parent directory.
+    Falls back to ``CWD/config.yaml`` if nothing exists (loader will error).
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pkg_dir = os.path.dirname(script_dir)
+    pkg_parent_dir = os.path.dirname(pkg_dir)
+    search_dirs = [os.getcwd(), pkg_parent_dir]
+    for base_dir in search_dirs:
+        for name in _CONFIG_SEARCH_ORDER:
+            candidate = os.path.join(base_dir, name)
+            if os.path.isfile(candidate):
+                return candidate
+    # Default -- loader will report a clear error
+    return os.path.join(os.getcwd(), "config.yaml")
+
 
 def _read_config_file(cfg_fpath: str) -> Dict[str, Any]:
     """Read and parse a YAML config file from *cfg_fpath*.
@@ -149,6 +172,8 @@ def _maybe_resolve_secrets(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     store = SecretStore(provider_type=provider_type, **store_kwargs)
     strict = secrets_section.get("strict", False)
 
+    # nosemgrep: python-logger-credential-disclosure
+    # (logs reference count and provider type, not actual secret values)
     logger.info(
         "Resolving %d secret reference(s) via '%s' provider.",
         len(refs),

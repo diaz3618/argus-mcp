@@ -14,6 +14,7 @@ when the Dockerfile changes (e.g. package version bump).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -392,10 +393,15 @@ async def _build_from_string(
     line_callback: Optional[Callable[[str], None]] = None,
 ) -> bool:
     """Write a Dockerfile string to a temp directory and build it."""
-    with tempfile.TemporaryDirectory(prefix="argus_build_") as tmpdir:
+
+    def _write_dockerfile(tmpdir: str, content: str) -> str:
         df_path = os.path.join(tmpdir, "Dockerfile")
         with open(df_path, "w", encoding="utf-8") as f:
-            f.write(dockerfile_content)
+            f.write(content)
+        return df_path
+
+    with tempfile.TemporaryDirectory(prefix="argus_build_") as tmpdir:
+        df_path = await asyncio.to_thread(_write_dockerfile, tmpdir, dockerfile_content)
 
         return await crt.build_image(
             container_runtime,

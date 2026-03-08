@@ -250,6 +250,23 @@ def _strip_go_version(module_path: str) -> str:
     return module_path
 
 
+def _validate_build_inputs(
+    package: str,
+    build_env: Optional[Dict[str, str]],
+    system_deps: Optional[List[str]],
+) -> Tuple[str, Dict[str, str], List[str]]:
+    """Validate and normalise common Dockerfile generation inputs."""
+    package = validate_package_name(package)
+    validated_deps = validate_system_deps(system_deps or [])
+    validated_env: Dict[str, str] = {}
+    if build_env:
+        for k, v in build_env.items():
+            validate_build_env_key(k)
+            validate_build_env_value(v)
+            validated_env[k] = v
+    return package, validated_env, validated_deps
+
+
 # ── Dockerfile generation (using Jinja2 templates) ───────────────────────
 
 
@@ -290,14 +307,7 @@ def generate_uvx_dockerfile(
     image = builder_image or rc.builder_image
 
     # Validate inputs
-    package = validate_package_name(package)
-    validated_deps = validate_system_deps(system_deps or [])
-    validated_env: Dict[str, str] = {}
-    if build_env:
-        for k, v in build_env.items():
-            validate_build_env_key(k)
-            validate_build_env_value(v)
-            validated_env[k] = v
+    package, validated_env, validated_deps = _validate_build_inputs(package, build_env, system_deps)
 
     # Build typed template data
     data = TemplateData(
@@ -346,14 +356,7 @@ def generate_npx_dockerfile(
     image = builder_image or rc.builder_image
 
     # Validate inputs
-    package = validate_package_name(package)
-    validated_deps = validate_system_deps(system_deps or [])
-    validated_env: Dict[str, str] = {}
-    if build_env:
-        for k, v in build_env.items():
-            validate_build_env_key(k)
-            validate_build_env_value(v)
-            validated_env[k] = v
+    package, validated_env, validated_deps = _validate_build_inputs(package, build_env, system_deps)
 
     clean_name = _strip_version(package)
     bin_name = _npm_bin_name(clean_name)
@@ -411,14 +414,9 @@ def generate_go_dockerfile(
     image = builder_image or rc.builder_image
 
     # Validate inputs
-    go_package = validate_package_name(go_package)
-    validated_deps = validate_system_deps(system_deps or [])
-    validated_env: Dict[str, str] = {}
-    if build_env:
-        for k, v in build_env.items():
-            validate_build_env_key(k)
-            validate_build_env_value(v)
-            validated_env[k] = v
+    go_package, validated_env, validated_deps = _validate_build_inputs(
+        go_package, build_env, system_deps
+    )
 
     # Strip version from Go package for clean name
     clean_name = _strip_go_version(go_package)

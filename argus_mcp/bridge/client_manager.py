@@ -43,6 +43,9 @@ from argus_mcp.errors import BackendServerError, ConfigurationError
 
 logger = logging.getLogger(__name__)
 
+# Startup ordering: connect fast transports first, then build+connect stdio.
+_TYPE_PRIORITY = {"streamable-http": 0, "sse": 1, "stdio": 2}
+
 
 async def _log_subproc_stream(
     stream: Optional[asyncio.StreamReader], svr_name: str, stream_name: str
@@ -245,7 +248,7 @@ class ClientManager:
         self._pending_tasks: Dict[str, asyncio.Task] = {}
         self._exit_stack = AsyncExitStack()
         self._backend_stacks: Dict[str, AsyncExitStack] = {}
-        self._devnull_files: list = []
+        self._devnull: Optional[Any] = None  # single shared devnull for errlog
         self._status_records: Dict[str, Any] = {}
         self._progress_cb: Optional[Callable[..., None]] = None
         self._shutdown_requested: bool = False
@@ -346,12 +349,11 @@ class ClientManager:
 
         # Suppress subprocess stderr so it does not corrupt the TUI.
         # The MCP SDK defaults errlog=sys.stderr, which writes directly
-        # to fd 2 — the same fd Textual uses for rendering.  Sending a
-        # devnull file-object prevents any backend process output from
-        # bleeding through.
-        devnull = open(os.devnull, "w")  # noqa: SIM115
-        self._devnull_files.append(devnull)
-        transport_ctx = stdio_client(stdio_cfg, errlog=devnull)
+        # to fd 2 — the same fd Textual uses for rendering.  A single
+        # shared devnull file-object prevents per-backend FD leaks.
+        if self._devnull is None:
+            self._devnull = open(os.devnull, "w")  # noqa: SIM115
+        transport_ctx = stdio_client(stdio_cfg, errlog=self._devnull)
         streams = await _stack.enter_async_context(transport_ctx)
         logger.debug("[%s] (stdio) transport streams established.", svr_name)
 
@@ -1030,8 +1032,8 @@ class ClientManager:
                                 "[%s] Auth discovery completed — will retry with credentials.",
                                 n,
                             )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Auth discovery failed for '%s': %s", n, exc)
         except Exception:
             pass
 
@@ -1165,7 +1167,7 @@ class ClientManager:
         )
 
         # ── Separate remote and stdio backends ────────────────────────
-        _type_priority = {"streamable-http": 0, "sse": 1, "stdio": 2}
+        _type_priority = _TYPE_PRIORITY
         sorted_items = sorted(
             config_data.items(),
             key=lambda kv: _type_priority.get(kv[1].get("type", "stdio"), 2),
@@ -1293,13 +1295,13 @@ class ClientManager:
                 exc_info=True,
             )
 
-        # Close devnull file objects opened for subprocess stderr suppression
-        for f in self._devnull_files:
+        # Close the shared devnull file used for subprocess stderr suppression
+        if self._devnull is not None:
             try:
-                f.close()
+                self._devnull.close()
             except Exception:
                 pass
-        self._devnull_files.clear()
+            self._devnull = None
 
         logger.info("ClientManager closed, all sessions cleared.")
 

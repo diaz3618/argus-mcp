@@ -19,6 +19,7 @@ from typing import Optional
 
 import uvicorn
 
+from argus_mcp.config.loader import find_config_file as _find_config_file
 from argus_mcp.constants import (
     DEFAULT_HOST,
     DEFAULT_PORT,
@@ -31,35 +32,12 @@ module_logger = logging.getLogger(__name__)
 
 uvicorn_svr_inst: Optional[uvicorn.Server] = None
 
-# Config file search order (first match wins)
-_CONFIG_SEARCH_ORDER = ("config.yaml", "config.yml")
-
 # Legacy PID file location (kept for backward-compat cleanup)
 _PID_FILE = os.path.join(
     os.path.expanduser("~"),
     ".argus",
     "argus-mcp.pid",
 )
-
-
-def _find_config_file() -> str:
-    """Locate the config file by checking well-known directories in priority order.
-
-    Search order per directory: config.yaml → config.yml
-    Directories checked: CWD first, then the package's parent directory.
-    Falls back to ``CWD/config.yaml`` if nothing exists (loader will error).
-    """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    pkg_parent_dir = os.path.dirname(script_dir)
-    search_dirs = [os.getcwd(), pkg_parent_dir]
-    for base_dir in search_dirs:
-        for name in _CONFIG_SEARCH_ORDER:
-            candidate = os.path.join(base_dir, name)
-            if os.path.isfile(candidate):
-                return candidate
-    # Default — loader will report a clear error
-    return os.path.join(os.getcwd(), "config.yaml")
-
 
 # ── ``argus-mcp server`` ─────────────────────────────────────────────
 
@@ -94,22 +72,22 @@ async def _run_server(
     # Import app here to avoid circular imports at module level
     from argus_mcp.server.app import app
 
-    app_s = app.state
-    app_s.host = host
-    app_s.port = port
-    app_s.actual_log_file = log_fpath
-    app_s.file_log_level_configured = cfg_log_lvl
-    app_s.config_file_path = cfg_abs_path
-    app_s.verbosity = verbosity
+    app_state = app.state
+    app_state.host = host
+    app_state.port = port
+    app_state.actual_log_file = log_fpath
+    app_state.file_log_level_configured = cfg_log_lvl
+    app_state.config_file_path = cfg_abs_path
+    app_state.verbosity = verbosity
 
     # Read transport type from config so display/management can use it.
     try:
         from argus_mcp.config.loader import load_argus_config
 
         _argus_cfg = load_argus_config(cfg_abs_path)
-        app_s.transport_type = _argus_cfg.server.transport
+        app_state.transport_type = _argus_cfg.server.transport
     except Exception:
-        app_s.transport_type = "streamable-http"
+        app_state.transport_type = "streamable-http"
         module_logger.debug(
             "Transport type detection failed, defaulting to streamable-http", exc_info=True
         )
@@ -518,10 +496,7 @@ def _cmd_tui(args: argparse.Namespace) -> None:
     client_cfg = ClientConfig()  # safe defaults
     cfg_path = getattr(args, "config", None) or os.environ.get("ARGUS_CONFIG")
     if cfg_path is None:
-        for _name in ("config.yaml", "config.yml"):
-            if os.path.isfile(_name):
-                cfg_path = _name
-                break
+        cfg_path = _find_config_file()
     if cfg_path and os.path.isfile(cfg_path):
         try:
             from argus_mcp.config.loader import load_argus_config
