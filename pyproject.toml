@@ -131,6 +131,7 @@ addopts = "-q --strict-markers"
 
 [tool.coverage.run]
 source = ["argus_mcp"]
+branch = true
 omit = [
     "argus_mcp/__main__.py",
     "argus_mcp/tui/*",
@@ -146,6 +147,7 @@ exclude_lines = [
 ]
 show_missing = true
 skip_empty = true
+fail_under = 50
 
 # ── python-semantic-release ──────────────────────────────────────────────
 
