@@ -1610,7 +1610,7 @@ class ClientManager:
             from argus_mcp.bridge.auth.store import TokenStore
 
             store = TokenStore()
-            store.save(svr_name, tokens)
+            await store.save(svr_name, tokens)
 
             # Store discovered auth config for retry
             self._discovered_auth[svr_name] = {

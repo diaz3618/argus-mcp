@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _log_task_exception(task: asyncio.Task) -> None:  # type: ignore[type-arg]
+def _log_task_exception(task: "asyncio.Task[object]") -> None:
     """Done-callback: log unhandled exceptions from background tasks."""
     if task.cancelled():
         return
