@@ -123,8 +123,9 @@ class FileProvider(SecretProvider):
             with open(self._path, "rb") as f:
                 encrypted = f.read()
             decrypted = fernet.decrypt(encrypted)  # type: ignore[attr-defined]
-            return json.loads(decrypted)
-        except Exception as exc:
+            loaded: Dict[str, str] = json.loads(decrypted)
+            return loaded
+        except (OSError, ValueError) as exc:
             raise RuntimeError(
                 f"Failed to load/decrypt secrets file {self._path}: {exc}. "
                 "Check that ARGUS_SECRET_KEY is correct and the file is not corrupted."
@@ -200,7 +201,8 @@ class KeyringProvider(SecretProvider):
 
     def get(self, name: str) -> Optional[str]:
         kr = self._ensure_keyring()
-        return kr.get_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
+        result: Optional[str] = kr.get_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
+        return result
 
     def set(self, name: str, value: str) -> None:
         kr = self._ensure_keyring()
@@ -214,8 +216,8 @@ class KeyringProvider(SecretProvider):
         kr = self._ensure_keyring()
         try:
             kr.delete_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to delete secret '%s' from keyring: %s", name, exc)
         names = set(self.list_names())
         names.discard(name)
         kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))  # type: ignore[attr-defined]
@@ -225,7 +227,8 @@ class KeyringProvider(SecretProvider):
         raw = kr.get_password(self.SERVICE_NAME, self._names_key)  # type: ignore[attr-defined]
         if raw:
             try:
-                return json.loads(raw)
+                loaded: List[str] = json.loads(raw)
+                return loaded
             except json.JSONDecodeError:
                 pass
         return []

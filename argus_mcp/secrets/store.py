@@ -6,7 +6,7 @@ Combines a :class:`SecretProvider` backend with convenience helpers.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from .providers import SecretProvider, create_provider
 
@@ -58,7 +58,7 @@ class SecretStore:
         return self._provider.get(name) is not None
 
     @classmethod
-    def from_config(cls, config: dict) -> "SecretStore":
+    def from_config(cls, config: dict[str, Any]) -> "SecretStore":
         """Create a SecretStore from a config dictionary.
 
         Expected keys::

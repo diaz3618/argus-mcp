@@ -105,6 +105,6 @@ def load_policies(policy_list: List[Dict[str, Any]]) -> List[AuthzPolicy]:
     for item in policy_list:
         try:
             policies.append(AuthzPolicy.from_dict(item))
-        except Exception as exc:
+        except (KeyError, ValueError, TypeError) as exc:
             logger.warning("Skipping invalid policy %s: %s", item, exc)
     return policies

@@ -236,7 +236,8 @@ class PKCEAuthProvider(AuthProvider):
                     self._backend_name,
                 )
                 return refreshed.access_token
-            except Exception as exc:
+            except (OSError, ConnectionError) as exc:
+                # nosemgrep: python-logger-credential-disclosure (logs exception type, not token)
                 logger.warning(
                     "[%s] Token refresh failed, will re-authenticate: %s",
                     self._backend_name,

@@ -34,13 +34,14 @@ _MCP_PATH_PREFIXES = ("/mcp", "/sse", "/messages")
 
 # Hosts considered "localhost" — requests from these origins are always
 # permitted, matching MCP Inspector / Claude Desktop / VS Code behaviour.
-_LOCALHOST_HOSTS: FrozenSet[str] = frozenset({
-    "localhost",
-    "127.0.0.1",
-    "::1",
-    "[::1]",
-    "0.0.0.0",
-})
+_LOCALHOST_HOSTS: FrozenSet[str] = frozenset(
+    {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "[::1]",
+    }
+)
 
 # Environment variable for additional allowed origins.
 _ALLOWED_ORIGINS_ENV = "ARGUS_ALLOWED_ORIGINS"
@@ -60,7 +61,8 @@ def _is_localhost_origin(origin: str) -> bool:
         parsed = urlparse(origin)
         host = (parsed.hostname or "").lower()
         return host in _LOCALHOST_HOSTS
-    except Exception:
+    except (ValueError, AttributeError) as exc:
+        logger.debug("Failed to parse origin '%s': %s", origin, exc)
         return False
 
 

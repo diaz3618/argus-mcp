@@ -24,6 +24,7 @@ All network I/O uses httpx (lazy-imported to keep it optional).
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import time
 from dataclasses import dataclass, field
@@ -40,6 +41,34 @@ logger = logging.getLogger(__name__)
 # Default TTL: 3600s.
 _METADATA_CACHE_TTL: float = 3600.0
 _metadata_cache: Dict[str, Dict[str, Any]] = {}
+
+# Schemes allowed for OAuth discovery endpoints.
+_ALLOWED_SCHEMES = frozenset({"https", "http"})
+
+
+def _validate_discovery_url(url: str, *, allow_private: bool = True) -> None:
+    """Raise ``ValueError`` if *url* looks like an SSRF target.
+
+    Checks:
+    - Scheme must be http or https.
+    - Host must not be empty.
+    - When *allow_private* is False, rejects RFC-1918 / loopback addresses.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in _ALLOWED_SCHEMES:
+        raise ValueError(f"Unsupported scheme '{parsed.scheme}' in discovery URL: {url}")
+    host = parsed.hostname
+    if not host:
+        raise ValueError(f"Missing host in discovery URL: {url}")
+    if not allow_private:
+        try:
+            addr = ipaddress.ip_address(host)
+            if addr.is_private or addr.is_loopback or addr.is_link_local:
+                raise ValueError(f"Private/loopback address not allowed: {url}")
+        except ValueError as exc:
+            if "not allowed" in str(exc):
+                raise
+            # hostname is a DNS name, not a literal IP — allow it
 
 
 # ── Data classes ─────────────────────────────────────────────────────────
@@ -90,6 +119,8 @@ async def discover_oauth_metadata(
     Returns ``None`` if discovery fails entirely (server does not
     require OAuth, or endpoints are unreachable).
     """
+    _validate_discovery_url(mcp_server_url)
+
     # Check cache first
     cached = _metadata_cache.get(mcp_server_url)
     if cached:
@@ -100,13 +131,22 @@ async def discover_oauth_metadata(
                 mcp_server_url,
                 age,
             )
-            return cached["metadata"]
+            result: Optional[OAuthMetadata] = cached["metadata"]
+            return result
         # Expired — remove stale entry
         _metadata_cache.pop(mcp_server_url, None)
 
     import httpx  # noqa: PLC0415
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+    # Disable automatic redirect following to prevent SSRF via redirect
+    # chains (e.g. public URL → 302 → private/loopback).  Discovery
+    # endpoints should respond directly; if they redirect we handle it
+    # manually after re-validating each hop.
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=False,
+        max_redirects=0,
+    ) as client:
         # Step 1 — RFC 9728 resource metadata
         auth_server_url = await _discover_resource_metadata(client, mcp_server_url)
 
@@ -117,6 +157,17 @@ async def discover_oauth_metadata(
         if not auth_server_url:
             logger.debug(
                 "No authorization server discovered for %s.",
+                mcp_server_url,
+            )
+            return None
+
+        # Validate discovered auth server URL against SSRF
+        try:
+            _validate_discovery_url(auth_server_url)
+        except ValueError:
+            logger.warning(
+                "Discovered auth server URL failed validation: %s (from %s)",
+                auth_server_url,
                 mcp_server_url,
             )
             return None
@@ -134,27 +185,25 @@ async def discover_oauth_metadata(
         return meta
 
 
-async def discover_from_401(
-    response_headers: Dict[str, str],
-    *,
-    timeout: float = 10.0,
-) -> Optional[OAuthMetadata]:
-    """Discover OAuth metadata from a 401 response's headers.
-
-    Useful when an initial connection attempt fails and the caller
-    already has the HTTP headers.
-    """
-    auth_server = _parse_www_authenticate(response_headers.get("www-authenticate", ""))
-    if not auth_server:
-        return None
-
-    import httpx  # noqa: PLC0415
-
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        return await _discover_oidc(client, auth_server)
-
-
 # ── Internal helpers ─────────────────────────────────────────────────────
+
+_MAX_REDIRECTS = 3
+
+
+async def _safe_get(client: Any, url: str) -> Any:
+    """GET with manual redirect following and SSRF validation on each hop."""
+    for _ in range(_MAX_REDIRECTS):
+        resp = await client.get(url)
+        if resp.status_code not in (301, 302, 303, 307, 308):
+            return resp
+        location = resp.headers.get("location")
+        if not location:
+            return resp
+        # Resolve relative redirects
+        url = urljoin(url, location)
+        _validate_discovery_url(url)
+    logger.warning("Too many redirects during discovery for %s", url)
+    return resp
 
 
 async def _discover_resource_metadata(
@@ -171,12 +220,12 @@ async def _discover_resource_metadata(
         "/.well-known/oauth-protected-resource",
     )
     try:
-        resp = await client.get(well_known_url)
+        resp = await _safe_get(client, well_known_url)
         if resp.status_code == 200:
             data = resp.json()
             auth_server = data.get("authorization_servers", [None])
             if isinstance(auth_server, list) and auth_server:
-                url = auth_server[0]
+                url: Optional[str] = auth_server[0]
                 logger.info(
                     "RFC 9728 discovery → authorization server: %s",
                     url,
@@ -185,12 +234,14 @@ async def _discover_resource_metadata(
             # Fallback: single-value field
             url = data.get("authorization_server")
             if url:
+                if not isinstance(url, str):
+                    return None
                 logger.info(
                     "RFC 9728 discovery → authorization server: %s",
                     url,
                 )
                 return url
-    except Exception as exc:
+    except (OSError, ConnectionError) as exc:  # noqa: BLE001
         logger.debug(
             "RFC 9728 discovery failed for %s: %s",
             mcp_url,
@@ -205,11 +256,11 @@ async def _probe_www_authenticate(
 ) -> Optional[str]:
     """Send a ``GET`` to the MCP URL and inspect a 401 response."""
     try:
-        resp = await client.get(mcp_url)
+        resp = await _safe_get(client, mcp_url)
         if resp.status_code == 401:
             www_auth = resp.headers.get("www-authenticate", "")
             return _parse_www_authenticate(www_auth)
-    except Exception as exc:
+    except (OSError, ConnectionError) as exc:  # noqa: BLE001
         logger.debug(
             "401 probe failed for %s: %s",
             mcp_url,
@@ -268,7 +319,7 @@ async def _discover_oidc(
 
     # ── Pass 1: RFC 8414 (preferred) ────────────────────────────────
     try:
-        resp = await client.get(rfc8414_url)
+        resp = await _safe_get(client, rfc8414_url)
         if resp.status_code == 200:
             rfc8414_data = resp.json()
             logger.debug(
@@ -276,7 +327,7 @@ async def _discover_oidc(
                 auth_server_url,
                 rfc8414_data.get("issuer", "?"),
             )
-    except Exception as exc:
+    except (OSError, ConnectionError) as exc:  # noqa: BLE001
         logger.debug(
             "RFC 8414 discovery failed for %s: %s",
             auth_server_url,
@@ -285,7 +336,7 @@ async def _discover_oidc(
 
     # ── Pass 2: OIDC (fallback / supplement) ────────────────────────
     try:
-        resp = await client.get(oidc_url)
+        resp = await _safe_get(client, oidc_url)
         if resp.status_code == 200:
             oidc_data = resp.json()
             logger.debug(
@@ -293,7 +344,7 @@ async def _discover_oidc(
                 auth_server_url,
                 oidc_data.get("issuer", "?"),
             )
-    except Exception as exc:
+    except (OSError, ConnectionError) as exc:  # noqa: BLE001
         logger.debug(
             "OIDC discovery failed for %s: %s",
             auth_server_url,

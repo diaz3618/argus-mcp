@@ -53,7 +53,8 @@ def resolve_secrets(
     dict
         A new dictionary with resolved secret values.
     """
-    return _walk(config, store, strict=strict, path="")
+    result: Dict[str, Any] = _walk(config, store, strict=strict, path="")
+    return result
 
 
 def _walk(
@@ -100,7 +101,7 @@ def _resolve_string(
         from argus_mcp.display.logging_config import secret_redaction_filter
 
         secret_redaction_filter.register(resolved)
-    except Exception as exc:
+    except (ImportError, AttributeError) as exc:
         logger.warning("Secret resolution logging failed: %s", exc)
 
     # nosemgrep: python-logger-credential-disclosure (logs secret name, not value)
@@ -115,7 +116,7 @@ def find_secret_references(config: Dict[str, Any]) -> List[str]:
     return refs
 
 
-def _collect_refs(value: Union[Dict, List, str, Any], refs: List[str]) -> None:
+def _collect_refs(value: Union[Dict[str, Any], List[Any], str, Any], refs: List[str]) -> None:
     if isinstance(value, dict):
         for v in value.values():
             _collect_refs(v, refs)

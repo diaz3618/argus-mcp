@@ -76,11 +76,13 @@ class TokenStore:
             await asyncio.to_thread(path.write_text, content, "utf-8")
             # Restrict permissions — owner-only read/write
             os.chmod(path, 0o600)
-            logger.debug(  # intentionally debug-level for troubleshooting
+            # nosemgrep: python-logger-credential-disclosure (logs name, not value)
+            logger.debug(
                 "Token saved for backend '%s'",
                 backend_name,
             )
         except OSError as exc:
+            # nosemgrep: python-logger-credential-disclosure (logs OS error, not token)
             logger.warning(
                 "Failed to save token for '%s': %s",
                 backend_name,
@@ -100,11 +102,19 @@ class TokenStore:
         try:
             raw = await asyncio.to_thread(path.read_text, "utf-8")
             data = json.loads(raw)
-        except (OSError, json.JSONDecodeError) as exc:
+        except OSError as exc:
             logger.warning(
                 "Failed to read token for '%s': %s",
                 backend_name,
                 exc,
+            )
+        except json.JSONDecodeError:
+            # nosemgrep: python-logger-credential-disclosure
+            # Log only the exception type — the message may contain
+            # raw file content (token fragments).
+            logger.warning(
+                "Failed to parse token file for '%s' (corrupt JSON)",
+                backend_name,
             )
             return None
 
@@ -114,6 +124,7 @@ class TokenStore:
         if saved_at and expires_in:
             elapsed = time.time() - saved_at
             if elapsed >= (expires_in - 60):
+                # nosemgrep: python-logger-credential-disclosure (logs elapsed time, not token)
                 logger.debug(
                     "Stored access token for '%s' has expired (elapsed=%.0fs).",
                     backend_name,
@@ -147,6 +158,7 @@ class TokenStore:
         path = self._path_for(backend_name)
         if path.exists():
             path.unlink()
+            # nosemgrep: python-logger-credential-disclosure (logs name, not value)
             logger.debug("Token deleted for backend '%s'.", backend_name)
             return True
         return False
@@ -170,4 +182,5 @@ class TokenStore:
             self._dir.mkdir(parents=True, exist_ok=True)
             os.chmod(self._dir, 0o700)
         except OSError as exc:
+            # nosemgrep: python-logger-credential-disclosure (logs path, not token)
             logger.warning("Failed to create token directory %s: %s", self._dir, exc)

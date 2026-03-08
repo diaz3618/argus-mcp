@@ -112,7 +112,7 @@ class JWTValidator:
             self._keys_fetched_at = time.monotonic()
             try:
                 claims = self._decode(token, jwt)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 raise JWTValidationError(f"JWT validation failed after key refresh: {exc}") from exc
         except jwt.exceptions.ExpiredSignatureError as exc:
             raise JWTValidationError("Token has expired") from exc

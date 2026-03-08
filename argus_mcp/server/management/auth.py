@@ -64,7 +64,7 @@ class BearerAuthMiddleware:
     # require auth when exposed to a non-localhost interface.
     _MUTATING_SUFFIXES = frozenset({"/reload", "/reconnect", "/shutdown"})
 
-    _LOCALHOST_ADDRS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
+    _LOCALHOST_ADDRS = frozenset({"127.0.0.1", "localhost", "::1"})
 
     def __init__(
         self,
@@ -90,6 +90,39 @@ class BearerAuthMiddleware:
     def auth_enabled(self) -> bool:
         return self._token is not None
 
+    async def _handle_no_auth(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Pass request through when auth is disabled, warning on exposed binds."""
+        server_tuple = scope.get("server")
+        bind_host = server_tuple[0] if server_tuple else "127.0.0.1"
+        is_exposed = bind_host not in self._LOCALHOST_ADDRS
+
+        if is_exposed and not self._warned_exposed:
+            self._warned_exposed = True
+            logger.warning(
+                "⚠️  SECURITY WARNING: Management API authentication is "
+                "DISABLED while serving on non-localhost address '%s'. "
+                "Mutating endpoints (/reload, /reconnect, /shutdown) are "
+                "accessible to anyone on the network. "
+                "Set %s env var to secure admin endpoints.",
+                bind_host,
+                MGMT_TOKEN_ENV_VAR,
+            )
+
+        path = scope.get("path", "/")
+        stripped = path.rstrip("/")
+        if is_exposed and any(stripped.endswith(s) for s in self._MUTATING_SUFFIXES):
+            client = scope.get("client")
+            client_host = client[0] if client else "unknown"
+            logger.warning(
+                "⚠️  Unauthenticated mutating request from %s → %s "
+                "(no %s configured, binding on non-localhost '%s')",
+                client_host,
+                path,
+                MGMT_TOKEN_ENV_VAR,
+                bind_host,
+            )
+        await self.app(scope, receive, send)
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
@@ -103,44 +136,8 @@ class BearerAuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # If no token configured, allow all requests — but warn on
-        # mutating endpoints when the server is bound to a non-localhost
-        # interface.
-        # The bind address is resolved lazily from the ASGI scope's
-        # ``server`` tuple so it works even though the middleware is
-        # constructed before the host is known.
         if not self.auth_enabled:
-            server_tuple = scope.get("server")
-            bind_host = server_tuple[0] if server_tuple else "127.0.0.1"
-            is_exposed = bind_host not in self._LOCALHOST_ADDRS
-
-            # Emit a one-time prominent warning on first exposed request.
-            if is_exposed and not self._warned_exposed:
-                self._warned_exposed = True
-                logger.warning(
-                    "⚠️  SECURITY WARNING: Management API authentication is "
-                    "DISABLED while serving on non-localhost address '%s'. "
-                    "Mutating endpoints (/reload, /reconnect, /shutdown) are "
-                    "accessible to anyone on the network. "
-                    "Set %s env var to secure admin endpoints.",
-                    bind_host,
-                    MGMT_TOKEN_ENV_VAR,
-                )
-
-            if is_exposed and any(
-                stripped.endswith(s) for s in self._MUTATING_SUFFIXES
-            ):
-                client = scope.get("client")
-                client_host = client[0] if client else "unknown"
-                logger.warning(
-                    "⚠️  Unauthenticated mutating request from %s → %s "
-                    "(no %s configured, binding on non-localhost '%s')",
-                    client_host,
-                    path,
-                    MGMT_TOKEN_ENV_VAR,
-                    bind_host,
-                )
-            await self.app(scope, receive, send)
+            await self._handle_no_auth(scope, receive, send)
             return
 
         # Extract Authorization header from raw ASGI headers
@@ -161,7 +158,6 @@ class BearerAuthMiddleware:
 
         # Constant-time comparison to prevent timing attacks
         if not hmac.compare_digest(provided_token, self._token):  # type: ignore[arg-type]
-            # Extract client host from scope for logging
             client = scope.get("client")
             client_host = client[0] if client else "unknown"
             logger.warning(

@@ -74,7 +74,7 @@ class OIDCDiscovery:
                 resp = await client.get(url)
                 resp.raise_for_status()
                 data: Dict[str, Any] = resp.json()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             raise OIDCDiscoveryError(
                 f"Failed to fetch OIDC discovery document from {url}: {exc}"
             ) from exc

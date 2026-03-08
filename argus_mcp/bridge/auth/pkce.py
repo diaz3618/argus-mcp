@@ -320,6 +320,9 @@ class PKCEFlow:
             # Wait for callback
             try:
                 await asyncio.wait_for(ready.wait(), timeout=self._timeout)
+            except asyncio.CancelledError:
+                logger.info("PKCE authorization flow cancelled.")
+                raise
             except asyncio.TimeoutError:
                 raise RuntimeError(
                     f"OAuth authorization timed out after {self._timeout}s. "
@@ -384,6 +387,7 @@ class PKCEFlow:
                 headers={"Accept": "application/json"},
             )
             if resp.status_code >= 400:
+                # nosemgrep: python-logger-credential-disclosure (logs HTTP status, not token)
                 logger.error(
                     "Token exchange failed: HTTP %d",
                     resp.status_code,
