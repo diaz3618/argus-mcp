@@ -11,6 +11,7 @@ import os
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from argus_mcp.constants import (
+    AUTH_DISCOVERY_TIMEOUT,
     BACKEND_RETRIES,
     BACKEND_RETRY_BACKOFF,
     BACKEND_RETRY_DELAY,
@@ -161,10 +162,9 @@ async def await_auth_discoveries(
     if not auth_wait_names:
         return
 
-    _AUTH_WAIT_TIMEOUT = 120.0
     logger.info(
         "Waiting up to %.0fs for pending auth discovery on %d backend(s): %s",
-        _AUTH_WAIT_TIMEOUT,
+        AUTH_DISCOVERY_TIMEOUT,
         len(auth_wait_names),
         ", ".join(auth_wait_names),
     )
@@ -173,7 +173,7 @@ async def await_auth_discoveries(
         if progress_cb is not None:
             progress_cb(n, "initializing", "Waiting for browser authentication…")
     try:
-        await asyncio.wait(pending, timeout=_AUTH_WAIT_TIMEOUT)
+        await asyncio.wait(pending, timeout=AUTH_DISCOVERY_TIMEOUT)
         for n in auth_wait_names:
             auth_task = auth_discovery_tasks.get(n)
             if auth_task and auth_task.done():

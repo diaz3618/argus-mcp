@@ -42,6 +42,12 @@ BACKEND_RETRIES = 3  # number of automatic retries for failed backends
 BACKEND_RETRY_DELAY = 5.0  # base delay between retries (exponential backoff applied)
 BACKEND_RETRY_BACKOFF = 1.5  # multiplier applied to delay on each successive retry
 
+# OAuth auth discovery timeout — how long the retry loop waits for the
+# user to complete the browser-based PKCE authentication flow.  Must be
+# >= the PKCE flow timeout (600 s) to avoid retries racing ahead of a
+# slow interactive login.
+AUTH_DISCOVERY_TIMEOUT = 630  # seconds (PKCE 600 s + 30 s buffer)
+
 # SSE heartbeat for management event streams
 SSE_HEARTBEAT_INTERVAL = 30  # seconds
 

@@ -90,12 +90,16 @@ async def attempt_auth_discovery(
     discovered_auth: Dict[str, Dict[str, Any]],
     progress_cb: Optional[Callable[..., None]] = None,
 ) -> str:
-    """Run OAuth auto-discovery for a backend, shielded from cancellation.
+    """Start OAuth auto-discovery for a backend in the background.
 
     Returns an updated failure reason string.  Uses task tracking to
     prevent duplicate DCR registrations and PKCE flows — if an auth
-    discovery task is already running for this backend, waits on it
-    instead of starting a new one.
+    discovery task is already running for this backend, returns
+    immediately and lets the retry loop wait on it.
+
+    The background task runs the full PKCE browser flow (up to 600 s).
+    The startup coordinator's ``await_auth_discoveries`` waits for it
+    with a generous timeout before launching retries.
 
     For remote backends (SSE / streamable-http) only.
     """
@@ -106,28 +110,19 @@ async def attempt_auth_discovery(
     existing_task = auth_discovery_tasks.get(svr_name)
     if existing_task is not None and not existing_task.done():
         logger.info(
-            "[%s] Auth discovery already in progress — waiting for existing flow to complete.",
+            "[%s] Auth discovery already in progress — "
+            "retry loop will wait for it before retrying.",
             svr_name,
         )
-        try:
-            auth_ok = await asyncio.shield(existing_task)
-            if auth_ok:
-                return "Auth discovered — will retry with OAuth token."
-        except asyncio.CancelledError:
-            logger.info(
-                "[%s] Wait for existing auth flow interrupted by "
-                "cancellation — flow continues in background.",
-                svr_name,
-            )
-        except Exception as wait_exc:  # noqa: BLE001
-            logger.debug(
-                "[%s] Existing auth flow failed: %s",
-                svr_name,
-                wait_exc,
-            )
-        return default_reason
+        return "Auth discovery already running — will retry after browser authentication completes."
 
-    # ── Start a new auth discovery task ─────────────────────────
+    # ── Start a new auth discovery task (non-blocking) ──────────
+    # The PKCE browser flow can take minutes while the user
+    # interacts with the authorization page.  We launch it as a
+    # background task so the concurrency semaphore is released
+    # immediately and other backends can proceed.  The startup
+    # coordinator's retry loop (await_auth_discoveries) will wait
+    # for this task with a generous timeout before retrying.
     coro = try_auth_discovery(svr_name, svr_conf, discovered_auth, progress_cb)
     task = asyncio.create_task(
         coro,
@@ -136,23 +131,12 @@ async def attempt_auth_discovery(
     task.add_done_callback(_log_task_exception)
     auth_discovery_tasks[svr_name] = task
 
-    try:
-        auth_ok = await asyncio.shield(task)
-        if auth_ok:
-            return "Auth discovered — will retry with OAuth token."
-    except asyncio.CancelledError:
-        logger.info(
-            "[%s] Auth discovery interrupted by cancellation — "
-            "inner coroutine continues in background.",
-            svr_name,
-        )
-    except Exception as auth_exc:  # noqa: BLE001
-        logger.debug(
-            "[%s] Auth discovery attempt failed: %s",
-            svr_name,
-            auth_exc,
-        )
-    return default_reason
+    logger.info(
+        "[%s] Auth discovery started in background (PKCE browser flow). "
+        "Retry loop will wait for completion.",
+        svr_name,
+    )
+    return "Auth required — PKCE browser flow started. Will retry after authentication completes."
 
 
 async def try_auth_discovery(
