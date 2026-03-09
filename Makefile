@@ -4,12 +4,13 @@
 #
 # Targets:
 #   Testing & Quality    test, lint, typecheck, security, quality
-#   Docker               docker-build, docker-push, ghcr-push
-#   Release              version, release-dry, release, tag, tag-push, publish
-#   Utilities             clean, dev-install
+#   Docker               docker-build
+#   Utilities            clean, dev-install
+#
+# Release targets live in Makefile.release (not tracked in git).
 #
 # Prerequisites:
-#   uv, docker, semgrep, snyk, python-semantic-release
+#   uv, docker, semgrep, snyk
 # ──────────────────────────────────────────────────────────────
 
 SHELL := /bin/bash
@@ -22,8 +23,6 @@ export
 # ── Project metadata (read from pyproject.toml) ─────────────
 VERSION := $(shell python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])" 2>/dev/null || echo "0.0.0")
 IMAGE_DOCKERHUB := diaz3618/argus-mcp
-IMAGE_GHCR      := ghcr.io/diaz3618/argus-mcp
-PLATFORMS        := linux/amd64,linux/arm64
 
 # ── Semgrep rule packs tailored to this project ─────────────
 SEMGREP_PACKS := p/python p/security-audit p/secrets p/dockerfile
@@ -80,80 +79,6 @@ quality: lint typecheck test security ## Full quality gate (lint + types + tests
 docker-build: ## Build Docker image (local, current arch)
 	docker build -t $(IMAGE_DOCKERHUB):$(VERSION) -t $(IMAGE_DOCKERHUB):latest .
 	@echo "Built $(IMAGE_DOCKERHUB):$(VERSION)"
-
-# ══════════════════════════════════════════════════════════════
-# Docker — Publish to Docker Hub
-# ══════════════════════════════════════════════════════════════
-
-.PHONY: docker-push
-docker-push: ## Build multi-arch and push to Docker Hub
-	docker buildx build \
-		--platform $(PLATFORMS) \
-		--tag $(IMAGE_DOCKERHUB):$(VERSION) \
-		--tag $(IMAGE_DOCKERHUB):latest \
-		--push .
-	@echo "Pushed $(IMAGE_DOCKERHUB):$(VERSION) + latest"
-
-# ══════════════════════════════════════════════════════════════
-# Docker — Publish to GHCR
-# ══════════════════════════════════════════════════════════════
-
-.PHONY: ghcr-push
-ghcr-push: ## Build multi-arch and push to GHCR
-	docker buildx build \
-		--platform $(PLATFORMS) \
-		--tag $(IMAGE_GHCR):$(VERSION) \
-		--tag $(IMAGE_GHCR):latest \
-		--push .
-	@echo "Pushed $(IMAGE_GHCR):$(VERSION) + latest"
-
-# ══════════════════════════════════════════════════════════════
-# Release — Versioning & Changelog (python-semantic-release)
-# ══════════════════════════════════════════════════════════════
-#
-# Release flow:
-#   make release → PSR bumps version, stamps files, commits, tags, pushes
-#     Tag push triggers CI cascade:
-#       release.yml  → GitHub Release  → publish.yml → PyPI (OIDC)
-#       docker.yml   → Docker Hub + GHCR (single build, multi-registry)
-#
-# Version sources (all kept in sync by PSR):
-#   pyproject.toml:project.version    — package metadata (single source of truth)
-#   argus_mcp/constants.py            — runtime constant
-#   git tag (v{version})              — Docker image tags via metadata-action
-#
-
-.PHONY: version
-version: ## Show current project version
-	@echo "$(VERSION)"
-
-.PHONY: changelog
-changelog: ## Generate/update CHANGELOG.md from commit history
-	semantic-release changelog
-
-.PHONY: release-dry
-release-dry: ## Preview next version without making changes
-	semantic-release version --print
-	@echo "---"
-	semantic-release --noop version
-
-.PHONY: release
-release: quality ## Cut a release (bump version, tag, changelog, push)
-	semantic-release version
-	@echo "Release complete. Version: $$(semantic-release version --print-last-released)"
-
-.PHONY: tag
-tag: ## Create a git tag for current version (no push)
-	git tag -a "v$(VERSION)" -m "release: v$(VERSION)"
-	@echo "Created tag v$(VERSION). Push with: make tag-push"
-
-.PHONY: tag-push
-tag-push: ## Push the current version tag (triggers CI release cascade)
-	git push origin "v$(VERSION)"
-	@echo "Pushed v$(VERSION) — CI will create release, publish to PyPI, Docker Hub, and GHCR"
-
-.PHONY: publish
-publish: release docker-push ghcr-push ## Full release + publish to both registries (manual)
 
 # ══════════════════════════════════════════════════════════════
 # Utilities
