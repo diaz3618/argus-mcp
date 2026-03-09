@@ -591,6 +591,28 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         logger.info("Lifespan startup phase completed successfully.")
         startup_ok = True
 
+        # ── Ensure uvicorn doesn't auto-exit after successful startup ─
+        # During the (potentially very long) startup phase, a stale
+        # should_exit flag may have been set (e.g. by signal handler
+        # overlap, or by uvicorn's own LifespanOn error detection).
+        # Clear it so that uvicorn enters main_loop() instead of
+        # returning immediately from _serve().
+        import argus_mcp.cli as _cli_mod
+
+        _uv = getattr(_cli_mod, "uvicorn_svr_inst", None)
+        if _uv is not None and getattr(_uv, "should_exit", False):
+            logger.warning(
+                "Clearing stale should_exit flag on uvicorn server "
+                "(was True after successful startup)."
+            )
+            _uv.should_exit = False
+        # Also clear the lifespan-level flag that uvicorn checks in
+        # Server.startup() right after our lifespan returns.
+        _lifespan = getattr(_uv, "lifespan", None) if _uv is not None else None
+        if _lifespan is not None and getattr(_lifespan, "should_exit", False):
+            logger.warning("Clearing stale should_exit flag on uvicorn lifespan.")
+            _lifespan.should_exit = False
+
         # ── Display: ready ───────────────────────────────────────────
         status_info_ready = gen_status_info(
             app_state,

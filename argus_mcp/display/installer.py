@@ -219,7 +219,6 @@ class InstallerDisplay:
         self._verbose = verbose
 
         # Sequential expand/collapse state
-        self._completed_lines: List[str] = []
         self._active_name: Optional[str] = None
         self._active_spinner: Optional[Spinner] = None
 
@@ -232,15 +231,10 @@ class InstallerDisplay:
     # ── Rendering ────────────────────────────────────────────────────
 
     def _build_renderable(self) -> RenderableType:
-        """Build the Group of completed lines + active spinner + build output."""
+        """Build the active spinner + build output (completed lines are printed directly)."""
         parts: List[RenderableType] = []
 
-        for line in self._completed_lines:
-            parts.append(Text.from_markup(line))
-
         if self._active_name is not None and self._active_spinner is not None:
-            if parts:
-                parts.append(Text(""))
             parts.append(self._active_spinner)
 
             lines = self._build_lines.get(self._active_name, [])
@@ -305,7 +299,7 @@ class InstallerDisplay:
         self._live.start()
 
     def _collapse_to_completed(self, name: str, entry: _BackendEntry) -> None:
-        """Collapse a finished backend into a single completed line."""
+        """Collapse a finished backend: print its status line permanently above the Live area."""
         elapsed = time.monotonic() - entry.start_time if entry.start_time else 0.0
         mins, secs = divmod(int(elapsed), 60)
         style = entry.style
@@ -323,7 +317,12 @@ class InstallerDisplay:
             status = "Skipped"
 
         line = f"  {icon} [{style.name_style}]{label:<42}[/] {status} 0:{mins:02d}:{secs:02d}"
-        self._completed_lines.append(line)
+
+        # Print permanently above the Live display area (Rich handles cursor)
+        if self._live is not None:
+            self._live.console.print(Text.from_markup(line))
+        else:
+            self._console.print(Text.from_markup(line))
 
         # Clear active state if this was the active backend
         self._build_lines.pop(name, None)
@@ -420,8 +419,6 @@ class InstallerDisplay:
 
         try:
             if self._live is not None:
-                # Final refresh with all backends collapsed
-                self._live.update(self._build_renderable())
                 self._live.stop()
         except (BrokenPipeError, SystemExit):
             pass

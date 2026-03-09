@@ -211,6 +211,11 @@ async def wrap_backend(
         return params, False
 
     # ── Pre-create container (docker create) ────────────────────────
+    # Clean up any existing container for this backend (e.g. from a
+    # previous failed attempt) before creating a new one.
+    if svr_name in _active_containers:
+        await cleanup_container(svr_name)
+
     net_mode = effective_network(network)
     mem = memory or _DEFAULT_MEMORY
     cpu = cpus or _DEFAULT_CPUS

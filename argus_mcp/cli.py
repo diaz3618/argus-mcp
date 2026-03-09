@@ -775,6 +775,159 @@ def _cmd_secret(args: argparse.Namespace) -> None:
         print(f"Secret '{args.name}' deleted.")
 
 
+# ── ``argus-mcp clean`` ─────────────────────────────────────────────
+
+
+def _cmd_clean(args: argparse.Namespace) -> None:
+    """Remove containers and images created by argus-mcp.
+
+    Finds containers whose image starts with ``arguslocal/`` and
+    removes them.  Optionally removes the ``arguslocal/`` images
+    and the ``argus-mcp`` Docker network as well.
+    """
+    import subprocess
+
+    from argus_mcp.bridge.container.templates import IMAGE_PREFIX
+
+    images_flag: bool = getattr(args, "images", False)
+    network_flag: bool = getattr(args, "network", False)
+    all_flag: bool = getattr(args, "all", False)
+    if all_flag:
+        images_flag = network_flag = True
+
+    # ── Detect runtime ───────────────────────────────────────────
+    runtime = "docker"
+    for candidate in ("docker", "podman"):
+        try:
+            subprocess.run(
+                [candidate, "version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=10,
+            )
+            runtime = candidate
+            break
+        except (FileNotFoundError, subprocess.SubprocessError):
+            continue
+
+    # ── Remove containers ────────────────────────────────────────
+    # Find all containers (running + stopped) whose image starts
+    # with the arguslocal/ prefix.
+    result = subprocess.run(
+        [
+            runtime,
+            "ps",
+            "-a",
+            "--filter",
+            f"ancestor={IMAGE_PREFIX}/",
+            "--format",
+            "{{.ID}} {{.Names}} {{.Image}} {{.Status}}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    # The ancestor filter alone is imprecise — also list by name pattern
+    result2 = subprocess.run(
+        [
+            runtime,
+            "ps",
+            "-a",
+            "--format",
+            "{{.ID}} {{.Names}} {{.Image}} {{.Status}}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    # Collect container IDs whose image starts with arguslocal/
+    container_lines: list[str] = []
+    container_ids: list[str] = []
+    seen: set[str] = set()
+    for line in (result.stdout + "\n" + result2.stdout).strip().splitlines():
+        parts = line.split(None, 3)
+        if len(parts) < 3:
+            continue
+        cid, _name, image = parts[0], parts[1], parts[2]
+        if cid in seen:
+            continue
+        if image.startswith(f"{IMAGE_PREFIX}/"):
+            seen.add(cid)
+            container_ids.append(cid)
+            container_lines.append(line)
+
+    if container_ids:
+        print(f"Removing {len(container_ids)} argus-mcp container(s):")
+        for line in container_lines:
+            print(f"  {line}")
+        subprocess.run(
+            [runtime, "rm", "-f", *container_ids],
+            capture_output=True,
+            timeout=60,
+        )
+        print("Containers removed.")
+    else:
+        print("No argus-mcp containers found.")
+
+    # ── Remove images ────────────────────────────────────────────
+    if images_flag:
+        img_result = subprocess.run(
+            [
+                runtime,
+                "images",
+                "--format",
+                "{{.ID}} {{.Repository}}:{{.Tag}}",
+                f"{IMAGE_PREFIX}/*",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        image_ids: list[str] = []
+        image_lines: list[str] = []
+        for line in img_result.stdout.strip().splitlines():
+            parts = line.split(None, 1)
+            if parts:
+                image_ids.append(parts[0])
+                image_lines.append(line)
+
+        if image_ids:
+            print(f"\nRemoving {len(image_ids)} arguslocal image(s):")
+            for line in image_lines:
+                print(f"  {line}")
+            subprocess.run(
+                [runtime, "rmi", "-f", *image_ids],
+                capture_output=True,
+                timeout=120,
+            )
+            print("Images removed.")
+        else:
+            print("\nNo arguslocal images found.")
+
+    # ── Remove network ───────────────────────────────────────────
+    if network_flag:
+        from argus_mcp.bridge.container.network import ARGUS_NETWORK
+
+        net_result = subprocess.run(
+            [runtime, "network", "ls", "--filter", f"name={ARGUS_NETWORK}", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        net_ids = net_result.stdout.strip().splitlines()
+        if net_ids:
+            print(f"\nRemoving '{ARGUS_NETWORK}' network…")
+            subprocess.run(
+                [runtime, "network", "rm", ARGUS_NETWORK],
+                capture_output=True,
+                timeout=30,
+            )
+            print("Network removed.")
+        else:
+            print(f"\nNo '{ARGUS_NETWORK}' network found.")
+
+
 # ── CLI parser construction ──────────────────────────────────────────────
 
 
@@ -944,6 +1097,31 @@ def _build_parser() -> argparse.ArgumentParser:
     sp_del.add_argument("name", help="Secret name")
 
     sp_secret.set_defaults(func=_cmd_secret)
+
+    # ── clean ───────────────────────────────────────────────────
+    sp_clean = subparsers.add_parser(
+        "clean",
+        help="Remove containers and images created by argus-mcp",
+    )
+    sp_clean.add_argument(
+        "--images",
+        action="store_true",
+        default=False,
+        help="Also remove arguslocal/* container images",
+    )
+    sp_clean.add_argument(
+        "--network",
+        action="store_true",
+        default=False,
+        help="Also remove the argus-mcp Docker network",
+    )
+    sp_clean.add_argument(
+        "--all",
+        action="store_true",
+        default=False,
+        help="Remove containers, images, and network (equivalent to --images --network)",
+    )
+    sp_clean.set_defaults(func=_cmd_clean)
 
     return parser
 
