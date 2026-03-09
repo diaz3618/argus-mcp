@@ -284,7 +284,7 @@ async def try_auth_discovery(
             progress_cb(
                 svr_name,
                 "initializing",
-                "Authentication successful — preparing retry\u2026",
+                "Authentication successful\u2026",
             )
         return True
 

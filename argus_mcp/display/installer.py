@@ -171,7 +171,7 @@ _STYLES: Dict[RuntimeKind, _RuntimeStyle] = {
 class _BackendEntry:
     """Tracks state for one backend in the display."""
 
-    __slots__ = ("name", "runtime", "style", "phase", "message", "start_time")
+    __slots__ = ("name", "runtime", "style", "phase", "message", "start_time", "end_time")
 
     def __init__(self, name: str, runtime: RuntimeKind) -> None:
         self.name = name
@@ -180,6 +180,7 @@ class _BackendEntry:
         self.phase = DisplayPhase.PENDING
         self.message = "Pending..."
         self.start_time: float = 0.0  # set on first non-PENDING phase
+        self.end_time: float = 0.0  # frozen on terminal phase
 
 
 # ── Main display class ──────────────────────────────────────────────────
@@ -228,20 +229,67 @@ class InstallerDisplay:
             self._entries[name] = entry
             self._ordered.append(entry)
 
+        # Sort to match startup coordinator order: remote first, then stdio
+        _type_prio = {"streamable-http": 0, "sse": 1}
+        self._ordered.sort(key=lambda e: _type_prio.get(backends[e.name].get("type", "stdio"), 2))
+
     # ── Rendering ────────────────────────────────────────────────────
 
+    def _format_completed_line(self, entry: _BackendEntry) -> Text:
+        """Return a Rich Text for a terminal-state backend line."""
+        elapsed = (
+            (entry.end_time or time.monotonic()) - entry.start_time if entry.start_time else 0.0
+        )
+        mins, secs = divmod(int(elapsed), 60)
+        style = entry.style
+        label = f"Connecting {entry.name} ({style.label}):"
+
+        if entry.phase == DisplayPhase.READY:
+            icon = "[bold bright_green]\u2713[/]"
+            status = "Ready"
+        elif entry.phase == DisplayPhase.FAILED:
+            icon = "[bold red]\u2717[/]"
+            status = entry.message or "Failed"
+        else:
+            icon = "[dim]-[/]"
+            status = "Skipped"
+
+        line = f"  {icon} [{style.name_style}]{label:<42}[/] {status} 0:{mins:02d}:{secs:02d}"
+        return Text.from_markup(line)
+
     def _build_renderable(self) -> RenderableType:
-        """Build the active spinner + build output (completed lines are printed directly)."""
+        """Render all visible backends in config order inside the Live area."""
         parts: List[RenderableType] = []
 
-        if self._active_name is not None and self._active_spinner is not None:
-            parts.append(self._active_spinner)
+        for entry in self._ordered:
+            # Skip backends that haven't started yet
+            if entry.phase == DisplayPhase.PENDING:
+                continue
 
-            lines = self._build_lines.get(self._active_name, [])
-            if lines:
-                visible = lines[-self._max_build_lines :]
-                for ln in visible:
-                    parts.append(Text(f"    {ln}", style="dim"))
+            # Terminal states: show completed line
+            if entry.phase in (DisplayPhase.READY, DisplayPhase.FAILED, DisplayPhase.SKIPPED):
+                parts.append(self._format_completed_line(entry))
+                continue
+
+            # Active backend with spinner
+            if self._active_name == entry.name and self._active_spinner is not None:
+                parts.append(self._active_spinner)
+                # Build output lines (for docker builds)
+                lines = self._build_lines.get(entry.name, [])
+                if lines:
+                    visible = lines[-self._max_build_lines :]
+                    for ln in visible:
+                        parts.append(Text(f"    {ln}", style="dim"))
+                continue
+
+            # In-progress but not active: dim status line
+            style = entry.style
+            msg = entry.message or f"{entry.phase.value.title()}..."
+            line = (
+                f"  [dim]\u2026[/] [bold]Connecting[/] [{style.name_style}]{entry.name}[/] "
+                f"({style.label}): {msg}"
+            )
+            parts.append(Text.from_markup(line))
 
         if not parts:
             parts.append(Text(""))
@@ -299,32 +347,8 @@ class InstallerDisplay:
         self._live.start()
 
     def _collapse_to_completed(self, name: str, entry: _BackendEntry) -> None:
-        """Collapse a finished backend: print its status line permanently above the Live area."""
-        elapsed = time.monotonic() - entry.start_time if entry.start_time else 0.0
-        mins, secs = divmod(int(elapsed), 60)
-        style = entry.style
-
-        label = f"Connecting {name} ({style.label}):"
-
-        if entry.phase == DisplayPhase.READY:
-            icon = "[bold bright_green]\u2713[/]"
-            status = "Ready"
-        elif entry.phase == DisplayPhase.FAILED:
-            icon = "[bold red]\u2717[/]"
-            status = entry.message or "Failed"
-        else:
-            icon = "[dim]-[/]"
-            status = "Skipped"
-
-        line = f"  {icon} [{style.name_style}]{label:<42}[/] {status} 0:{mins:02d}:{secs:02d}"
-
-        # Print permanently above the Live display area (Rich handles cursor)
-        if self._live is not None:
-            self._live.console.print(Text.from_markup(line))
-        else:
-            self._console.print(Text.from_markup(line))
-
-        # Clear active state if this was the active backend
+        """Mark a backend as finished: freeze elapsed time and clear active state."""
+        entry.end_time = time.monotonic()
         self._build_lines.pop(name, None)
         if self._active_name == name:
             self._active_name = None
@@ -412,8 +436,11 @@ class InstallerDisplay:
                 if len(lines) > 200:
                     del lines[:100]
 
-        # ── Set this backend as the active one ───────────────────
-        self._set_active(name, entry)
+        # ── Claim spinner: BUILDING always wins, others only if unclaimed ──
+        if entry.phase == DisplayPhase.BUILDING:
+            self._set_active(name, entry)
+        elif self._active_name is None or self._active_name == name:
+            self._set_active(name, entry)
         self._refresh()
 
     def finalize(self) -> None:
@@ -426,11 +453,14 @@ class InstallerDisplay:
         self._active_name = None
         self._active_spinner = None
 
-        # Collapse any remaining non-terminal backends as skipped
+        # Mark any remaining non-terminal backends as skipped
         for entry in self._ordered:
-            if entry.phase not in (DisplayPhase.READY, DisplayPhase.FAILED):
+            if entry.phase not in (DisplayPhase.READY, DisplayPhase.FAILED, DisplayPhase.SKIPPED):
                 entry.phase = DisplayPhase.SKIPPED
-                self._collapse_to_completed(entry.name, entry)
+                entry.end_time = time.monotonic()
+
+        # Final refresh to render all terminal states before stopping
+        self._refresh()
 
         try:
             if self._live is not None:
