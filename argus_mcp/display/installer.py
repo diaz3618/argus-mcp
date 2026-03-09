@@ -329,6 +329,21 @@ class InstallerDisplay:
         if self._active_name == name:
             self._active_name = None
             self._active_spinner = None
+            self._promote_next_active()
+
+    def _promote_next_active(self) -> None:
+        """Activate the next in-progress backend if nothing is currently shown."""
+        if self._active_name is not None:
+            return
+        for entry in self._ordered:
+            if entry.phase not in (
+                DisplayPhase.READY,
+                DisplayPhase.FAILED,
+                DisplayPhase.SKIPPED,
+                DisplayPhase.PENDING,
+            ):
+                self._set_active(entry.name, entry)
+                return
 
     def _set_active(self, name: str, entry: _BackendEntry) -> None:
         """Make *name* the active backend with an appropriate spinner."""
