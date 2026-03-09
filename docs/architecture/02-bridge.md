@@ -1,7 +1,8 @@
-# Bridge: Routing, Registry & Forwarding
+# Bridge: Routing, Registry & Orchestration
 
 The bridge layer connects Argus to backend MCP servers, discovers their
-capabilities, and routes incoming requests to the correct backend.
+capabilities, orchestrates startup, and routes incoming requests to the
+correct backend.
 
 ## ClientManager
 
@@ -115,10 +116,57 @@ backends:
 
 Groups are queryable via `GET /manage/v1/groups?group=search-tools`.
 
-## Request Forwarding
+## Startup Coordinator
 
-`argus_mcp/bridge/forwarder.py` is the legacy forwarding path. The modern
-path uses the middleware chain's `RoutingMiddleware` which:
+`argus_mcp/bridge/startup_coordinator.py` orchestrates backend initialization
+using a 3-phase strategy that starts remote backends before local ones:
+
+**Type Priority:**
+
+| Priority | Type | Rationale |
+|----------|------|-----------|
+| 0 | `streamable-http` | Network connections are I/O-bound, benefit from early start |
+| 1 | `sse` | Same as above |
+| 2 | `stdio` | Local processes require CPU; may trigger container builds |
+
+**3-Phase Startup:**
+
+1. **Launch remote tasks** — All `streamable-http` and `sse` backends are
+   started concurrently (up to `STARTUP_CONCURRENCY` at a time) with a
+   `STARTUP_STAGGER_DELAY` between each launch.
+2. **Build and connect stdio** — Stdio backends are processed sequentially.
+   Each may trigger container image builds, so serial execution avoids
+   resource contention.
+3. **Gather remote results** — Wait for all remote tasks started in phase 1
+   to complete, collecting results and errors.
+
+This ordering ensures network-bound connections have maximum time to
+handshake while stdio backends build images.
+
+## Auth Discovery
+
+`argus_mcp/bridge/auth_discovery.py` handles non-blocking OAuth/OIDC
+metadata discovery for backends that use outgoing authentication.
+
+- Runs via `asyncio.create_task()` — does not block server startup
+- Uses a `AUTH_DISCOVERY_TIMEOUT` of 630 seconds for slow providers
+- Deduplicates discovery requests per provider URL
+- Populates the outgoing auth provider after discovery completes
+
+## Transport Factory
+
+`argus_mcp/bridge/transport_factory.py` encapsulates the creation of MCP
+transport connections for each backend type (stdio, SSE, streamable-http).
+It is called by `ClientManager` when establishing new backend connections.
+
+## Backend Connection Helpers
+
+`argus_mcp/bridge/backend_connection.py` provides shared connection utilities
+used by `ClientManager` during backend initialization and reconnection.
+
+## Request Routing
+
+Request forwarding uses the middleware chain's `RoutingMiddleware` which:
 
 1. Looks up the capability in the route map
 2. Resolves to the backend name

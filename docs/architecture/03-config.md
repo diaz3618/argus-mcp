@@ -21,7 +21,12 @@ Config file (YAML)
 | Module | Purpose |
 |--------|---------|
 | `config/loader.py` | File I/O, format detection, validation |
-| `config/schema.py` | Pydantic models (ArgusConfig, BackendConfig, etc.) |
+| `config/schema.py` | Top-level ArgusConfig Pydantic model |
+| `config/schema_backends.py` | Backend config models (stdio, SSE, streamable-http) |
+| `config/schema_client.py` | Client/TUI config models |
+| `config/schema_registry.py` | Registry config models |
+| `config/schema_security.py` | Auth, authz, secrets config models |
+| `config/schema_server.py` | Server & management config models |
 | `config/migration.py` | Legacy flat-dict → v1 migration |
 | `config/diff.py` | Config change detection for hot-reload |
 | `config/flags.py` | Feature flag management |

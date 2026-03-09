@@ -14,8 +14,10 @@ Argus MCP is a **central gateway and management platform** for MCP (Model Contex
 The project has a **server/client architecture**:
 
 - **`argus-mcp server`** — Headless server that runs the MCP bridge, management API, and transports.
+- **`argus-mcp build`** — Pre-build container images for stdio backends.
 - **`argus-mcp tui`** — Textual-based terminal UI that connects to a running server over HTTP.
 - **`argus-mcp secret`** — Manage encrypted secrets (set, get, list, delete).
+- **`argus-mcp clean`** — Remove containers, images, and networks created by Argus MCP.
 
 **Core Advantages:**
 
@@ -97,17 +99,19 @@ argus-mcp --help
 ```
 
 ```text
-usage: argus-mcp [-h] {server,stop,status,tui,secret} ...
+usage: argus-mcp [-h] {server,build,stop,status,tui,secret,clean} ...
 
 Argus MCP v0.7.0
 
 positional arguments:
-  {server,stop,status,tui,secret}
+  {server,build,stop,status,tui,secret,clean}
     server       Run the headless Argus server (Uvicorn + MCP bridge)
+    build        Pre-build container images for stdio backends
     stop         Stop a detached Argus server
     status       List all running Argus server sessions
     tui          Launch the Textual TUI connected to a running Argus server
     secret       Manage encrypted secrets (set, get, list, delete)
+    clean        Remove containers, images, and networks created by argus-mcp
 
 options:
   -h, --help     show this help message and exit
@@ -233,6 +237,7 @@ backends:
 | `command` | Yes | Executable to run |
 | `args` | No | Command arguments (default: `[]`) |
 | `env` | No | Environment variables |
+| `container` | No | Container isolation config (enabled by default for stdio) |
 
 **sse** — Connect to MCP servers over SSE; optionally start a local process.
 
@@ -243,7 +248,7 @@ backends:
 | `command` | No | Optional local process to start |
 | `args` | No | Command arguments |
 | `headers` | No | Extra HTTP headers |
-| `auth` | No | Outgoing auth config (`static` or `oauth2`) |
+| `auth` | No | Outgoing auth config (`static`, `oauth2`, or `pkce`) |
 
 **streamable-http** — Connect to MCP servers using Streamable HTTP transport.
 
@@ -252,7 +257,7 @@ backends:
 | `type` | Yes | `"streamable-http"` |
 | `url` | Yes | Streamable HTTP endpoint URL |
 | `headers` | No | Extra HTTP headers |
-| `auth` | No | Outgoing auth config (`static` or `oauth2`) |
+| `auth` | No | Outgoing auth config (`static`, `oauth2`, or `pkce`) |
 
 > Streamable HTTP backends must always set `type: streamable-http` explicitly.
 

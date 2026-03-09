@@ -658,6 +658,8 @@ Recognized flags (from `config/flags.py` defaults):
 | `outgoing_auth` | `true` | Enable outgoing authentication for backends |
 | `session_management` | `true` | Enable session management |
 | `yaml_config` | `true` | Enable YAML config file support |
+| `container_isolation` | `true` | Enable automatic container isolation for stdio backends |
+| `build_on_startup` | `true` | Build container images on server startup |
 
 Unknown flag names are accepted for future-proofing and default to `false`.
 Config file watching is always active when a config path is provided — it is

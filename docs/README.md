@@ -36,7 +36,7 @@ docs/
 ├── architecture/
 │   ├── 00-overview.md     ← High-level architecture
 │   ├── 01-server.md       ← Server & transport layer
-│   ├── 02-bridge.md       ← Bridge: routing, registry, forwarding
+│   ├── 02-bridge.md       ← Bridge: routing, registry, orchestration
 │   ├── 03-config.md       ← Config loading pipeline
 │   └── 04-runtime.md      ← Service lifecycle
 │
@@ -45,6 +45,9 @@ docs/
 │   ├── server.md          ← `argus-mcp server`
 │   ├── tui.md             ← `argus-mcp tui`
 │   └── secret.md          ← `argus-mcp secret`
+│
+│   Remaining subcommands (build, stop, status, clean): see
+│   `argus-mcp <command> --help` or the CLI overview.
 │
 ├── security/
 │   ├── README.md          ← Security overview

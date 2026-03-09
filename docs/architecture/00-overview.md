@@ -26,7 +26,7 @@ operational visibility — all through a single connection point.
                      │  │ API          │  │                  │  │
                      │  │ /manage/v1/  │  │ Registry         │  │
                      │  │              │  │ ClientManager    │  │
-                     │  │ Health       │  │ Forwarder        │  │
+                     │  │ Health       │  │ StartupCoord     │  │
                      │  │ Status       │  │ Optimizer        │  │
                      │  │ Backends     │  │ ConflictResolver │  │
                      │  │ Events       │  │ Filters          │  │
@@ -53,14 +53,21 @@ operational visibility — all through a single connection point.
 argus_mcp/
 ├── __init__.py
 ├── __main__.py          # python -m argus_mcp
-├── cli.py               # Entry point: server, tui, secret subcommands
+├── cli.py               # Entry point: server, build, stop, status, tui, secret, clean
 ├── constants.py         # Shared constants
 ├── errors.py            # Base exception hierarchy
+├── _error_utils.py      # Error formatting helpers
+├── _task_utils.py       # Asyncio task utilities
 ├── sessions.py          # Named detached-session registry (stop/status)
 │
 ├── config/              # Configuration system
 │   ├── loader.py        # JSON/YAML loading, validation
-│   ├── schema.py        # Pydantic config models
+│   ├── schema.py        # Top-level ArgusConfig Pydantic model
+│   ├── schema_backends.py  # Backend config models (stdio, SSE, streamable-http)
+│   ├── schema_client.py    # Client/TUI config models
+│   ├── schema_registry.py  # Registry config models
+│   ├── schema_security.py  # Auth, authz, secrets config models
+│   ├── schema_server.py    # Server & management config models
 │   ├── migration.py     # Legacy → v1 auto-migration
 │   ├── diff.py          # Config change detection
 │   ├── flags.py         # FeatureFlags
@@ -72,15 +79,21 @@ argus_mcp/
 │   ├── lifespan.py      # Startup/shutdown lifecycle
 │   ├── handlers.py      # MCP protocol handlers
 │   ├── transport.py     # SSE + Streamable HTTP transports
-│   ├── auth/            # Incoming authentication
-│   ├── authz/           # RBAC authorization
-│   ├── session/         # Client session tracking
-│   └── management/      # REST management API
+│   ├── origin.py        # Origin validation middleware (MCP spec)
+│   ├── state.py         # Server state management
+│   ├── auth/            # Incoming authentication (JWT, OIDC, local)
+│   ├── authz/           # RBAC authorization (engine + policies)
+│   ├── session/         # Client session tracking (manager + models)
+│   └── management/      # REST management API (router, schemas, auth)
 │
 ├── bridge/              # Backend connectivity layer
-│   ├── client_manager.py    # Backend connections
+│   ├── client_manager.py       # Backend connections lifecycle
 │   ├── capability_registry.py  # Capability aggregation
-│   ├── forwarder.py     # Request forwarding
+│   ├── backend_connection.py   # Backend connection helpers
+│   ├── startup_coordinator.py  # Startup orchestration & ordering
+│   ├── auth_discovery.py       # Non-blocking OAuth/OIDC auth discovery
+│   ├── transport_factory.py    # Transport creation factory
+│   ├── subprocess_utils.py     # Subprocess management utilities
 │   ├── conflict.py      # Conflict resolution
 │   ├── filter.py        # Capability filtering
 │   ├── rename.py        # Tool renaming
@@ -88,6 +101,11 @@ argus_mcp/
 │   ├── elicitation.py   # MCP elicitation support
 │   ├── version_checker.py  # Version drift detection
 │   ├── auth/            # Outgoing authentication
+│   │   ├── discovery.py     # OAuth/OIDC metadata discovery (RFC 9728)
+│   │   ├── pkce.py          # PKCE browser-based auth flow
+│   │   ├── provider.py      # Auth provider factory
+│   │   ├── store.py         # Token/credential storage
+│   │   └── token_cache.py   # Token caching and refresh
 │   ├── container/       # Container isolation for stdio backends
 │   │   ├── wrapper.py       # Main entry point — wrap_backend()
 │   │   ├── image_builder.py # Docker image build orchestration
@@ -101,9 +119,9 @@ argus_mcp/
 │   │       ├── uvx.dockerfile.j2  # Python/uvx backend Dockerfile
 │   │       ├── npx.dockerfile.j2  # Node.js/npx backend Dockerfile
 │   │       └── go.dockerfile.j2   # Go binary backend Dockerfile
-│   ├── health/          # Health checking
+│   ├── health/          # Health checking (checker + circuit breaker)
 │   ├── middleware/       # Request middleware chain
-│   └── optimizer/       # Tool optimizer (meta-tools)
+│   └── optimizer/       # Tool optimizer (meta-tools + search index)
 │
 ├── runtime/             # Service lifecycle
 │   ├── service.py       # ArgusService orchestration
@@ -117,7 +135,6 @@ argus_mcp/
 │   ├── store.py         # SecretStore facade
 │   ├── providers.py     # Env, File, Keyring providers
 │   └── resolver.py      # Config secret:name resolution
-│
 ├── skills/              # Skill packs
 │   ├── manifest.py      # SkillManifest model
 │   └── manager.py       # Install, enable, discover
@@ -128,14 +145,18 @@ argus_mcp/
 │   └── composite_tool.py # Workflow-as-tool wrapper
 │
 ├── telemetry/           # OpenTelemetry integration
+│   ├── config.py        # Telemetry configuration
 │   ├── metrics.py       # Counters, histograms
 │   └── tracing.py       # Span management
 │
 ├── registry/            # Server registry
-│   └── client.py        # Registry client
+│   ├── client.py        # Registry client
+│   ├── cache.py         # Registry cache
+│   └── models.py        # Registry data models
 │
 ├── display/             # Console output (headless mode)
-│   ├── console.py       # Status display
+│   ├── installer.py     # Backend startup progress display (Rich Live)
+│   ├── console.py       # General status display
 │   └── logging_config.py # File logging + secret redaction
 │
 └── tui/                 # Terminal UI (Textual)
@@ -160,12 +181,18 @@ CLI (main)
       → Load & validate config (JSON/YAML)
       → Resolve secrets (secret:name → values)
       → Create ArgusService
-        → ClientManager: connect to all backends
-          → For each stdio backend:
-            → Container wrapper: detect runtime, build image, pre-create container
-            → Wrap params: command becomes "docker start -ai <container_id>"
-          → For each SSE/HTTP backend:
-            → Connect directly (no container isolation)
+        → StartupCoordinator: sort backends (remotes first, then stdio)
+          → Phase 1: launch_remote_tasks()
+            → Concurrent (semaphore-gated, stagger 0.5s)
+            → For each SSE/HTTP backend:
+              → Auth discovery (RFC 9728): non-blocking, PKCE 630s timeout
+              → Connect transport
+          → Phase 2: build_and_connect_stdio()
+            → For each stdio backend:
+              → Container wrapper: detect runtime, build image, pre-create container
+              → Wrap params: command becomes "docker start -ai <container_id>"
+          → Phase 3: gather_remote_results()
+            → Await remote tasks, collect pass/fail
         → CapabilityRegistry: discover & aggregate capabilities
         → Apply conflict resolution, filters, renames
         → Build middleware chain

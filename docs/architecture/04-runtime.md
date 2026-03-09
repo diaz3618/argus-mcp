@@ -13,24 +13,28 @@ managing backend connections, and coordinating subsystems.
 1. Load and validate config file
 2. Resolve secret:name references via SecretStore
 3. Initialize ClientManager with backend configs
-4. Start all backend connections (parallel):
-   a. For stdio backends:
-      - Detect container runtime (Docker/Podman)
-      - Classify command (uvx/npx/go/docker/unknown)
-      - Build or reuse container image
-      - Pre-create container (docker create)
-      - Wrap StdioServerParameters to use "docker start -ai"
-   b. For SSE/HTTP backends:
-      - Connect directly to remote endpoint
-5. Build CapabilityRegistry from connected backends
-6. Apply conflict resolution, filters, renames
-7. Initialize subsystems:
+4. Start auth discovery (non-blocking asyncio.create_task)
+5. StartupCoordinator 3-phase backend initialization:
+   Phase 1 — Launch remote tasks:
+     - Sort backends by _TYPE_PRIORITY (streamable-http=0, sse=1, stdio=2)
+     - Start all remote backends (SSE + streamable-http) concurrently
+     - Respect STARTUP_CONCURRENCY limit with STARTUP_STAGGER_DELAY
+   Phase 2 — Build and connect stdio:
+     - Process stdio backends sequentially
+     - For each: detect runtime → classify command → build image → create container
+     - Wrap StdioServerParameters to use "docker start -ai"
+   Phase 3 — Gather remote results:
+     - Await all remote tasks from Phase 1
+     - Collect results and errors
+6. Build CapabilityRegistry from connected backends
+7. Apply conflict resolution, filters, renames
+8. Initialize subsystems:
    - AuditLogger (if enabled)
    - HealthChecker
    - GroupManager
    - ToolIndex (if optimizer enabled)
    - FeatureFlags
-8. Report status via console/display
+9. Report status via display/installer.py (Rich Live)
 ```
 
 ### Shutdown (`service.stop()`)
@@ -103,6 +107,8 @@ The service coordinates these subsystems:
 | Subsystem | Module | Role |
 |-----------|--------|------|
 | ClientManager | `bridge/client_manager.py` | Backend connections |
+| StartupCoordinator | `bridge/startup_coordinator.py` | 3-phase backend startup orchestration |
+| AuthDiscovery | `bridge/auth_discovery.py` | Non-blocking OAuth/OIDC provider discovery |
 | ContainerWrapper | `bridge/container/wrapper.py` | Container isolation for stdio backends |
 | CapabilityRegistry | `bridge/capability_registry.py` | Capability aggregation |
 | AuditLogger | `audit/logger.py` | Audit event recording |
