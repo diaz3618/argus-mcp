@@ -1,4 +1,4 @@
-"""Backend startup progress display.
+"""Backend startup progress display
 
 Color scheme (non-monotone):
 - **Python / uvx** — Blue family: bright_blue spinner, cyan name, blue status.
@@ -17,13 +17,8 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, TextIO
 
 from rich.console import Console, Group, RenderableType
-from rich.progress import (
-    Progress,
-    ProgressColumn,
-    SpinnerColumn,
-    Task,
-    TimeElapsedColumn,
-)
+from rich.live import Live
+from rich.spinner import Spinner
 from rich.text import Text
 
 # ── Phase enum (display-side, decoupled from runtime) ────────────────────
@@ -31,10 +26,10 @@ from rich.text import Text
 
 class DisplayPhase(str, Enum):
     PENDING = "pending"
-    BUILDING = "building"  # docker image build in progress
+    BUILDING = "building"
     INITIALIZING = "initializing"
-    DOWNLOADING = "downloading"  # docker pull / npm install
-    RETRYING = "retrying"  # automatic retry after failure
+    DOWNLOADING = "downloading"
+    RETRYING = "retrying"
     READY = "ready"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -170,117 +165,13 @@ _STYLES: Dict[RuntimeKind, _RuntimeStyle] = {
 }
 
 
-# ── Progress subclass: build-output aware ────────────────────────────────
-
-
-class _BuildAwareProgress(Progress):
-    """Progress that appends build-output lines below the task table.
-
-    Rich's ``Progress`` passes ``get_renderable=self.get_renderable`` to its
-    internal ``Live``, so ``Live.update()`` is effectively dead — the Live
-    auto-refresh always calls ``get_renderable()`` instead of reading
-    ``_renderable``.  This subclass hooks into that call so that docker
-    build output appears below the progress rows and is removed when the
-    build finishes.
-    """
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        self._extra_renderables: list[RenderableType] = []
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
-
-    def get_renderable(self) -> RenderableType:
-        table = super().get_renderable()
-        if self._extra_renderables:
-            return Group(table, *self._extra_renderables)
-        return table
-
-
-# ── Custom Rich column: status-aware spinner ────────────────────────────
-
-
-class _StatusSpinnerColumn(ProgressColumn):
-    """Spinner that shows animated dots while running, then a result icon.
-
-    While a task is active it renders Rich "dots" spinner coloured via
-    ``task.fields["spinner_style"]``.  Once the task is finished, it renders
-    ``task.fields["result_icon"]`` (checkmark or X) with the matching style.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._spinner = SpinnerColumn("dots")
-
-    def render(self, task: Task) -> Text:
-        fields = task.fields
-
-        if task.finished:
-            icon: str = fields.get("result_icon", "\u2713")
-            icon_style: str = fields.get("result_style", "bold bright_green")
-            return Text(f"  {icon}", style=icon_style)
-
-        # Delegate to the inner SpinnerColumn for the animated dots frame
-        spinner_text = self._spinner.render(task)
-        style_str: str = fields.get("spinner_style", "bold white")
-        result = Text("  ", style=style_str)
-        result.append(str(spinner_text))
-        return result
-
-
-# ── Custom Rich column: coloured backend name + tag ─────────────────────
-
-
-class _ColouredDescColumn(ProgressColumn):
-    """Renders ``Connecting <name> (<tag>): `` with per-task Rich styles.
-
-    During the BUILDING phase the verb changes to ``Deploying`` so the
-    user sees streaming build output under a deployment header.
-    """
-
-    def render(self, task: Task) -> Text:
-        fields = task.fields
-        name: str = fields.get("backend_name", task.description)
-        name_style: str = fields.get("name_style", "white")
-        tag_label: str = fields.get("tag_label", "")
-        tag_style: str = fields.get("tag_style", "dim")
-        verb: str = fields.get("desc_verb", "Connecting")
-
-        line = Text(f"{verb} ")
-        line.append(name, style=name_style)
-        line.append(" (")
-        line.append(tag_label, style=tag_style)
-        line.append("): ")
-        return line
-
-
-# ── Custom Rich column: phase status text ───────────────────────────────
-
-
-class _StatusTextColumn(ProgressColumn):
-    """Renders the current phase message (Pending / Initializing / Ready).
-
-    Long messages are truncated to ``max_width`` characters to prevent
-    line-wrapping that can cause Rich Live ghost-frame artifacts when the
-    progress table is taller than the terminal viewport.
-    """
-
-    max_width: int = 60
-
-    def render(self, task: Task) -> Text:
-        fields = task.fields
-        status_msg: str = fields.get("status_msg", "Pending...")
-        status_style: str = fields.get("current_status_style", "blue")
-        if len(status_msg) > self.max_width:
-            status_msg = status_msg[: self.max_width - 1] + "\u2026"
-        return Text(status_msg, style=status_style, no_wrap=True)
-
-
 # ── Backend display entry ────────────────────────────────────────────────
 
 
 class _BackendEntry:
-    """Tracks state for one backend in the Rich progress table."""
+    """Tracks state for one backend in the display."""
 
-    __slots__ = ("name", "runtime", "style", "phase", "message", "start_time", "task_id")
+    __slots__ = ("name", "runtime", "style", "phase", "message", "start_time")
 
     def __init__(self, name: str, runtime: RuntimeKind) -> None:
         self.name = name
@@ -288,8 +179,7 @@ class _BackendEntry:
         self.style = _STYLES.get(runtime, _STYLES[RuntimeKind.UNKNOWN])
         self.phase = DisplayPhase.PENDING
         self.message = "Pending..."
-        self.start_time = time.monotonic()
-        self.task_id: Any = None  # Rich TaskID, set during render_initial
+        self.start_time: float = 0.0  # set on first non-PENDING phase
 
 
 # ── Main display class ──────────────────────────────────────────────────
@@ -298,6 +188,10 @@ class _BackendEntry:
 class InstallerDisplay:
     """Progress display for MCP backend connections.
 
+    Uses Rich ``Live`` with ``Group`` rendering to show one active backend
+    at a time (spinner + build output), collapsing finished backends to a
+    single status line.  This matches the prototype visual model.
+
     Parameters
     ----------
     backends : dict
@@ -305,6 +199,8 @@ class InstallerDisplay:
     stream : TextIO
         Output stream (default ``sys.stderr`` to keep stdout clean for MCP
         JSON-RPC transport).
+    verbose : bool
+        Higher refresh rate when ``True``.
     """
 
     def __init__(
@@ -316,11 +212,16 @@ class InstallerDisplay:
         self._console = Console(stderr=True, file=stream)
         self._entries: Dict[str, _BackendEntry] = {}
         self._ordered: List[_BackendEntry] = []
-        self._progress: Optional[_BuildAwareProgress] = None
+        self._live: Optional[Live] = None
         self._finalized = False
         self._build_lines: Dict[str, List[str]] = {}
         self._max_build_lines = 15
         self._verbose = verbose
+
+        # Sequential expand/collapse state
+        self._completed_lines: List[str] = []
+        self._active_name: Optional[str] = None
+        self._active_spinner: Optional[Spinner] = None
 
         for name, conf in backends.items():
             runtime = detect_runtime(conf)
@@ -328,11 +229,40 @@ class InstallerDisplay:
             self._entries[name] = entry
             self._ordered.append(entry)
 
+    # ── Rendering ────────────────────────────────────────────────────
+
+    def _build_renderable(self) -> RenderableType:
+        """Build the Group of completed lines + active spinner + build output."""
+        parts: List[RenderableType] = []
+
+        for line in self._completed_lines:
+            parts.append(Text.from_markup(line))
+
+        if self._active_name is not None and self._active_spinner is not None:
+            if parts:
+                parts.append(Text(""))
+            parts.append(self._active_spinner)
+
+            lines = self._build_lines.get(self._active_name, [])
+            if lines:
+                visible = lines[-self._max_build_lines :]
+                for ln in visible:
+                    parts.append(Text(f"    {ln}", style="dim"))
+
+        if not parts:
+            parts.append(Text(""))
+
+        return Group(*parts)
+
+    def _refresh(self) -> None:
+        """Push the current renderable to the Live display."""
+        if self._live is not None:
+            self._live.update(self._build_renderable())
+
     # ── Public API ───────────────────────────────────────────────────
 
     def _build_runtime_summary(self) -> str:
         """Return a Rich-formatted summary of runtime-type counts."""
-        total = len(self._ordered)
         npx_count = sum(
             1 for e in self._ordered if e.runtime in (RuntimeKind.NPX, RuntimeKind.NODE)
         )
@@ -341,6 +271,7 @@ class InstallerDisplay:
         )
         docker_count = sum(1 for e in self._ordered if e.runtime == RuntimeKind.DOCKER)
         remote_count = sum(1 for e in self._ordered if e.runtime == RuntimeKind.REMOTE)
+        total = len(self._ordered)
         other_count = total - npx_count - uvx_count - docker_count - remote_count
 
         parts: List[str] = []
@@ -357,7 +288,7 @@ class InstallerDisplay:
         return ", ".join(parts)
 
     def render_initial(self) -> None:
-        """Print the header and start the Rich Progress live display."""
+        """Print the header and start the Rich Live display."""
         total = len(self._ordered)
         if total == 0:
             return
@@ -365,138 +296,60 @@ class InstallerDisplay:
         summary = self._build_runtime_summary()
         self._console.print(f"\n[bold]Backend operations:[/bold] {total} connections ({summary})\n")
 
-        # Build the Rich Progress display with custom columns.
         fps = 12 if self._verbose else 4
-        self._progress = _BuildAwareProgress(
-            _StatusSpinnerColumn(),
-            _ColouredDescColumn(),
-            _StatusTextColumn(),
-            TimeElapsedColumn(),
+        self._live = Live(
+            Text(""),
             console=self._console,
-            transient=False,
-            redirect_stdout=False,
-            redirect_stderr=False,
             refresh_per_second=fps,
         )
-        self._progress.start()
+        self._live.start()
 
-        # Add a task per backend
-        for entry in self._ordered:
-            style = entry.style
-            task_id = self._progress.add_task(
-                entry.name,
-                total=1,
-                completed=0,
-                backend_name=entry.name,
-                spinner_style=style.spinner_style,
-                name_style=style.name_style,
-                tag_label=style.label,
-                tag_style=style.tag_style,
-                status_msg="Pending...",
-                current_status_style=style.status_style,
-                result_icon="\u2713",  # ✓
-                result_style="bold bright_green",
-            )
-            entry.task_id = task_id
-
-    def _update_live_renderable(self) -> None:
-        """Refresh the Live renderable to include/exclude build output.
-
-        Only shows build output for the MOST recently updated backend so
-        that the display stays clean with one active build at a time
-        (matching the prototype).
-        """
-        if self._progress is None:
-            return
-        active = {n: lines for n, lines in self._build_lines.items() if lines}
-        if active:
-            # Show only the most recently updated backend's build output.
-            # Since builds are sequential, the last key is the active one.
-            last_name = list(active.keys())[-1]
-            lines = active[last_name]
-            visible = lines[-self._max_build_lines :]
-            text = Text()
-            for ln in visible:
-                text.append(f"    {ln}\n", style="dim")
-            self._progress._extra_renderables = [text]
-        else:
-            self._progress._extra_renderables = []
-
-    def _apply_building_phase(self, name: str, entry: _BackendEntry) -> None:
-        """Handle BUILDING phase: stream docker build output."""
-        if entry.message:
-            lines = self._build_lines.setdefault(name, [])
-            if not lines:
-                lines.append(f"$ docker build -t argus-mcp-{name} .")
-                lines.append("")
-            lines.append(entry.message)
-            if len(lines) > 200:
-                del lines[:100]
-        if self._progress is not None:
-            self._progress.update(
-                entry.task_id,
-                status_msg="Building image\u2026",
-                current_status_style="bright_yellow",
-                spinner_style="bold bright_yellow",
-                desc_verb="Deploying",
-            )
-        self._update_live_renderable()
-
-    def _apply_phase_render(self, name: str, entry: _BackendEntry) -> None:
-        """Apply phase-specific progress bar updates for *entry*."""
-        assert self._progress is not None  # caller guarantees
-
+    def _collapse_to_completed(self, name: str, entry: _BackendEntry) -> None:
+        """Collapse a finished backend into a single completed line."""
+        elapsed = time.monotonic() - entry.start_time if entry.start_time else 0.0
+        mins, secs = divmod(int(elapsed), 60)
         style = entry.style
 
+        label = f"Connecting {name} ({style.label}):"
+
         if entry.phase == DisplayPhase.READY:
-            self._progress.update(
-                entry.task_id,
-                completed=1,
-                status_msg="Ready",
-                current_status_style="green",
-                result_icon="\u2713",
-                result_style="bold bright_green",
-            )
+            icon = "[bold bright_green]\u2713[/]"
+            status = "Ready"
         elif entry.phase == DisplayPhase.FAILED:
-            msg = entry.message or "Failed"
-            self._progress.update(
-                entry.task_id,
-                completed=1,
-                status_msg=msg,
-                current_status_style="red",
-                result_icon="\u2717",
-                result_style="bold red",
-            )
-        elif entry.phase == DisplayPhase.BUILDING:
-            self._apply_building_phase(name, entry)
-        elif entry.phase == DisplayPhase.DOWNLOADING:
-            msg = entry.message or "Downloading..."
-            self._progress.update(
-                entry.task_id,
-                status_msg=msg,
-                current_status_style=style.status_style,
-            )
-        elif entry.phase == DisplayPhase.RETRYING:
-            msg = entry.message or "Retrying..."
-            self._progress.update(
-                entry.task_id,
-                completed=0,
-                status_msg=msg,
-                current_status_style="yellow",
-                spinner_style="bold yellow",
-            )
-        elif entry.phase == DisplayPhase.INITIALIZING:
-            msg = entry.message or "Initializing..."
-            self._progress.update(
-                entry.task_id,
-                status_msg=msg,
-                current_status_style=style.status_style,
+            icon = "[bold red]\u2717[/]"
+            status = entry.message or "Failed"
+        else:
+            icon = "[dim]-[/]"
+            status = "Skipped"
+
+        line = f"  {icon} [{style.name_style}]{label:<42}[/] {status} 0:{mins:02d}:{secs:02d}"
+        self._completed_lines.append(line)
+
+        # Clear active state if this was the active backend
+        self._build_lines.pop(name, None)
+        if self._active_name == name:
+            self._active_name = None
+            self._active_spinner = None
+
+    def _set_active(self, name: str, entry: _BackendEntry) -> None:
+        """Make *name* the active backend with an appropriate spinner."""
+        self._active_name = name
+        style = entry.style
+
+        if entry.phase == DisplayPhase.BUILDING:
+            header = f" [bold]Deploying[/] [{style.name_style}]{name}[/] ({style.label})"
+            self._active_spinner = Spinner(
+                "dots",
+                text=Text.from_markup(header),
+                style="yellow",
             )
         else:
-            self._progress.update(
-                entry.task_id,
-                status_msg=entry.message or "Pending...",
-                current_status_style=style.status_style,
+            msg = entry.message or f"{entry.phase.value.title()}..."
+            header = f" [bold]Connecting[/] [{style.name_style}]{name}[/] ({style.label}): {msg}"
+            self._active_spinner = Spinner(
+                "dots",
+                text=Text.from_markup(header),
+                style=style.spinner_style,
             )
 
     def update(
@@ -508,19 +361,19 @@ class InstallerDisplay:
     ) -> None:
         """Update a backend's display state."""
         entry = self._entries.get(name)
-        if entry is None or self._finalized or self._progress is None:
+        if entry is None or self._finalized or self._live is None:
             return
 
+        # Parse the new phase
         if phase is not None:
             try:
                 new_phase = DisplayPhase(phase)
                 # Clear build output when leaving BUILDING phase
                 if new_phase != DisplayPhase.BUILDING and name in self._build_lines:
                     del self._build_lines[name]
-                    self._update_live_renderable()
-                    # Reset the description verb back to "Connecting"
-                    if self._progress is not None and entry.task_id is not None:
-                        self._progress.update(entry.task_id, desc_verb="Connecting")
+                # Record the start time on first non-PENDING phase
+                if entry.phase == DisplayPhase.PENDING and new_phase != DisplayPhase.PENDING:
+                    entry.start_time = time.monotonic()
                 entry.phase = new_phase
             except ValueError:
                 pass
@@ -528,38 +381,50 @@ class InstallerDisplay:
         if message is not None:
             entry.message = message
 
-        self._apply_phase_render(name, entry)
+        # ── Terminal phases: collapse to completed line ───────────
+        if entry.phase in (DisplayPhase.READY, DisplayPhase.FAILED):
+            self._collapse_to_completed(name, entry)
+            self._refresh()
+            return
+
+        # ── BUILDING phase: accumulate build output ──────────────
+        if entry.phase == DisplayPhase.BUILDING:
+            if entry.message:
+                lines = self._build_lines.setdefault(name, [])
+                if not lines:
+                    lines.append(f"$ docker build -t argus-mcp-{name} .")
+                    lines.append("")
+                lines.append(entry.message)
+                if len(lines) > 200:
+                    del lines[:100]
+
+        # ── Set this backend as the active one ───────────────────
+        self._set_active(name, entry)
+        self._refresh()
 
     def finalize(self) -> None:
-        """Stop the Rich live display and print a summary line."""
+        """Stop the Rich Live display and print a summary line."""
         if self._finalized:
             return
         self._finalized = True
 
-        # Clear any leftover build output before stopping
         self._build_lines.clear()
+        self._active_name = None
+        self._active_spinner = None
 
-        # Force-finish any still-pending tasks so spinners stop.
-        # Wrap in BrokenPipeError guard — stdout may already be closed
-        # if the server was started via `timeout` or piped to a pager.
+        # Collapse any remaining non-terminal backends as skipped
+        for entry in self._ordered:
+            if entry.phase not in (DisplayPhase.READY, DisplayPhase.FAILED):
+                entry.phase = DisplayPhase.SKIPPED
+                self._collapse_to_completed(entry.name, entry)
+
         try:
-            if self._progress is not None:
-                self._progress._extra_renderables = []
-                for entry in self._ordered:
-                    if entry.task_id is not None:
-                        task_obj = self._progress.tasks[entry.task_id]
-                        if not task_obj.finished:
-                            self._progress.update(
-                                entry.task_id,
-                                completed=1,
-                                status_msg="Skipped",
-                                current_status_style="dim",
-                                result_icon="-",
-                                result_style="dim",
-                            )
-                self._progress.stop()
+            if self._live is not None:
+                # Final refresh with all backends collapsed
+                self._live.update(self._build_renderable())
+                self._live.stop()
         except (BrokenPipeError, SystemExit):
-            pass  # stdout closed — nothing to display
+            pass
 
         ready = sum(1 for e in self._ordered if e.phase == DisplayPhase.READY)
         failed = sum(1 for e in self._ordered if e.phase == DisplayPhase.FAILED)
@@ -577,7 +442,7 @@ class InstallerDisplay:
                     f"[/bold bright_red]  [red]({failed} failed)[/red]\n"
                 )
         except (BrokenPipeError, SystemExit):
-            pass  # stdout closed — nothing to display
+            pass
 
     def make_callback(self) -> Callable[..., None]:
         """Return a callback suitable for ClientManager progress reporting.
