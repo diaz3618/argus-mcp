@@ -280,6 +280,12 @@ async def try_auth_discovery(
             "[%s] OAuth PKCE auth succeeded — token stored for retry.",
             svr_name,
         )
+        if progress_cb is not None:
+            progress_cb(
+                svr_name,
+                "initializing",
+                "Authentication successful — preparing retry\u2026",
+            )
         return True
 
     except (Exception, asyncio.CancelledError) as exc:  # noqa: BLE001

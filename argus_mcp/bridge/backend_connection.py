@@ -67,6 +67,34 @@ def record_failure(
         progress_cb(svr_name, "failed", msg)
 
 
+def record_auth_pending_or_failure(
+    svr_name: str,
+    record: Any,
+    msg: str,
+    auth_discovery_tasks: Dict[str, "asyncio.Task[Any]"],
+    progress_cb: Optional[Callable[..., None]],
+) -> None:
+    """Keep INITIALIZING when auth discovery is running, else mark FAILED.
+
+    When a PKCE browser flow is in progress, the backend should show a
+    spinner (INITIALIZING) rather than collapsing to a permanent ``\u2717``
+    line.  The retry loop will wait for the auth task and produce the
+    real ``\u2713`` / ``\u2717`` once the outcome is known.
+    """
+    auth_task = auth_discovery_tasks.get(svr_name)
+    if auth_task is not None and not auth_task.done():
+        from argus_mcp.runtime.models import BackendPhase
+
+        try:
+            record.transition(BackendPhase.INITIALIZING, msg)
+        except ValueError:
+            pass
+        if progress_cb is not None:
+            progress_cb(svr_name, "initializing", msg)
+    else:
+        record_failure(svr_name, record, msg, progress_cb)
+
+
 # ── Error handlers ───────────────────────────────────────────────────────
 
 
@@ -438,7 +466,13 @@ async def start_backend_svr(
             discovered_auth,
             progress_cb,
         )
-        record_failure(svr_name, record, reason, progress_cb)
+        record_auth_pending_or_failure(
+            svr_name,
+            record,
+            reason,
+            auth_discovery_tasks,
+            progress_cb,
+        )
         return False
 
     except BaseException as e_start:  # noqa: BLE001
@@ -452,5 +486,11 @@ async def start_backend_svr(
             discovered_auth,
             progress_cb,
         )
-        record_failure(svr_name, record, reason, progress_cb)
+        record_auth_pending_or_failure(
+            svr_name,
+            record,
+            reason,
+            auth_discovery_tasks,
+            progress_cb,
+        )
         return False

@@ -184,8 +184,31 @@ async def await_auth_discoveries(
                             "[%s] Auth discovery completed — will retry with credentials.",
                             n,
                         )
+                        if progress_cb is not None:
+                            progress_cb(
+                                n,
+                                "initializing",
+                                "Authenticated — retrying connection\u2026",
+                            )
+                    else:
+                        logger.info(
+                            "[%s] Auth discovery finished without credentials.",
+                            n,
+                        )
+                        if progress_cb is not None:
+                            progress_cb(
+                                n,
+                                "initializing",
+                                "Authentication incomplete — retrying\u2026",
+                            )
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Auth discovery failed for '%s': %s", n, exc)
+                    if progress_cb is not None:
+                        progress_cb(
+                            n,
+                            "initializing",
+                            f"Auth discovery error: {exc}",
+                        )
     except Exception as exc:  # noqa: BLE001
         logger.debug("Error while waiting for auth discovery tasks: %s", exc)
 
