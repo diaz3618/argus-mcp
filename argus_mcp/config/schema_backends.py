@@ -104,6 +104,13 @@ class OAuth2AuthConfig(BaseModel):
     client_id: str = Field(..., min_length=1)
     client_secret: str = Field(..., min_length=1, description="Supports ${ENV_VAR}.")
     scopes: List[str] = Field(default_factory=list)
+    token_expiry_buffer_seconds: float = Field(
+        default=300.0,
+        ge=0,
+        description=(
+            "Seconds before token expiry to trigger proactive refresh. Default 300 (5 min)."
+        ),
+    )
 
 
 class PKCEAuthConfig(BaseModel):
@@ -122,6 +129,13 @@ class PKCEAuthConfig(BaseModel):
         default="", description="Optional client secret. Supports ${ENV_VAR}."
     )
     scopes: List[str] = Field(default_factory=list)
+    token_expiry_buffer_seconds: float = Field(
+        default=300.0,
+        ge=0,
+        description=(
+            "Seconds before token expiry to trigger proactive refresh. Default 300 (5 min)."
+        ),
+    )
 
 
 AuthConfig = Annotated[

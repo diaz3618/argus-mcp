@@ -183,6 +183,7 @@ class PKCEAuthProvider(AuthProvider):
         client_secret: str = "",
         scopes: Optional[List[str]] = None,
         token_dir: Optional[str] = None,
+        expiry_buffer: float = 60.0,
     ) -> None:
         self._backend_name = backend_name
         self._auth_endpoint = authorization_endpoint
@@ -190,7 +191,7 @@ class PKCEAuthProvider(AuthProvider):
         self._client_id = client_id
         self._client_secret = client_secret
         self._scopes = scopes or []
-        self._cache = TokenCache(expiry_buffer=60.0)
+        self._cache = TokenCache(expiry_buffer=expiry_buffer)
         self._lock = asyncio.Lock()
         self._token_dir = token_dir
 
@@ -299,11 +300,15 @@ def create_auth_provider(
         {"type": "static", "headers": {"Authorization": "Bearer $TOKEN"}}
 
         {"type": "oauth2", "token_url": "…", "client_id": "…",
-         "client_secret": "…", "scopes": ["read"]}
+         "client_secret": "…", "scopes": ["read"],
+         "token_expiry_buffer_seconds": 300}
 
         {"type": "pkce", "authorization_endpoint": "…",
          "token_endpoint": "…", "client_id": "…",
-         "scopes": ["openid"]}
+         "scopes": ["openid"],
+         "token_expiry_buffer_seconds": 300}
+
+    ``token_expiry_buffer_seconds`` defaults to 300 (5 min) when absent.
 
     Raises :class:`ValueError` for unknown types or missing keys.
     """
@@ -323,6 +328,7 @@ def create_auth_provider(
             client_id=auth_cfg["client_id"],
             client_secret=auth_cfg["client_secret"],
             scopes=auth_cfg.get("scopes", []),
+            expiry_buffer=float(auth_cfg.get("token_expiry_buffer_seconds", 300.0)),
         )
 
     if auth_type == "pkce":
@@ -337,6 +343,7 @@ def create_auth_provider(
             client_secret=auth_cfg.get("client_secret", ""),
             scopes=auth_cfg.get("scopes", []),
             token_dir=auth_cfg.get("token_dir"),
+            expiry_buffer=float(auth_cfg.get("token_expiry_buffer_seconds", 300.0)),
         )
 
     raise ValueError(f"Unknown auth type: {auth_type!r}")
