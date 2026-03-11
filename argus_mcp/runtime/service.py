@@ -637,7 +637,7 @@ class ArgusService:
                 "error": f"Backend '{name}' not found in configuration.",
             }
 
-        timeout = RECONNECT_TIMEOUT
+        timeout: float = RECONNECT_TIMEOUT
         if self._config_path:
             try:
                 cfg = load_argus_config(self._config_path)
@@ -681,6 +681,7 @@ class ArgusService:
             backend=name,
         )
         await self._disconnect_backend(name)
+        assert self._config_data is not None  # guard: caller checks
         success = await self._connect_backend(name, self._config_data[name])
 
         if success:
