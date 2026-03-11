@@ -371,6 +371,17 @@ class ArgusService:
                 f"Backend connections: {self._backends_connected}/{self._backends_total} active.",
             )
 
+            # --- Start background token refresh service -------------------
+            try:
+                full_cfg = load_argus_config(self._config_path)
+                server_settings = full_cfg.server
+                self._manager.start_refresh_service(
+                    enabled=server_settings.auth_background_refresh_enabled,
+                    interval=server_settings.auth_background_refresh_interval_seconds,
+                )
+            except Exception:  # noqa: BLE001
+                logger.debug("Could not start background token refresh.", exc_info=True)
+
             # --- Phase 3: Discover capabilities ---------------------------
             if self._backends_connected > 0:
                 logger.info("Discovering capabilities...")

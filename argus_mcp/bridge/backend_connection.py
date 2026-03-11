@@ -332,6 +332,7 @@ async def connect_backend(
     devnull: Any,
     discovered_auth: Dict[str, Dict[str, Any]],
     progress_cb: Optional[Callable[..., None]],
+    auth_providers: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Inner connection logic (spawn transport + MCP init).
 
@@ -341,6 +342,10 @@ async def connect_backend(
     from argus_mcp.runtime.models import BackendPhase
 
     provider = await ad.resolve_auth_provider(svr_name, svr_conf, discovered_auth)
+
+    # Store auth provider for background refresh.
+    if provider is not None and auth_providers is not None:
+        auth_providers[svr_name] = provider
 
     # Build httpx.Auth wrapper when the backend has an auth provider.
     auth: "httpx.Auth | None" = None
@@ -405,6 +410,7 @@ async def start_backend_svr(
     auth_discovery_tasks: Dict[str, "asyncio.Task[Any]"],
     progress_cb: Optional[Callable[..., None]],
     shutdown_requested: bool,
+    auth_providers: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Start and initialize a single backend server connection."""
     svr_type = svr_conf.get("type")
@@ -447,6 +453,7 @@ async def start_backend_svr(
                 devnull,
                 discovered_auth,
                 progress_cb,
+                auth_providers=auth_providers,
             )
         else:
             await asyncio.wait_for(
@@ -460,6 +467,7 @@ async def start_backend_svr(
                     devnull,
                     discovered_auth,
                     progress_cb,
+                    auth_providers=auth_providers,
                 ),
                 timeout=startup_timeout,
             )

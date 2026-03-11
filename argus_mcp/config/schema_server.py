@@ -30,6 +30,19 @@ class ServerSettings(BaseModel):
     port: int = Field(default=9000, ge=1, le=65535)
     transport: Literal["sse", "streamable-http"] = "streamable-http"
     management: ManagementSettings = Field(default_factory=ManagementSettings)
+    auth_background_refresh_enabled: bool = Field(
+        default=True,
+        description=(
+            "Enable a background task that proactively refreshes OAuth tokens "
+            "for all backends before they expire."
+        ),
+    )
+    auth_background_refresh_interval_seconds: float = Field(
+        default=60.0,
+        ge=5,
+        le=3600,
+        description="Interval in seconds between background token refresh sweeps.",
+    )
 
     @field_validator("transport", mode="before")
     @classmethod

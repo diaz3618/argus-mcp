@@ -38,6 +38,8 @@ class ClientManager:
         self._shutdown_requested: bool = False
         self._discovered_auth: Dict[str, Dict[str, Any]] = {}
         self._auth_discovery_tasks: Dict[str, asyncio.Task[Any]] = {}
+        self._auth_providers: Dict[str, Any] = {}
+        self._refresh_service: Optional[Any] = None
         logger.info("ClientManager initialized.")
 
     def cancel_startup(self) -> None:
@@ -75,6 +77,7 @@ class ClientManager:
             auth_discovery_tasks=self._auth_discovery_tasks,
             progress_cb=self._progress_cb,
             shutdown_requested=self._shutdown_requested,
+            auth_providers=self._auth_providers,
         )
 
     async def _pre_build_container_image(self, svr_name: str, svr_conf: Dict[str, Any]) -> None:
@@ -101,6 +104,43 @@ class ClientManager:
             progress_callback=progress_callback,
             shutdown_requested_fn=lambda: self._shutdown_requested,
         )
+
+    # ── Background token refresh ─────────────────────────────────────
+
+    def start_refresh_service(
+        self,
+        *,
+        enabled: bool = True,
+        interval: float = 60.0,
+    ) -> None:
+        """Start the background token refresh service.
+
+        Parameters
+        ----------
+        enabled:
+            If ``False`` the service is not started (config opt-out).
+        interval:
+            Seconds between refresh sweeps.
+        """
+        if not enabled:
+            logger.info("Background token refresh disabled by configuration.")
+            return
+        if not self._auth_providers:
+            logger.debug("No auth providers registered — skipping refresh service.")
+            return
+        from argus_mcp.bridge.auth.refresh_service import AuthRefreshService
+
+        self._refresh_service = AuthRefreshService(
+            self._auth_providers,
+            interval=interval,
+        )
+        self._refresh_service.start()
+
+    async def _stop_refresh_service(self) -> None:
+        """Stop the background refresh service if running."""
+        if self._refresh_service is not None:
+            await self._refresh_service.stop()
+            self._refresh_service = None
 
     async def _cancel_pending_startup_tasks(self) -> None:
         """Cancel and await all pending backend startup tasks."""
@@ -155,11 +195,15 @@ class ClientManager:
                 except ValueError:
                     pass
 
+        # Stop background token refresh before tearing down connections.
+        await self._stop_refresh_service()
+
         await self._cancel_pending_startup_tasks()
         await self._close_backend_stacks()
         await self._close_global_exit_stack()
 
         self._sessions.clear()
+        self._auth_providers.clear()
 
         # Remove any pre-created Docker containers
         try:
@@ -227,6 +271,7 @@ class ClientManager:
             )
 
         self._sessions.pop(name, None)
+        self._auth_providers.pop(name, None)
 
     def get_session(self, svr_name: str) -> Optional[ClientSession]:
         """Get an active backend session by server name."""
