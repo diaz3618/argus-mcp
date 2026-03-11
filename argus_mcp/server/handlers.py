@@ -14,6 +14,12 @@ from argus_mcp.bridge.optimizer.meta_tools import (
     META_TOOLS,
 )
 from argus_mcp.errors import BackendServerError
+from argus_mcp.server.auth_context import (
+    current_auth_token,
+    current_client_ip,
+    current_session_id,
+    current_user,
+)
 from argus_mcp.server.state import get_state
 
 logger = logging.getLogger(__name__)
@@ -30,10 +36,28 @@ async def _dispatch(
     chain = state.middleware_chain
     if chain is None:
         raise RuntimeError("Middleware chain is not initialised on the MCP server instance.")
+
+    # Populate metadata from ASGI auth context (set by transport auth gate)
+    metadata: Dict[str, Any] = {}
+    user = current_user.get()
+    if user is not None:
+        metadata["user"] = user
+        metadata["user_subject"] = user.subject
+    token = current_auth_token.get()
+    if token is not None:
+        metadata["auth_token"] = token
+    session_id = current_session_id.get()
+    if session_id is not None:
+        metadata["session_id"] = session_id
+    client_ip = current_client_ip.get()
+    if client_ip is not None:
+        metadata["client_ip"] = client_ip
+
     ctx = RequestContext(
         capability_name=cap_name,
         mcp_method=mcp_method,
         arguments=arguments,
+        metadata=metadata,
     )
     result = await chain(ctx)
     if ctx.error is not None:

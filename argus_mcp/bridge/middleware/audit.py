@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from argus_mcp.audit.models import AuditEvent, AuditOutcome, AuditTarget
+from argus_mcp.audit.models import AuditEvent, AuditOutcome, AuditSource, AuditTarget
 from argus_mcp.bridge.middleware.chain import RequestContext
 
 logger = logging.getLogger("argus_mcp.audit")
@@ -58,6 +58,11 @@ class AuditMiddleware:
             event = AuditEvent(
                 event_id=ctx.request_id,
                 event_type="mcp_operation",
+                source=AuditSource(
+                    session_id=ctx.metadata.get("session_id"),
+                    client_ip=ctx.metadata.get("client_ip"),
+                    user_id=ctx.metadata.get("user_subject"),
+                ),
                 target=AuditTarget(
                     backend=ctx.server_name,
                     method=ctx.mcp_method,

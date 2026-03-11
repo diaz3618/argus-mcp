@@ -23,7 +23,7 @@ from argus_mcp.bridge.health import HealthChecker
 from argus_mcp.config import load_and_validate_config
 from argus_mcp.config.diff import compute_diff
 from argus_mcp.config.loader import load_argus_config
-from argus_mcp.constants import SERVER_NAME, SERVER_VERSION, SHUTDOWN_TIMEOUT
+from argus_mcp.constants import RECONNECT_TIMEOUT, SERVER_NAME, SERVER_VERSION, SHUTDOWN_TIMEOUT
 from argus_mcp.errors import BackendServerError
 from argus_mcp.runtime.models import (
     BackendInfo,
@@ -64,9 +64,7 @@ class ArgusService:
         await service.stop()
     """
 
-    # ------------------------------------------------------------------ #
-    #  Initialisation
-    # ------------------------------------------------------------------ #
+    # ── Initialisation ──────────────────────────────────────────────
 
     def __init__(self) -> None:
         self._state: ServiceState = ServiceState.PENDING
@@ -106,9 +104,7 @@ class ArgusService:
 
         logger.info("ArgusService initialized (state=%s).", self._state.value)
 
-    # ------------------------------------------------------------------ #
-    #  Properties
-    # ------------------------------------------------------------------ #
+    # ── Properties ─────────────────────────────────────────────────
 
     @property
     def state(self) -> ServiceState:
@@ -172,9 +168,7 @@ class ArgusService:
     def is_running(self) -> bool:
         return self._state == ServiceState.RUNNING
 
-    # ------------------------------------------------------------------ #
-    #  State Machine
-    # ------------------------------------------------------------------ #
+    # ── State Machine ──────────────────────────────────────────────
 
     def _build_registry(self) -> CapabilityRegistry:
         """Create a new CapabilityRegistry with the current conflict strategy."""
@@ -238,12 +232,15 @@ class ArgusService:
         rename_maps: Dict[str, RenameMap] = {}
         for name, backend in full_cfg.backends.items():
             if backend.tool_overrides:
-                rename_maps[name] = RenameMap(
-                    overrides={
-                        k: {"name": v.name or "", "description": v.description or ""}
-                        for k, v in backend.tool_overrides.items()
-                    }
-                )
+                overrides: Dict[str, Dict[str, str]] = {}
+                for k, v in backend.tool_overrides.items():
+                    entry: Dict[str, str] = {}
+                    if v.name is not None:
+                        entry["name"] = v.name
+                    if v.description is not None:
+                        entry["description"] = v.description
+                    overrides[k] = entry
+                rename_maps[name] = RenameMap(overrides=overrides)
         return rename_maps
 
     @staticmethod
@@ -283,9 +280,7 @@ class ArgusService:
             severity="info",
         )
 
-    # ------------------------------------------------------------------ #
-    #  Lifecycle: start
-    # ------------------------------------------------------------------ #
+    # ── Lifecycle: start ───────────────────────────────────────────
 
     async def start(
         self,
@@ -428,9 +423,7 @@ class ArgusService:
             self._ready_event.clear()
             raise
 
-    # ------------------------------------------------------------------ #
-    #  Lifecycle: stop
-    # ------------------------------------------------------------------ #
+    # ── Lifecycle: stop ────────────────────────────────────────────
 
     async def stop(self) -> None:
         """Execute the full shutdown sequence.
@@ -480,9 +473,7 @@ class ArgusService:
         finally:
             self._ready_event.clear()
 
-    # ------------------------------------------------------------------ #
-    #  Lifecycle: reload
-    # ------------------------------------------------------------------ #
+    # ── Lifecycle: reload ──────────────────────────────────────────
 
     async def reload(self) -> Dict[str, Any]:
         """Hot-reload config: re-read from disk, diff, and reconnect changed backends.
@@ -623,14 +614,14 @@ class ArgusService:
         if has_errors:
             logger.warning("Auto-reload completed with errors: %s", result["errors"])
 
-    # ------------------------------------------------------------------ #
-    #  Lifecycle: reconnect single backend
-    # ------------------------------------------------------------------ #
+    # ── Lifecycle: reconnect single backend ────────────────────────
 
     async def reconnect_backend(self, name: str) -> Dict[str, Any]:
         """Disconnect and reconnect a single backend by name.
 
         Returns a dict with keys: name, reconnected, error.
+        Applies a configurable timeout (``server.management.reconnect_timeout``
+        in config, falling back to :data:`RECONNECT_TIMEOUT`).
         """
         if self._state != ServiceState.RUNNING:
             return {
@@ -646,46 +637,75 @@ class ArgusService:
                 "error": f"Backend '{name}' not found in configuration.",
             }
 
+        timeout = RECONNECT_TIMEOUT
+        if self._config_path:
+            try:
+                cfg = load_argus_config(self._config_path)
+                if cfg.server.management.reconnect_timeout is not None:
+                    timeout = cfg.server.management.reconnect_timeout
+            except Exception:  # noqa: BLE001
+                pass  # fall back to constant
+
         async with self._reload_lock:
             try:
-                self.emit_event(
-                    "backend_disconnected",
-                    f"Reconnecting backend '{name}'...",
-                    backend=name,
+                return await asyncio.wait_for(
+                    self._do_reconnect(name),
+                    timeout=timeout,
                 )
-                await self._disconnect_backend(name)
-                success = await self._connect_backend(name, self._config_data[name])
-
-                if success:
-                    # Re-discover capabilities
-                    active_sessions = self._manager.get_all_sessions()
-                    self._registry = self._build_registry()
-                    await self._registry.discover_and_register(active_sessions)
-                    self._tools = self._registry.get_aggregated_tools()
-                    self._resources = self._registry.get_aggregated_resources()
-                    self._prompts = self._registry.get_aggregated_prompts()
-                    self._backends_connected = self._manager.get_active_session_count()
-                    self.emit_event(
-                        "backend_connected",
-                        f"Backend '{name}' reconnected.",
-                        backend=name,
-                    )
-                    return {"name": name, "reconnected": True, "error": None}
-                else:
-                    self._backends_connected = self._manager.get_active_session_count()
-                    return {
-                        "name": name,
-                        "reconnected": False,
-                        "error": f"Failed to reconnect backend '{name}'.",
-                    }
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Reconnect '%s' timed out after %.1fs.",
+                    name,
+                    timeout,
+                )
+                try:
+                    await self._disconnect_backend(name)
+                except Exception:  # noqa: BLE001
+                    pass
+                self._backends_connected = self._manager.get_active_session_count()
+                return {
+                    "name": name,
+                    "reconnected": False,
+                    "error": f"Reconnect timed out after {timeout}s.",
+                }
             except Exception as exc:  # noqa: BLE001
                 msg = f"{type(exc).__name__}: {exc}"
                 logger.error("Reconnect '%s' failed: %s", name, msg)
                 return {"name": name, "reconnected": False, "error": msg}
 
-    # ------------------------------------------------------------------ #
-    #  Lifecycle: shutdown (from API)
-    # ------------------------------------------------------------------ #
+    async def _do_reconnect(self, name: str) -> Dict[str, Any]:
+        """Inner reconnect logic — must be called under ``_reload_lock``."""
+        self.emit_event(
+            "backend_disconnected",
+            f"Reconnecting backend '{name}'...",
+            backend=name,
+        )
+        await self._disconnect_backend(name)
+        success = await self._connect_backend(name, self._config_data[name])
+
+        if success:
+            active_sessions = self._manager.get_all_sessions()
+            self._registry = self._build_registry()
+            await self._registry.discover_and_register(active_sessions)
+            self._tools = self._registry.get_aggregated_tools()
+            self._resources = self._registry.get_aggregated_resources()
+            self._prompts = self._registry.get_aggregated_prompts()
+            self._backends_connected = self._manager.get_active_session_count()
+            self.emit_event(
+                "backend_connected",
+                f"Backend '{name}' reconnected.",
+                backend=name,
+            )
+            return {"name": name, "reconnected": True, "error": None}
+
+        self._backends_connected = self._manager.get_active_session_count()
+        return {
+            "name": name,
+            "reconnected": False,
+            "error": f"Failed to reconnect backend '{name}'.",
+        }
+
+    # ── Lifecycle: shutdown (from API) ─────────────────────────────
 
     async def shutdown(self, timeout_seconds: int = SHUTDOWN_TIMEOUT) -> None:
         """Initiate graceful shutdown from the management API.
@@ -701,9 +721,7 @@ class ArgusService:
             self._error_message = f"Shutdown timed out after {timeout_seconds}s"
             self._state = ServiceState.ERROR
 
-    # ------------------------------------------------------------------ #
-    #  Internal: backend connect/disconnect helpers
-    # ------------------------------------------------------------------ #
+    # ── Internal: backend connect/disconnect helpers ──────────────
 
     async def _disconnect_backend(self, name: str) -> None:
         """Disconnect a single backend by name.
@@ -729,9 +747,7 @@ class ArgusService:
             logger.error("Failed to connect backend '%s': %s", name, exc)
             return False
 
-    # ------------------------------------------------------------------ #
-    #  Status reporting
-    # ------------------------------------------------------------------ #
+    # ── Status reporting ──────────────────────────────────────────
 
     def get_status(self) -> ServiceStatus:
         """Build a snapshot of the current service status."""
@@ -772,9 +788,7 @@ class ArgusService:
         status.compute_uptime()
         return status
 
-    # ------------------------------------------------------------------ #
-    #  Health change callback
-    # ------------------------------------------------------------------ #
+    # ── Health change callback ────────────────────────────────────
 
     def _on_health_change(self, backend: str, old_state: Any, new_state: Any) -> None:
         """Called by HealthChecker when a backend's health state changes."""
@@ -787,9 +801,7 @@ class ArgusService:
             details={"old": old_state.value, "new": new_state.value},
         )
 
-    # ------------------------------------------------------------------ #
-    #  Event system
-    # ------------------------------------------------------------------ #
+    # ── Event system ──────────────────────────────────────────────
 
     def emit_event(
         self,
@@ -848,9 +860,7 @@ class ArgusService:
         except ValueError:
             pass
 
-    # ------------------------------------------------------------------ #
-    #  Readiness
-    # ------------------------------------------------------------------ #
+    # ── Readiness ─────────────────────────────────────────────────
 
     async def wait_until_ready(self, timeout: Optional[float] = None) -> bool:
         """Block until the service reaches RUNNING state.

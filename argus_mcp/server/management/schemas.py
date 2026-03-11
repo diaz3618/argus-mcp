@@ -120,6 +120,8 @@ class CapabilitiesResponse(BaseModel):
     resources: List[ResourceDetail] = Field(default_factory=list)
     prompts: List[PromptDetail] = Field(default_factory=list)
     route_map: Dict[str, Tuple[str, str]] = Field(default_factory=dict)
+    optimizer_active: bool = False
+    mcp_visible_tool_count: int = 0
 
 
 # ── /manage/v1/events ────────────────────────────────────────────────────

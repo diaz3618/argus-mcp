@@ -107,6 +107,14 @@ async def handle_health(request: Request) -> JSONResponse:
     else:
         health = "unhealthy"
 
+    # Compute actual healthy count from health checker when available
+    health_checker = service.health_checker
+    if health_checker is not None:
+        all_health = health_checker.get_all_health()
+        healthy_count = sum(1 for bh in all_health.values() if bh.state.value == "healthy")
+    else:
+        healthy_count = svc_status.backends_connected  # fallback when no checker
+
     resp = HealthResponse(
         status=health,
         uptime_seconds=svc_status.uptime_seconds,
@@ -114,7 +122,7 @@ async def handle_health(request: Request) -> JSONResponse:
         backends=HealthBackends(
             total=svc_status.backends_total,
             connected=svc_status.backends_connected,
-            healthy=svc_status.backends_connected,  # approximate for now
+            healthy=healthy_count,
         ),
     )
     return JSONResponse(resp.model_dump())
@@ -340,11 +348,26 @@ async def handle_capabilities(request: Request) -> JSONResponse:
         ),
     )
 
+    # Determine optimizer state for informational fields
+    from argus_mcp.server.app import mcp_server as _mcp_server
+
+    optimizer_active = getattr(_mcp_server, "optimizer_enabled", False)
+    mcp_visible_tool_count = len(tools)
+    if optimizer_active:
+        from argus_mcp.bridge.optimizer.meta_tools import META_TOOLS
+
+        keep_list = getattr(_mcp_server, "optimizer_keep_list", [])
+        keep_names = set(keep_list)
+        kept_count = sum(1 for t in service.tools if t.name in keep_names)
+        mcp_visible_tool_count = len(META_TOOLS) + kept_count
+
     resp = CapabilitiesResponse(
         tools=tools,
         resources=resources,
         prompts=prompts,
         route_map=route_map,
+        optimizer_active=optimizer_active,
+        mcp_visible_tool_count=mcp_visible_tool_count,
     )
     return JSONResponse(resp.model_dump())
 

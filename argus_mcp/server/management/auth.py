@@ -86,9 +86,30 @@ class BearerAuthMiddleware:
                 MGMT_TOKEN_ENV_VAR,
             )
 
+    # ── State delegation ────────────────────────────────────────────
+    # When this middleware wraps a Starlette app and is stored as the
+    # ``mgmt_app`` reference, callers that access ``mgmt_app.state``
+    # (e.g. lifespan propagation, route handlers) transparently reach
+    # the inner Starlette's State object.
+
+    @property
+    def state(self):
+        """Delegate to inner app's Starlette state."""
+        return self.app.state
+
     @property
     def auth_enabled(self) -> bool:
         return self._token is not None
+
+    def set_token(self, token: str) -> None:
+        """Apply a token at runtime (deferred config-file fallback).
+
+        Called during lifespan when the config file provides
+        ``server.management.token`` but no ``ARGUS_MGMT_TOKEN`` env var
+        was set at app-factory time.
+        """
+        self._token = token
+        logger.info("Management API authentication ENABLED (token applied from config).")
 
     async def _handle_no_auth(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Pass request through when auth is disabled, warning on exposed binds."""

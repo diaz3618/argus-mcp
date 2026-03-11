@@ -119,7 +119,7 @@ async def wrap_backend(
         New parameters with the command wrapped in a container, and
         a boolean indicating whether isolation was applied.
     """
-    # ── Per-backend disable ──────────────────────────────────────────
+
     if not enabled:
         logger.debug(
             "[%s] Container isolation disabled via per-backend config.",
@@ -127,7 +127,6 @@ async def wrap_backend(
         )
         return params, False
 
-    # ── Check global disable ─────────────────────────────────────────
     env_val = os.environ.get("ARGUS_CONTAINER_ISOLATION", "").strip().lower()
     if env_val in ("0", "false", "no", "off", "disabled"):
         logger.debug(
@@ -136,7 +135,6 @@ async def wrap_backend(
         )
         return params, False
 
-    # ── Already containerised? ───────────────────────────────────────
     args_list = list(params.args) if params.args else []
     if is_already_containerised(params.command, args_list):
         logger.info(
@@ -148,7 +146,6 @@ async def wrap_backend(
         )
         return params, False
 
-    # ── Detect container runtime via factory ─────────────────────────
     factory = RuntimeFactory.get()
     runtime = factory.detect(override=runtime_override)
     if runtime is None:
@@ -161,7 +158,6 @@ async def wrap_backend(
 
     container_runtime = runtime.name  # "docker" or "podman"
 
-    # ── Runtime health check (cached inside the runtime instance) ────
     if not await runtime.is_healthy():
         logger.debug(
             "[%s] Container runtime '%s' unhealthy — running as bare subprocess.",
@@ -170,7 +166,6 @@ async def wrap_backend(
         )
         return params, False
 
-    # ── Classify command ─────────────────────────────────────────────
     transport = transport_override or classify_command(params.command)
     if transport is None:
         logger.warning(
@@ -185,7 +180,6 @@ async def wrap_backend(
         # but handle edge cases (e.g. docker without run subcommand)
         return params, False
 
-    # ── Build or reuse image ─────────────────────────────────────────
     image_tag, _binary, runtime_args = await ensure_image(
         svr_name,
         params.command,
@@ -210,7 +204,6 @@ async def wrap_backend(
         )
         return params, False
 
-    # ── Pre-create container (docker create) ────────────────────────
     # Clean up any existing container for this backend (e.g. from a
     # previous failed attempt) before creating a new one.
     if svr_name in _active_containers:

@@ -132,6 +132,7 @@ def _load_composite_workflows(mcp_svr_instance: Any, chain: Any) -> None:
 async def _attach_to_mcp_server(
     mcp_svr_instance: Any,
     service: ArgusService,
+    app_state: Any = None,
 ) -> None:
     """Attach bridge components from the service to the MCP server instance.
 
@@ -150,6 +151,7 @@ async def _attach_to_mcp_server(
     from argus_mcp.bridge.optimizer import ToolIndex
     from argus_mcp.config.loader import load_argus_config
     from argus_mcp.config.schema import ArgusConfig
+    from argus_mcp.server.auth.providers import AuthProviderRegistry
 
     mcp_svr_instance.manager = service.manager
     mcp_svr_instance.registry = service.registry
@@ -168,6 +170,39 @@ async def _attach_to_mcp_server(
     # ── Structured audit logger ──────────────────────────────────────
     audit_logger = AuditLogger()
     mcp_svr_instance.audit_logger = audit_logger
+
+    # ── Deferred management-API token (C-1) ──────────────────────────
+    # At app-factory time only the env var is checked.  Now that the
+    # full config is loaded, apply the config-file token if the env var
+    # was unset.
+    if full_cfg is not None and app_state is not None:
+        mgmt_app = getattr(app_state, "mgmt_app", None)
+        if mgmt_app is not None and hasattr(mgmt_app, "set_token"):
+            mgmt_cfg = getattr(getattr(full_cfg, "server", None), "management", None)
+            cfg_token = getattr(mgmt_cfg, "token", None)
+            if not mgmt_app.auth_enabled and cfg_token:
+                mgmt_app.set_token(cfg_token)
+
+    # ── Incoming auth for MCP data plane (C-2) ──────────────────────
+    # Create an AuthProviderRegistry from config and set it on the
+    # transport module so the ASGI-level auth gate validates requests
+    # before they reach the MCP SDK.
+    auth_registry: AuthProviderRegistry | None = None
+    if full_cfg is not None:
+        incoming_auth_type = full_cfg.incoming_auth.type
+        if incoming_auth_type != "anonymous":
+            auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
+            import argus_mcp.server.transport as _transport_mod
+
+            _transport_mod._incoming_auth_provider = auth_registry
+            logger.info(
+                "Incoming auth enabled: type=%s (ASGI gate active on transports).",
+                incoming_auth_type,
+            )
+        else:
+            logger.info("Incoming auth: anonymous (no ASGI gate).")
+    else:
+        logger.debug("No full config loaded; incoming auth defaults to anonymous.")
 
     # ── Telemetry initialization (Task 4.3 wiring) ───────────────────
     telemetry_enabled = False
@@ -192,8 +227,13 @@ async def _attach_to_mcp_server(
 
     mcp_svr_instance.telemetry_enabled = telemetry_enabled
 
-    # ── Middleware chain: Recovery → Telemetry (opt.) → Audit → Routing
-    middlewares: list = [RecoveryMiddleware()]
+    # ── Middleware chain: Auth (opt.) → Recovery → Telemetry (opt.) → Audit → Routing
+    middlewares: list = []
+    if auth_registry is not None:
+        from argus_mcp.bridge.middleware.auth import AuthMiddleware
+
+        middlewares.append(AuthMiddleware(auth_registry))
+    middlewares.append(RecoveryMiddleware())
     if telemetry_enabled:
         middlewares.append(TelemetryMiddleware())
     middlewares.append(AuditMiddleware(audit_logger=audit_logger))
@@ -219,6 +259,17 @@ async def _attach_to_mcp_server(
         route_map = service.registry.get_route_map()
         await tool_index.store(tools, route_map)
         mcp_svr_instance.optimizer_index = tool_index
+
+        if keep_list:
+            known = set(tool_index.tool_names)
+            missing = [t for t in keep_list if t not in known]
+            if missing:
+                logger.warning(
+                    "Optimizer keep_tools references unknown tool(s): %s. "
+                    "These may be misspelled or not yet registered.",
+                    missing,
+                )
+
         logger.info(
             "Optimizer enabled: indexed %d tool(s), keep-list=%s.",
             tool_index.tool_count,
@@ -571,7 +622,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
             installer_display.finalize()
 
         # ── Monkey-patch bridge components onto mcp_server ───────────
-        await _attach_to_mcp_server(mcp_server, service)
+        await _attach_to_mcp_server(mcp_server, service, app_state)
 
         # ── Create & start the SDK streamable-HTTP session manager ───
         # This must happen *after* handlers are attached so that

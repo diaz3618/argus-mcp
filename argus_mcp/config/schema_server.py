@@ -15,6 +15,12 @@ class ManagementSettings(BaseModel):
         default=None,
         description="Bearer token for /manage/ endpoints. Also ARGUS_MGMT_TOKEN env var.",
     )
+    reconnect_timeout: Optional[float] = Field(
+        default=None,
+        ge=1,
+        le=600,
+        description="Overall timeout in seconds for backend reconnect operations (default: 60).",
+    )
 
 
 class ServerSettings(BaseModel):

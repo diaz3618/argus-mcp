@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from mcp.server.lowlevel import NotificationOptions
 from mcp.server.models import InitializationOptions
@@ -12,11 +12,58 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from argus_mcp.constants import POST_MESSAGES_PATH, SERVER_NAME, SERVER_VERSION
+from argus_mcp.server.auth.providers import AuthenticationError, AuthProviderRegistry
+from argus_mcp.server.auth_context import (
+    current_auth_token,
+    current_client_ip,
+    current_session_id,
+    current_user,
+)
 
 logger = logging.getLogger(__name__)
 
 # Module-level SSE transport instance
 sse_transport = SseServerTransport(POST_MESSAGES_PATH)
+
+# Module-level incoming auth provider. Set during startup by lifespan
+# when ``incoming_auth.type`` is not ``anonymous``.
+_incoming_auth_provider: Optional[AuthProviderRegistry] = None
+
+
+def _extract_bearer_token(scope: dict) -> Optional[str]:
+    """Extract a bearer token from the ASSI scope's ``headers``."""
+    for name, value in scope.get("headers", []):
+        if name == b"authorization":
+            decoded = value.decode("latin-1")
+            if decoded.lower().startswith("bearer "):
+                return decoded[7:]
+            return None
+    return None
+
+
+async def _authenticate_request(scope: dict) -> None:
+    """Validate the incoming request and store identity in contextvars.
+
+    No-op when ``_incoming_auth_provider`` is *None* (anonymous mode).
+    Raises :class:`AuthenticationError` on failure.
+    """
+    # Extract session-id and client IP regardless of auth mode
+    for name, value in scope.get("headers", []):
+        if name == b"mcp-session-id":
+            current_session_id.set(value.decode("latin-1"))
+            break
+    client = scope.get("client")
+    if client is not None:
+        current_client_ip.set(client[0])
+
+    if _incoming_auth_provider is None:
+        return
+
+    token = _extract_bearer_token(scope)
+    user = await _incoming_auth_provider.authenticate(token)
+    current_user.set(user)
+    if token is not None:
+        current_auth_token.set(token)
 
 
 async def handle_sse(request: Request) -> None:
@@ -24,6 +71,15 @@ async def handle_sse(request: Request) -> None:
     from argus_mcp.server.app import mcp_server
 
     logger.debug("Received new SSE connection request (GET): %s", request.url)
+
+    # ── Incoming auth gate ───────────────────────────────────────────
+    try:
+        await _authenticate_request(request.scope)
+    except AuthenticationError as exc:
+        logger.warning("SSE auth rejected: %s", exc)
+        response = Response(status_code=401, content="Unauthorized")
+        await response(request.scope, request.receive, request._send)
+        return
 
     if not mcp_server.manager or not mcp_server.registry:
         logger.error(
@@ -104,6 +160,15 @@ async def handle_streamable_http(scope: Any, receive: Any, send: Any) -> None:
 
     if streamable_session_manager is None:
         response = Response(status_code=503, content="Service not ready")
+        await response(scope, receive, send)
+        return
+
+    # ── Incoming auth gate ───────────────────────────────────────────
+    try:
+        await _authenticate_request(scope)
+    except AuthenticationError as exc:
+        logger.warning("Streamable-HTTP auth rejected: %s", exc)
+        response = Response(status_code=401, content="Unauthorized")
         await response(scope, receive, send)
         return
 

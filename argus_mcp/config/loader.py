@@ -209,16 +209,12 @@ def load_and_validate_config(cfg_fpath: str) -> Dict[str, Dict[str, Any]]:
     if not os.path.exists(cfg_fpath):
         raise ConfigurationError(f"Configuration file does not exist: {cfg_fpath}")
 
-    # ── Read & parse (YAML) ──────────────────────────────────────────
     raw_data = _read_config_file(cfg_fpath)
 
-    # ── Env var expansion (before validation) ────────────────────────
     raw_data = expand_env_vars(raw_data)
 
-    # ── Secret resolution (before validation) ────────────────────────
     raw_data = _maybe_resolve_secrets(raw_data)
 
-    # ── Pydantic validation (collects ALL errors) ────────────────────
     try:
         config = ArgusConfig.model_validate(raw_data)
     except ValidationError as exc:
@@ -227,7 +223,6 @@ def load_and_validate_config(cfg_fpath: str) -> Dict[str, Dict[str, Any]]:
             f"Configuration validation failed ({len(exc.errors())} error(s)):\n{error_summary}"
         ) from exc
 
-    # ── Convert to downstream format ─────────────────────────────────
     validated: Dict[str, Dict[str, Any]] = {}
     for name, backend in config.backends.items():
         validated[name] = _backend_to_dict(name, backend)

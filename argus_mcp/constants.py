@@ -58,6 +58,9 @@ AUDIT_BACKUP_COUNT = 5
 # Graceful shutdown default timeout
 SHUTDOWN_TIMEOUT = 30  # seconds
 
+# Reconnect timeout (overall limit for disconnect + connect + rediscover)
+RECONNECT_TIMEOUT = 60  # seconds
+
 # Optimizer search default result limit
 OPTIMIZER_SEARCH_LIMIT = 5
 
