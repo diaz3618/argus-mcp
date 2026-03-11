@@ -170,6 +170,15 @@ class ReconnectResponse(BaseModel):
     error: Optional[str] = None
 
 
+# ── /manage/v1/reauth/{name} (POST) ──────────────────────────────────────
+
+
+class ReAuthResponse(BaseModel):
+    name: str
+    reauth_initiated: bool = False
+    error: Optional[str] = None
+
+
 # ── /manage/v1/shutdown (POST) ──────────────────────────────────────────
 
 

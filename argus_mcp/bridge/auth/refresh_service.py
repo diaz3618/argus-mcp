@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from argus_mcp.bridge.auth.provider import AuthProvider, StaticTokenProvider
 
 logger = logging.getLogger(__name__)
+
+# Type alias for the re-auth callback.  Receives (backend_name, reason).
+ReAuthCallback = Callable[[str, str], None]
 
 
 class AuthRefreshService:
@@ -22,6 +25,10 @@ class AuthRefreshService:
     The service iterates stored :class:`AuthProvider` instances and calls
     ``get_headers()`` on each non-static provider.  This triggers the
     provider's internal cache-check → refresh logic, keeping tokens warm.
+
+    When a provider's ``get_headers()`` raises an exception, the service
+    invokes the optional *on_reauth_required* callback so that the server
+    or TUI can surface an interactive re-authentication prompt.
     """
 
     def __init__(
@@ -29,10 +36,12 @@ class AuthRefreshService:
         auth_providers: Dict[str, Any],
         *,
         interval: float = 60.0,
+        on_reauth_required: Optional[ReAuthCallback] = None,
     ) -> None:
         self._providers = auth_providers
         self._interval = max(5.0, interval)
         self._task: asyncio.Task[None] | None = None
+        self._on_reauth_required = on_reauth_required
 
     # ── Public API ───────────────────────────────────────────────────
 
@@ -94,5 +103,17 @@ class AuthRefreshService:
                     name,
                     exc_info=True,
                 )
+                if self._on_reauth_required is not None:
+                    try:
+                        self._on_reauth_required(
+                            name,
+                            f"Token refresh failed for backend '{name}'",
+                        )
+                    except Exception:  # noqa: BLE001
+                        logger.debug(
+                            "on_reauth_required callback error for '%s'.",
+                            name,
+                            exc_info=True,
+                        )
         if refreshed:
             logger.debug("Background refresh sweep: %d provider(s) refreshed.", refreshed)

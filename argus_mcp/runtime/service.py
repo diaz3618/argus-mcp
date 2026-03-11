@@ -717,6 +717,56 @@ class ArgusService:
             "error": f"Failed to reconnect backend '{name}'.",
         }
 
+    # ── Lifecycle: re-authenticate single backend ──────────────────
+
+    async def reauth_backend(self, name: str) -> Dict[str, Any]:
+        """Trigger interactive re-authentication for a single backend.
+
+        Returns a dict with keys: name, reauth_initiated, error.
+        Only PKCE-based providers support interactive re-auth.
+        """
+        if self._state != ServiceState.RUNNING:
+            return {
+                "name": name,
+                "reauth_initiated": False,
+                "error": f"Cannot re-authenticate in state: {self._state.value}",
+            }
+
+        if not self._config_data or name not in self._config_data:
+            return {
+                "name": name,
+                "reauth_initiated": False,
+                "error": f"Backend '{name}' not found in configuration.",
+            }
+
+        provider = self._manager._auth_providers.get(name)
+        if provider is None:
+            return {
+                "name": name,
+                "reauth_initiated": False,
+                "error": f"Backend '{name}' has no auth provider.",
+            }
+
+        if not hasattr(provider, "trigger_reauth"):
+            return {
+                "name": name,
+                "reauth_initiated": False,
+                "error": f"Backend '{name}' does not support interactive re-auth.",
+            }
+
+        try:
+            await provider.trigger_reauth()
+            self.emit_event(
+                "backend_reauth",
+                f"Re-authentication completed for backend '{name}'.",
+                backend=name,
+            )
+            return {"name": name, "reauth_initiated": True, "error": None}
+        except Exception as exc:  # noqa: BLE001
+            msg = f"{type(exc).__name__}: {exc}"
+            logger.error("Re-auth for '%s' failed: %s", name, msg)
+            return {"name": name, "reauth_initiated": False, "error": msg}
+
     # ── Lifecycle: shutdown (from API) ─────────────────────────────
 
     async def shutdown(self, timeout_seconds: int = SHUTDOWN_TIMEOUT) -> None:

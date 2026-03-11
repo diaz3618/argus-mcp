@@ -53,6 +53,7 @@ async def _run_server(
     log_lvl_cli: str,
     config_path: str | None = None,
     verbosity: int = 0,
+    auto_reauth: bool = False,
 ) -> None:
     """Async main for the headless server subcommand."""
     global uvicorn_svr_inst
@@ -84,6 +85,7 @@ async def _run_server(
     app_state.file_log_level_configured = cfg_log_lvl
     app_state.config_file_path = resolved_config_path
     app_state.verbosity = verbosity
+    app_state.auto_reauth = auto_reauth
 
     # Read transport type from config so display/management can use it.
     try:
@@ -313,6 +315,7 @@ def _cmd_server(args: argparse.Namespace) -> None:
                 log_lvl_cli=args.log_level,
                 config_path=getattr(args, "config", None),
                 verbosity=getattr(args, "verbose", 0) or 0,
+                auto_reauth=getattr(args, "auto_reauth", False),
             )
         )
     except KeyboardInterrupt:
@@ -996,6 +999,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "Increase startup verbosity. "
             "-v shows connection progress and streaming docker build output; "
             "-vv adds full subprocess/debug output."
+        ),
+    )
+    sp_server.add_argument(
+        "--auto-reauth",
+        action="store_true",
+        default=False,
+        help=(
+            "Automatically open the browser for re-authentication when an "
+            "OAuth backend's refresh token is expired or revoked."
         ),
     )
     sp_server.set_defaults(func=_cmd_server)

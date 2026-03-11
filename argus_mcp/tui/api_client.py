@@ -17,6 +17,7 @@ from argus_mcp.server.management.schemas import (
     CapabilitiesResponse,
     EventsResponse,
     HealthResponse,
+    ReAuthResponse,
     ReconnectResponse,
     ReloadResponse,
     ShutdownResponse,
@@ -153,6 +154,16 @@ class ApiClient:
         )
         resp.raise_for_status()
         return ReconnectResponse.model_validate(resp.json())
+
+    async def post_reauth(self, backend_name: str) -> ReAuthResponse:
+        """``POST /manage/v1/reauth/{name}``"""
+        client = self._ensure_client()
+        resp = await client.post(
+            f"reauth/{backend_name}",
+            timeout=_MUTATING_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return ReAuthResponse.model_validate(resp.json())
 
     async def post_shutdown(self, timeout_seconds: float = 5.0) -> ShutdownResponse:
         """``POST /manage/v1/shutdown``"""

@@ -59,3 +59,16 @@ class ConfigSyncUpdate(Message):
         self.details = details
         self.timestamp = timestamp
         super().__init__()
+
+
+class ReAuthRequired(Message):
+    """Posted when a backend's OAuth token cannot be refreshed.
+
+    Signals that the user must interactively re-authenticate for a
+    specific backend (e.g. via a browser-based PKCE flow).
+    """
+
+    def __init__(self, backend_name: str, reason: str = "") -> None:
+        self.backend_name = backend_name
+        self.reason = reason
+        super().__init__()

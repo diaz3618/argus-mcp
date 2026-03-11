@@ -40,6 +40,7 @@ from argus_mcp.server.management.schemas import (
     HealthBackends,
     HealthResponse,
     PromptDetail,
+    ReAuthResponse,
     ReconnectResponse,
     ReloadResponse,
     ResourceDetail,
@@ -507,6 +508,33 @@ async def handle_reconnect(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump(), status_code=status_code)
 
 
+# ── POST /manage/v1/reauth/{name} ────────────────────────────────────────
+
+
+async def handle_reauth(request: Request) -> JSONResponse:
+    """Trigger interactive re-authentication for a backend."""
+    service = _get_service(request)
+    name = request.path_params.get("name", "")
+
+    if not name:
+        return _error_json("bad_request", "Backend name is required.", 400)
+    if len(name) > MGMT_BACKEND_NAME_MAX_LEN:
+        return _error_json("bad_request", "Backend name is too long.", 400)
+    if not _BACKEND_NAME_RE.match(name):
+        return _error_json("bad_request", "Backend name contains invalid characters.", 400)
+
+    if not service.is_running:
+        return _error_json("service_unavailable", "Service is not running.", 503)
+
+    if service.config_data and name not in service.config_data:
+        return _error_json("not_found", f"Backend '{name}' not found.", 404)
+
+    result = await service.reauth_backend(name)
+    resp = ReAuthResponse(**result)
+    status_code = 200 if resp.reauth_initiated else 500
+    return JSONResponse(resp.model_dump(), status_code=status_code)
+
+
 # ── POST /manage/v1/shutdown ────────────────────────────────────────────
 
 
@@ -587,6 +615,7 @@ management_routes = Router(
         Route("/events/stream", endpoint=handle_events_stream, methods=["GET"]),
         Route("/reload", endpoint=handle_reload, methods=["POST"]),
         Route("/reconnect/{name}", endpoint=handle_reconnect, methods=["POST"]),
+        Route("/reauth/{name}", endpoint=handle_reauth, methods=["POST"]),
         Route("/shutdown", endpoint=handle_shutdown, methods=["POST"]),
     ]
 )

@@ -277,6 +277,35 @@ class PKCEAuthProvider(AuthProvider):
         await store.save(self._backend_name, tokens)
         return tokens.access_token
 
+    async def trigger_reauth(self) -> str:
+        """Force an interactive PKCE browser re-auth for this backend.
+
+        Invalidates all cached/stored tokens and launches the browser
+        OAuth flow unconditionally.  Returns the new access token.
+        """
+        from argus_mcp.bridge.auth.pkce import PKCEFlow
+        from argus_mcp.bridge.auth.store import TokenStore
+
+        self._cache.invalidate()
+        store = TokenStore(self._token_dir)
+
+        logger.info(
+            "[%s] Triggering interactive re-authentication…",
+            self._backend_name,
+        )
+        async with self._lock:
+            flow = PKCEFlow(
+                authorization_endpoint=self._auth_endpoint,
+                token_endpoint=self._token_endpoint,
+                client_id=self._client_id,
+                client_secret=self._client_secret,
+                scopes=self._scopes,
+            )
+            tokens = await flow.execute()
+            self._cache.set(tokens.access_token, tokens.expires_in)
+            await store.save(self._backend_name, tokens)
+        return tokens.access_token
+
     def redacted_repr(self) -> str:
         return (
             f"PKCEAuthProvider(backend={self._backend_name!r}, "

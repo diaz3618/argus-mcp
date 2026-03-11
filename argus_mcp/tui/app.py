@@ -24,6 +24,7 @@ from argus_mcp.tui.events import (
     ConfigSyncUpdate,
     ConnectionLost,
     ConnectionRestored,
+    ReAuthRequired,
 )
 from argus_mcp.tui.screens.audit_log import AuditLogScreen
 from argus_mcp.tui.screens.backend_detail import BackendDetailModal
@@ -818,6 +819,42 @@ class ArgusApp(App):
                 pass
         except (OSError, ConnectionError) as exc:
             self.notify(f"Reconnect failed: {exc}", title="Error", severity="error")
+
+    def on_re_auth_required(self, event: ReAuthRequired) -> None:
+        """Handle a backend requiring interactive re-authentication."""
+        try:
+            event_log = self.screen.query_one(EventLogWidget)
+            event_log.add_event(
+                "🔑 Re-auth Required",
+                f"Backend '{event.backend_name}' needs re-authentication.",
+            )
+        except NoMatches:
+            pass
+        self.notify(
+            f"Backend '{event.backend_name}' requires re-authentication. "
+            "Use the management API /reauth endpoint to trigger it.",
+            title="Re-auth Required",
+            severity="warning",
+            timeout=8,
+        )
+
+    async def _trigger_reauth(self, name: str) -> None:
+        """Ask the management API to trigger re-auth for a specific backend."""
+        mgr = self._server_manager
+        if mgr is None:
+            return
+        client = getattr(mgr, "active_client", None)
+        if client is None:
+            return
+        try:
+            await client.post_reauth(name)
+            self.notify(
+                f"Re-auth for '{name}' initiated",
+                title="Re-auth",
+                severity="information",
+            )
+        except (OSError, ConnectionError) as exc:
+            self.notify(f"Re-auth failed: {exc}", title="Error", severity="error")
 
     # ── Key-bound actions ───────────────────────────────────────
 

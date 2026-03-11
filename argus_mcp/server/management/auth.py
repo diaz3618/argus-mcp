@@ -62,7 +62,7 @@ class BearerAuthMiddleware:
 
     # Mutating path suffixes — these are the endpoints that should
     # require auth when exposed to a non-localhost interface.
-    _MUTATING_SUFFIXES = frozenset({"/reload", "/reconnect", "/shutdown"})
+    _MUTATING_SUFFIXES = frozenset({"/reload", "/reconnect", "/reauth", "/shutdown"})
 
     _LOCALHOST_ADDRS = frozenset({"127.0.0.1", "localhost", "::1"})
 

@@ -8,7 +8,7 @@ from argus_mcp.bridge.auth.provider import (
     StaticTokenProvider,
     create_auth_provider,
 )
-from argus_mcp.bridge.auth.refresh_service import AuthRefreshService
+from argus_mcp.bridge.auth.refresh_service import AuthRefreshService, ReAuthCallback
 from argus_mcp.bridge.auth.token_cache import TokenCache
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "McpBearerAuth",
     "OAuth2Provider",
     "PKCEAuthProvider",
+    "ReAuthCallback",
     "StaticTokenProvider",
     "TokenCache",
     "create_auth_provider",
