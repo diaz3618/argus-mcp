@@ -31,6 +31,10 @@ class AuthProvider(abc.ABC):
         """Return HTTP headers to inject into outgoing requests."""
 
     @abc.abstractmethod
+    def invalidate(self) -> None:
+        """Discard any cached credentials so the next call re-fetches."""
+
+    @abc.abstractmethod
     def redacted_repr(self) -> str:
         """Human-readable description with sensitive values masked."""
 
@@ -51,6 +55,9 @@ class StaticTokenProvider(AuthProvider):
 
     async def get_headers(self) -> Dict[str, str]:
         return dict(self._headers)
+
+    def invalidate(self) -> None:
+        """No-op — static tokens cannot be refreshed."""
 
     def redacted_repr(self) -> str:
         safe: Dict[str, str] = {}
@@ -97,6 +104,10 @@ class OAuth2Provider(AuthProvider):
                 if token is None:
                     token = await self._fetch_token()
         return {"Authorization": f"Bearer {token}"}
+
+    def invalidate(self) -> None:
+        """Clear cached OAuth2 token so the next call re-fetches."""
+        self._cache.invalidate()
 
     async def _fetch_token(self) -> str:
         """POST to the token endpoint and cache the result."""
@@ -202,6 +213,10 @@ class PKCEAuthProvider(AuthProvider):
             token = await self._resolve_token()
 
         return {"Authorization": f"Bearer {token}"}
+
+    def invalidate(self) -> None:
+        """Clear cached PKCE token so the next call re-fetches."""
+        self._cache.invalidate()
 
     async def _resolve_token(self) -> str:
         """Try disk store, refresh, or interactive flow."""

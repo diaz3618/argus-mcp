@@ -8,7 +8,10 @@ import asyncio
 import logging
 import os
 from contextlib import AsyncExitStack
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    import httpx
 
 from mcp import ClientSession, StdioServerParameters
 
@@ -337,7 +340,18 @@ async def connect_backend(
     """
     from argus_mcp.runtime.models import BackendPhase
 
-    auth_headers = await ad.resolve_auth_headers(svr_name, svr_conf, discovered_auth)
+    provider = await ad.resolve_auth_provider(svr_name, svr_conf, discovered_auth)
+
+    # Build httpx.Auth wrapper when the backend has an auth provider.
+    auth: "httpx.Auth | None" = None
+    if provider is not None:
+        from argus_mcp.bridge.auth.httpx_auth import McpBearerAuth
+
+        auth = McpBearerAuth(provider)
+
+    # Static / config-level headers still flow through the headers channel.
+    auth_headers = (await provider.get_headers()) if provider is not None else None
+
     backend_stack = await prepare_backend_stack(svr_name, backend_stacks)
 
     session = await tf.create_transport_session(
@@ -348,6 +362,7 @@ async def connect_backend(
         backend_stack,
         devnull,
         manage_subproc=_manage_subproc,
+        auth=auth,
     )
 
     # Initialize MCP session with appropriate timeout

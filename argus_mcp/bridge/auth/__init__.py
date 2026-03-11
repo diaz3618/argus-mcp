@@ -1,5 +1,6 @@
 """Outgoing authentication for backend MCP server connections."""
 
+from argus_mcp.bridge.auth.httpx_auth import McpBearerAuth
 from argus_mcp.bridge.auth.provider import (
     AuthProvider,
     OAuth2Provider,
@@ -11,6 +12,7 @@ from argus_mcp.bridge.auth.token_cache import TokenCache
 
 __all__ = [
     "AuthProvider",
+    "McpBearerAuth",
     "OAuth2Provider",
     "PKCEAuthProvider",
     "StaticTokenProvider",

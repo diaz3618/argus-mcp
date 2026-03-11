@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple
 
 from argus_mcp._task_utils import _log_task_exception
+
+if TYPE_CHECKING:
+    from argus_mcp.bridge.auth.provider import AuthProvider
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +81,33 @@ async def resolve_auth_headers(
         return headers
     except Exception as exc:  # noqa: BLE001
         logger.error("[%s] Failed to resolve auth headers: %s", svr_name, exc)
+        return None
+
+
+async def resolve_auth_provider(
+    svr_name: str,
+    svr_conf: Dict[str, Any],
+    discovered_auth: Dict[str, Dict[str, Any]],
+) -> Optional["AuthProvider"]:
+    """Return a long-lived :class:`AuthProvider` for a backend.
+
+    Unlike :func:`resolve_auth_headers` (which creates a throw-away
+    provider), this keeps the provider alive so it can be wrapped in
+    :class:`McpBearerAuth` for transparent per-request auth + 401 retry.
+    """
+    auth_cfg = svr_conf.get("auth")
+    if not auth_cfg:
+        auth_cfg = discovered_auth.get(svr_name)
+    if not auth_cfg:
+        return None
+    try:
+        from argus_mcp.bridge.auth.provider import create_auth_provider
+
+        provider = create_auth_provider(auth_cfg, backend_name=svr_name)
+        logger.info("[%s] Auth provider created: %s", svr_name, provider.redacted_repr())
+        return provider
+    except Exception as exc:  # noqa: BLE001
+        logger.error("[%s] Failed to create auth provider: %s", svr_name, exc)
         return None
 
 

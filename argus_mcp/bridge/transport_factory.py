@@ -13,6 +13,7 @@ import os
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional, TextIO, Tuple
 
+import httpx
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
@@ -53,6 +54,7 @@ async def init_sse(
     *,
     sse_startup_delay: float = SSE_LOCAL_START_DELAY,
     headers: Optional[Dict[str, str]] = None,
+    auth: Optional[httpx.Auth] = None,
     manage_subproc: Any = None,
 ) -> Tuple[Any, ClientSession]:
     """Create an SSE transport and session on *stack*.
@@ -75,7 +77,7 @@ async def init_sse(
         )
         await asyncio.sleep(sse_startup_delay)
 
-    transport_ctx = sse_client(url=sse_url, headers=headers)
+    transport_ctx = sse_client(url=sse_url, headers=headers, auth=auth)
     streams = await stack.enter_async_context(transport_ctx)
     logger.debug("[%s] (sse) transport streams established.", svr_name)
     session_ctx = ClientSession(*streams)
@@ -89,10 +91,11 @@ async def init_streamablehttp(
     stack: AsyncExitStack,
     *,
     headers: Optional[Dict[str, str]] = None,
+    auth: Optional[httpx.Auth] = None,
 ) -> Tuple[Any, ClientSession]:
     """Create a streamable-HTTP transport and session on *stack*."""
     logger.debug("[%s] Streamable-HTTP backend, url=%s", svr_name, url)
-    transport_ctx = streamablehttp_client(url=url, headers=headers)
+    transport_ctx = streamablehttp_client(url=url, headers=headers, auth=auth)
     read_stream, write_stream, _get_session_id = await stack.enter_async_context(transport_ctx)
     logger.debug("[%s] (streamable-http) transport streams established.", svr_name)
     session_ctx = ClientSession(read_stream, write_stream)
@@ -224,6 +227,7 @@ async def create_transport_session(
     backend_stack: AsyncExitStack,
     devnull: TextIO,
     *,
+    auth: Optional[httpx.Auth] = None,
     manage_subproc: Any = None,
 ) -> ClientSession:
     """Dispatch to the correct transport initializer and return the session."""
@@ -252,6 +256,7 @@ async def create_transport_session(
             backend_stack,
             sse_startup_delay=svr_conf.get("sse_startup_delay", SSE_LOCAL_START_DELAY),
             headers=sse_headers,
+            auth=auth,
             manage_subproc=manage_subproc,
         )
 
@@ -267,6 +272,7 @@ async def create_transport_session(
             sh_url,
             backend_stack,
             headers=sh_headers,
+            auth=auth,
         )
 
     else:
