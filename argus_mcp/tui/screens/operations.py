@@ -13,6 +13,7 @@ from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.optimizer_panel import OptimizerPanel
 from argus_mcp.tui.widgets.otel_panel import OTelPanel
 from argus_mcp.tui.widgets.sync_status import SyncStatusWidget
+from argus_mcp.tui.widgets.tool_ops_panel import ToolOpsPanel
 from argus_mcp.tui.widgets.workflows_panel import WorkflowsPanel
 
 
@@ -29,3 +30,5 @@ class OperationsScreen(ArgusScreen):
                 yield OTelPanel(id="otel-panel-widget")
             with TabPane("Sync", id="tab-ops-sync"):
                 yield SyncStatusWidget(id="sync-status-widget")
+            with TabPane("Tool Ops", id="tab-ops-toolops"):
+                yield ToolOpsPanel(id="tool-ops-panel-widget")

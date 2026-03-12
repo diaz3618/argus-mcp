@@ -28,13 +28,16 @@ from argus_mcp.tui.events import (
 )
 from argus_mcp.tui.screens.audit_log import AuditLogScreen
 from argus_mcp.tui.screens.backend_detail import BackendDetailModal
+from argus_mcp.tui.screens.catalog_browser import CatalogBrowserScreen
 from argus_mcp.tui.screens.client_config import ClientConfigModal
 from argus_mcp.tui.screens.dashboard import DashboardScreen
 from argus_mcp.tui.screens.exit_modal import ExitModal
+from argus_mcp.tui.screens.export_import import ExportImportScreen
 from argus_mcp.tui.screens.health import HealthScreen
 from argus_mcp.tui.screens.operations import OperationsScreen
 from argus_mcp.tui.screens.registry import RegistryScreen
 from argus_mcp.tui.screens.security import SecurityScreen
+from argus_mcp.tui.screens.server_logs import ServerLogsScreen
 from argus_mcp.tui.screens.settings import SettingsScreen
 from argus_mcp.tui.screens.setup_wizard import SetupWizardScreen
 from argus_mcp.tui.screens.skills import SkillsScreen
@@ -123,6 +126,9 @@ class ArgusApp(App):
         "security": SecurityScreen,
         "operations": OperationsScreen,
         "wizard": SetupWizardScreen,
+        "server_logs": ServerLogsScreen,
+        "export_import": ExportImportScreen,
+        "catalog": CatalogBrowserScreen,
     }
 
     DEFAULT_MODE = "dashboard"
@@ -224,6 +230,21 @@ class ArgusApp(App):
             title="Setup Wizard",
             help="Config editor with import/export, backend templates (w)",
             callback=lambda: self.switch_mode("wizard"),
+        )
+        yield SystemCommand(
+            title="Server Logs",
+            help="Per-server operational logs with filtering",
+            callback=lambda: self.switch_mode("server_logs"),
+        )
+        yield SystemCommand(
+            title="Export / Import",
+            help="Export and import config with dry-run preview",
+            callback=lambda: self.switch_mode("export_import"),
+        )
+        yield SystemCommand(
+            title="Catalog Browser",
+            help="Onboard backends from YAML catalog definitions",
+            callback=lambda: self.switch_mode("catalog"),
         )
         yield SystemCommand(
             title="Export Client Config",
