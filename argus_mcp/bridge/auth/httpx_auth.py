@@ -34,13 +34,16 @@ class McpBearerAuth(httpx.Auth):
     ----------
     provider:
         The :class:`AuthProvider` that supplies bearer tokens.
+    retry_on_401:
+        When *False*, skip the automatic 401-retry logic.  Defaults to *True*.
     """
 
     requires_request_body = False
     requires_response_body = False
 
-    def __init__(self, provider: AuthProvider) -> None:
+    def __init__(self, provider: AuthProvider, *, retry_on_401: bool = True) -> None:
         self._provider = provider
+        self._retry_on_401 = retry_on_401
 
     async def async_auth_flow(
         self,
@@ -53,7 +56,7 @@ class McpBearerAuth(httpx.Auth):
         response = yield request
 
         retries = 0
-        while response.status_code == 401 and retries < _MAX_401_RETRIES:
+        while self._retry_on_401 and response.status_code == 401 and retries < _MAX_401_RETRIES:
             retries += 1
             logger.warning(
                 "Received 401 from %s — invalidating token and retrying (%d/%d).",

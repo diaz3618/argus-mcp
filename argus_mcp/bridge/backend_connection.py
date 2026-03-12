@@ -352,7 +352,11 @@ async def connect_backend(
     if provider is not None:
         from argus_mcp.bridge.auth.httpx_auth import McpBearerAuth
 
-        auth = McpBearerAuth(provider)
+        auth_cfg = svr_conf.get("auth")
+        retry_on_401 = (
+            auth_cfg.get("auth_retry_on_401", True) if isinstance(auth_cfg, dict) else True
+        )
+        auth = McpBearerAuth(provider, retry_on_401=retry_on_401)
 
     # Static / config-level headers still flow through the headers channel.
     auth_headers = (await provider.get_headers()) if provider is not None else None

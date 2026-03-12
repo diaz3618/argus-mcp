@@ -73,6 +73,9 @@ class ArgusService:
         self._config_path: Optional[str] = None
         self._config_data: Optional[Dict[str, Any]] = None
 
+        # Auto re-auth flag — set externally by lifespan after construction.
+        self._auto_reauth: bool = False
+
         # Bridge components
         self._manager: ClientManager = ClientManager()
         self._registry: CapabilityRegistry = CapabilityRegistry()
@@ -375,9 +378,32 @@ class ArgusService:
             try:
                 full_cfg = load_argus_config(self._config_path)
                 server_settings = full_cfg.server
+
+                def _on_reauth_required(backend_name: str, reason: str) -> None:
+                    self.emit_event(
+                        "reauth_required",
+                        f"Backend '{backend_name}' requires re-authentication: {reason}",
+                        severity="warning",
+                        backend=backend_name,
+                    )
+                    if self._auto_reauth:
+                        logger.info(
+                            "Auto re-auth enabled — scheduling re-auth for '%s'.",
+                            backend_name,
+                        )
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(self.reauth_backend(backend_name))
+                        except RuntimeError:
+                            logger.debug(
+                                "No running event loop for auto re-auth of '%s'.",
+                                backend_name,
+                            )
+
                 self._manager.start_refresh_service(
                     enabled=server_settings.auth_background_refresh_enabled,
                     interval=server_settings.auth_background_refresh_interval_seconds,
+                    on_reauth_required=_on_reauth_required,
                 )
             except Exception:  # noqa: BLE001
                 logger.debug("Could not start background token refresh.", exc_info=True)

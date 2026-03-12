@@ -584,6 +584,8 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     logger.info("Configuration file in use: %s", config_path)
 
     service = ArgusService()
+    # Propagate CLI --auto-reauth flag to the runtime service.
+    service._auto_reauth = getattr(app_state, "auto_reauth", False)
     # Store service on app.state so management API can access it later (0.2).
     app_state.argus_service = service  # type: ignore[attr-defined]
 

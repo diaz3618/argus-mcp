@@ -111,6 +111,10 @@ class OAuth2AuthConfig(BaseModel):
             "Seconds before token expiry to trigger proactive refresh. Default 300 (5 min)."
         ),
     )
+    auth_retry_on_401: bool = Field(
+        default=True,
+        description="Automatically retry requests with a fresh token on HTTP 401.",
+    )
 
 
 class PKCEAuthConfig(BaseModel):
@@ -135,6 +139,10 @@ class PKCEAuthConfig(BaseModel):
         description=(
             "Seconds before token expiry to trigger proactive refresh. Default 300 (5 min)."
         ),
+    )
+    auth_retry_on_401: bool = Field(
+        default=True,
+        description="Automatically retry requests with a fresh token on HTTP 401.",
     )
 
 

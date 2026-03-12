@@ -13,13 +13,16 @@ import asyncio
 import logging
 import os
 from contextlib import AsyncExitStack
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple
 
 from mcp import ClientSession, StdioServerParameters
 
 from argus_mcp.bridge import auth_discovery as ad
 from argus_mcp.bridge import backend_connection as bc
 from argus_mcp.bridge import startup_coordinator as sc
+
+if TYPE_CHECKING:
+    from argus_mcp.bridge.auth.refresh_service import ReAuthCallback
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +115,7 @@ class ClientManager:
         *,
         enabled: bool = True,
         interval: float = 60.0,
+        on_reauth_required: "ReAuthCallback | None" = None,
     ) -> None:
         """Start the background token refresh service.
 
@@ -121,6 +125,9 @@ class ClientManager:
             If ``False`` the service is not started (config opt-out).
         interval:
             Seconds between refresh sweeps.
+        on_reauth_required:
+            Optional callback invoked when a background refresh fails
+            and interactive re-authentication is needed.
         """
         if not enabled:
             logger.info("Background token refresh disabled by configuration.")
@@ -133,6 +140,7 @@ class ClientManager:
         self._refresh_service = AuthRefreshService(
             self._auth_providers,
             interval=interval,
+            on_reauth_required=on_reauth_required,
         )
         self._refresh_service.start()
 
