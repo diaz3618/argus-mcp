@@ -10,6 +10,39 @@ from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
+
+class MetadataProvenance(BaseModel):
+    """Optional provenance tracking fields for config entities.
+
+    These fields are populated automatically during import/export and
+    management API mutations.  They are never required for basic
+    configuration and default to ``None``.
+    """
+
+    created_by: Optional[str] = Field(
+        default=None, description="Principal that created this entry."
+    )
+    updated_by: Optional[str] = Field(
+        default=None, description="Principal that last modified this entry."
+    )
+    created_via: Optional[str] = Field(
+        default=None,
+        description="Channel through which entry was created (cli, tui, import, api).",
+    )
+    updated_via: Optional[str] = Field(
+        default=None,
+        description="Channel through which entry was last modified.",
+    )
+    import_batch_id: Optional[str] = Field(
+        default=None, description="Import batch that created/updated this entry."
+    )
+    metadata_version: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Monotonic version counter incremented on each update.",
+    )
+
+
 # ── Shared per-backend configs ───────────────────────────────────────────
 
 
@@ -291,7 +324,7 @@ class ContainerConfig(BaseModel):
 # ── Backend server configs ───────────────────────────────────────────────
 
 
-class StdioBackendConfig(BaseModel):
+class StdioBackendConfig(MetadataProvenance):
     """Configuration for a stdio-type backend MCP server."""
 
     type: Literal["stdio"]
@@ -329,7 +362,7 @@ class StdioBackendConfig(BaseModel):
         return v.strip()
 
 
-class SseBackendConfig(BaseModel):
+class SseBackendConfig(MetadataProvenance):
     """Configuration for an SSE-type backend MCP server."""
 
     type: Literal["sse"]
@@ -371,7 +404,7 @@ class SseBackendConfig(BaseModel):
         return v
 
 
-class StreamableHttpBackendConfig(BaseModel):
+class StreamableHttpBackendConfig(MetadataProvenance):
     """Configuration for a streamable-http-type backend MCP server."""
 
     type: Literal["streamable-http"]

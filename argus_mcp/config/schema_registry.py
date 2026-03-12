@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+
+from argus_mcp.config.schema_backends import MetadataProvenance
 
 
-class RegistryEntryConfig(BaseModel):
+class RegistryEntryConfig(MetadataProvenance):
     """A single registry source for browsing and installing MCP servers.
 
     Registries are external catalogs of MCP servers.  Configure one or more

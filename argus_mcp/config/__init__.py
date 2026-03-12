@@ -1,5 +1,18 @@
 """Configuration loading and validation for Argus MCP."""
 
+from argus_mcp.config.export import (
+    ExportFilter,
+    ExportResult,
+    SecretHandling,
+    export_config,
+)
+from argus_mcp.config.import_handler import (
+    ConflictStrategy,
+    ImportResult,
+    ImportValidationError,
+    import_config,
+    parse_import_payload,
+)
 from argus_mcp.config.loader import load_and_validate_config, load_argus_config
 from argus_mcp.config.migration import expand_env_vars
 from argus_mcp.config.schema import (
@@ -13,6 +26,7 @@ from argus_mcp.config.schema import (
     FiltersConfig,
     IncomingAuthConfig,
     ManagementSettings,
+    MetadataProvenance,
     OAuth2AuthConfig,
     OptimizerConfig,
     RegistryEntryConfig,
@@ -32,13 +46,20 @@ __all__ = [
     "BackendConfig",
     "CapabilityFilterConfig",
     "ConflictResolutionConfig",
+    "ConflictStrategy",
+    "ExportFilter",
+    "ExportResult",
     "FiltersConfig",
+    "ImportResult",
+    "ImportValidationError",
     "IncomingAuthConfig",
     "ManagementSettings",
+    "MetadataProvenance",
     "OAuth2AuthConfig",
     "OptimizerConfig",
     "RegistryEntryConfig",
     "ArgusConfig",
+    "SecretHandling",
     "ServerSettings",
     "SseBackendConfig",
     "StaticAuthConfig",
@@ -47,6 +68,9 @@ __all__ = [
     "TimeoutConfig",
     "ToolOverrideEntry",
     "expand_env_vars",
+    "export_config",
+    "import_config",
     "load_and_validate_config",
     "load_argus_config",
+    "parse_import_payload",
 ]
