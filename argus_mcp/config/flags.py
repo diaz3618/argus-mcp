@@ -1,8 +1,18 @@
 """Runtime feature flags.
 
-A simple ``Dict[str, bool]`` registry with sensible defaults.
-Flags are loaded from the ``feature_flags`` section of the Argus
-config and can be queried at runtime via :func:`is_enabled`.
+A ``Dict[str, bool]`` registry with sensible defaults and governance
+metadata.  Flags are loaded from the ``feature_flags`` section of the
+Argus config and can be queried at runtime via
+:meth:`FeatureFlags.is_enabled`.
+
+Each registered flag carries:
+
+* **default** – whether the flag is on or off out-of-the-box.
+* **risk** – ``"high"`` flags are default-disabled and require an
+  explicit opt-in in the user's config.  ``"low"`` flags are safe to
+  enable by default.
+* **description** – human-readable purpose shown in ``--show-flags``
+  and the TUI settings screen.
 
 Usage::
 
@@ -16,21 +26,79 @@ Usage::
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# Default feature-flag values.  Features are **off** unless explicitly
-# enabled in the config.
-_DEFAULTS: Dict[str, bool] = {
-    "optimizer": False,
-    "hot_reload": True,
-    "outgoing_auth": True,
-    "session_management": True,
-    "yaml_config": True,
-    "container_isolation": True,
-    "build_on_startup": True,
+
+@dataclass(frozen=True)
+class FlagSpec:
+    """Metadata for a single feature flag."""
+
+    default: bool
+    risk: str  # "high" or "low"
+    description: str
+
+
+# ------------------------------------------------------------------
+# Flag registry
+# ------------------------------------------------------------------
+# Convention:
+#   • risk="high"  → default MUST be False (enforced in _validate_registry)
+#   • risk="low"   → default may be True or False
+# ------------------------------------------------------------------
+FLAG_REGISTRY: Dict[str, FlagSpec] = {
+    "optimizer": FlagSpec(
+        default=False,
+        risk="high",
+        description="Experimental prompt/request optimizer. May alter tool payloads.",
+    ),
+    "hot_reload": FlagSpec(
+        default=True,
+        risk="low",
+        description="Watch config file for changes and reload backends automatically.",
+    ),
+    "outgoing_auth": FlagSpec(
+        default=True,
+        risk="low",
+        description="Attach OAuth/API-key headers to outgoing backend requests.",
+    ),
+    "session_management": FlagSpec(
+        default=True,
+        risk="low",
+        description="Enable per-client session tracking and lifecycle management.",
+    ),
+    "yaml_config": FlagSpec(
+        default=True,
+        risk="low",
+        description="Load configuration from YAML file (config.yaml).",
+    ),
+    "container_isolation": FlagSpec(
+        default=True,
+        risk="low",
+        description="Run stdio backends inside isolated containers when available.",
+    ),
+    "build_on_startup": FlagSpec(
+        default=True,
+        risk="low",
+        description="Pre-build container images for stdio backends at server startup.",
+    ),
 }
+
+_DEFAULTS: Dict[str, bool] = {k: v.default for k, v in FLAG_REGISTRY.items()}
+
+
+def _validate_registry() -> None:
+    """Verify governance invariants at import time."""
+    for name, spec in FLAG_REGISTRY.items():
+        if spec.risk == "high" and spec.default is True:
+            raise AssertionError(f"High-risk flag '{name}' must default to False, got True")
+        if spec.risk not in ("high", "low"):
+            raise AssertionError(f"Flag '{name}' has invalid risk level '{spec.risk}'")
+
+
+_validate_registry()
 
 
 class FeatureFlags:
@@ -67,6 +135,10 @@ class FeatureFlags:
     def all_flags(self) -> Dict[str, bool]:
         """Return a copy of all flags and their current values."""
         return dict(self._flags)
+
+    def describe(self, name: str) -> Optional[FlagSpec]:
+        """Return the :class:`FlagSpec` for *name*, or ``None``."""
+        return FLAG_REGISTRY.get(name)
 
     def __repr__(self) -> str:
         enabled = [k for k, v in self._flags.items() if v]

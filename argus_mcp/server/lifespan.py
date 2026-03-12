@@ -613,9 +613,9 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     config_path: str = getattr(app_state, "config_file_path", "")
     if not config_path:
         # Fallback auto-detect (should rarely hit — CLI sets this)
-        from argus_mcp.cli import _find_config_file
+        from argus_mcp.config.loader import find_config_file
 
-        config_path = _find_config_file()
+        config_path = find_config_file()
     logger.info("Configuration file in use: %s", config_path)
 
     service = ArgusService()

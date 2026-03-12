@@ -109,6 +109,28 @@ jobs:
       - name: Run mypy
         run: uv run mypy
 
+  # ──────────────────────────────────────────────
+  # Import boundary enforcement
+  # ──────────────────────────────────────────────
+  import-boundaries:
+    name: Import Boundaries (import-linter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.10"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run lint-imports
+        run: uv run lint-imports
+
   # NOTE: tests/ is local-only (excluded from remote). Test suite runs
   # via pre-push git hook instead — see .pre-commit-config.yaml.
 
@@ -188,6 +210,7 @@ jobs:
       - lint
       - format
       - typecheck
+      - import-boundaries
       - security-scan
       - container-scan
     runs-on: ubuntu-latest

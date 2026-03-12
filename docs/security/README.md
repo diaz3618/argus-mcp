@@ -36,6 +36,7 @@ Backend MCP Server
 | [Authorization](authorization.md) | RBAC policy enforcement |
 | [Secrets Management](secrets.md) | Encrypted secret store and resolution |
 | [Outgoing Auth](outgoing-auth.md) | Backend authentication (static headers, OAuth2) |
+| [Deployment Hardening](deployment-hardening.md) | Production checklist: secrets, TLS, SSRF, containers |
 
 ## Security Defaults
 

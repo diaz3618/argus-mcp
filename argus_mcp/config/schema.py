@@ -390,7 +390,13 @@ class ArgusConfig(BaseModel):
     )
     feature_flags: Dict[str, bool] = Field(
         default_factory=dict,
-        description="Feature flag overrides (flag_name → enabled).",
+        description=(
+            "Feature flag overrides (flag_name → enabled).  "
+            "Known flags: optimizer (high-risk, default off), "
+            "hot_reload, outgoing_auth, session_management, yaml_config, "
+            "container_isolation, build_on_startup (all low-risk, default on).  "
+            "High-risk flags are disabled by default and require explicit opt-in."
+        ),
     )
     plugins: PluginsConfig = Field(
         default_factory=PluginsConfig,

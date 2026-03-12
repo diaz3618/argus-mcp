@@ -31,6 +31,7 @@ argus-mcp = "argus_mcp.cli:main"
 [dependency-groups]
 dev = [
     "black>=24.4.2",
+    "import-linter>=2.1",
     "mypy>=1.17.1",
     "ruff>=0.14.13",
     "textual-dev>=1.0.0",
@@ -111,6 +112,37 @@ disable_error_code = ["attr-defined"]
 [[tool.mypy.overrides]]
 module = ["argus_mcp.tui.*"]
 ignore_errors = true
+
+# ── import-linter ────────────────────────────────────────────────────────
+# Layered architecture enforcement.  Higher layers may depend on lower,
+# but not the reverse.  Run: uv run lint-imports
+
+[tool.importlinter]
+root_package = "argus_mcp"
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "cli : tui",                                   # L5 — entry-points (non-independent)
+    "server",                                      # L4 — server
+    "bridge : runtime : plugins : registry : skills : workflows",  # L3 — business
+    "config : telemetry",                          # L2 — config
+    "display : audit : secrets : sessions",        # L1 — core services
+    "constants : errors : _task_utils : _error_utils",  # L0 — foundation
+]
+containers = ["argus_mcp"]
+ignore_imports = [
+    # bridge.middleware needs auth types from server.auth.providers
+    "argus_mcp.bridge.middleware.auth -> argus_mcp.server.auth.providers",
+    "argus_mcp.bridge.middleware.authz -> argus_mcp.server.auth.providers",
+    "argus_mcp.bridge.middleware.authz -> argus_mcp.server.authz.*",
+    # config.schema re-exports PluginsConfig for unified schema
+    "argus_mcp.config.schema -> argus_mcp.plugins.models",
+    # server.lifespan accesses cli.uvicorn_svr_inst for signal handling
+    "argus_mcp.server.lifespan -> argus_mcp.cli",
+]
 
 # ── pytest ───────────────────────────────────────────────────────────────
 
