@@ -24,6 +24,14 @@ class HealthResponse(BaseModel):
     backends: HealthBackends = Field(default_factory=HealthBackends)
 
 
+# ── /manage/v1/ready ─────────────────────────────────────────────────────
+
+
+class ReadyResponse(BaseModel):
+    ready: bool = False
+    reason: str = ""
+
+
 # ── /manage/v1/status ───────────────────────────────────────────────────
 
 

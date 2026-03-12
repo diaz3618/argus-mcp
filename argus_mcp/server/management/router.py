@@ -40,6 +40,7 @@ from argus_mcp.server.management.schemas import (
     HealthBackends,
     HealthResponse,
     PromptDetail,
+    ReadyResponse,
     ReAuthResponse,
     ReconnectResponse,
     ReloadResponse,
@@ -127,6 +128,21 @@ async def handle_health(request: Request) -> JSONResponse:
         ),
     )
     return JSONResponse(resp.model_dump())
+
+
+# ── GET /manage/v1/ready ────────────────────────────────────────────────
+
+
+async def handle_ready(request: Request) -> JSONResponse:
+    """Readiness probe — returns 200 when the gateway is ready to serve traffic."""
+    service = _get_service(request)
+    is_ready = service._ready_event.is_set()
+    if is_ready:
+        return JSONResponse(ReadyResponse(ready=True, reason="accepting traffic").model_dump())
+    return JSONResponse(
+        ReadyResponse(ready=False, reason="backends not connected").model_dump(),
+        status_code=503,
+    )
 
 
 # ── GET /manage/v1/status ───────────────────────────────────────────────
@@ -606,6 +622,7 @@ async def handle_sessions(request: Request) -> JSONResponse:
 management_routes = Router(
     routes=[
         Route("/health", endpoint=handle_health, methods=["GET"]),
+        Route("/ready", endpoint=handle_ready, methods=["GET"]),
         Route("/status", endpoint=handle_status, methods=["GET"]),
         Route("/backends", endpoint=handle_backends, methods=["GET"]),
         Route("/groups", endpoint=handle_groups, methods=["GET"]),

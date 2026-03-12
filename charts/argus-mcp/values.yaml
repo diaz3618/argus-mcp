@@ -1,0 +1,161 @@
+# Argus MCP Helm chart — default values
+# Override these in your values.yaml or via --set flags.
+
+# -- Number of gateway replicas
+replicaCount: 2
+
+image:
+  # -- Container image repository
+  repository: ghcr.io/diaz3618/argus-mcp
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Override the image tag (defaults to Chart.appVersion)
+  tag: ""
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- Annotations for the ServiceAccount
+  annotations: {}
+  # -- Name override (defaults to fullname)
+  name: ""
+
+# -- Pod-level annotations
+podAnnotations: {}
+
+# -- Pod-level security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# -- Container-level security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+gateway:
+  # -- Server port inside the container
+  port: 9000
+  # -- Server host binding
+  host: "0.0.0.0"  # nosec: binds to all interfaces inside pod
+  # -- Management API token (use existingSecret for production)
+  managementToken: ""
+  # -- Name of an existing Secret containing the management token
+  # Key must be "management-token"
+  existingSecret: ""
+  # -- Extra environment variables for the gateway container
+  extraEnv: []
+  # -- Mount a custom config.yaml from a ConfigMap
+  # If empty, the default example_config.yaml is used
+  configMapName: ""
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+# -- Startup probe (exec-based for config loading)
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /manage/v1/health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 12
+
+# -- Readiness probe (HTTP /manage/v1/ready)
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /manage/v1/ready
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 8
+
+# -- Liveness probe (HTTP /manage/v1/health)
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /manage/v1/health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 10
+
+autoscaling:
+  # -- Enable HPA
+  enabled: true
+  # -- Minimum replicas
+  minReplicas: 2
+  # -- Maximum replicas
+  maxReplicas: 10
+  # -- CPU utilization target (%)
+  targetCPUUtilizationPercentage: 90
+  # -- Memory utilization target (%)
+  targetMemoryUtilizationPercentage: 90
+
+service:
+  # -- Service type
+  type: ClusterIP
+  # -- Service port
+  port: 9000
+
+ingress:
+  # -- Enable Ingress
+  enabled: false
+  # -- Ingress class name
+  className: nginx
+  # -- Ingress annotations
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+  # -- Ingress hosts
+  hosts:
+    - host: argus-mcp.local
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration
+  tls: []
+  #  - secretName: argus-mcp-tls
+  #    hosts:
+  #      - argus-mcp.local
+
+networkPolicy:
+  # -- Enable NetworkPolicy
+  enabled: true
+  # -- Allow ingress from these pod selectors (empty = allow all)
+  allowFrom: []
+  # -- Deny egress to private networks (SSRF protection)
+  denyPrivateEgress: true
+
+# -- Node selector constraints
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}

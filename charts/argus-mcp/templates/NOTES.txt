@@ -1,0 +1,24 @@
+Argus MCP Gateway has been deployed.
+
+{{- if .Values.ingress.enabled }}
+Access the gateway via:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- else }}
+
+Get the gateway URL by running:
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "{{ include "argus-mcp.selectorLabels" . | replace "\n" "," }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 9000:$CONTAINER_PORT
+  echo "Gateway available at http://127.0.0.1:9000"
+{{- end }}
+
+Management API: /manage/v1/
+  Health:  /manage/v1/health
+  Ready:   /manage/v1/ready
+  Status:  /manage/v1/status
+
+{{- if .Values.autoscaling.enabled }}
+HPA is enabled ({{ .Values.autoscaling.minReplicas }}-{{ .Values.autoscaling.maxReplicas }} replicas).
+{{- end }}
