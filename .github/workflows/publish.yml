@@ -6,6 +6,10 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -30,6 +34,11 @@ jobs:
 
       - name: Build distribution packages
         run: python -m build
+
+      - name: Verify distribution packages
+        run: |
+          pip install twine
+          twine check dist/*
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4

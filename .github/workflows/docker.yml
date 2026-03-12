@@ -26,9 +26,14 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
+  id-token: write          # Cosign keyless (Sigstore/Fulcio OIDC)
 
 env:
   IMAGE_DOCKERHUB: diaz3618/argus-mcp
@@ -85,6 +90,7 @@ jobs:
 
       # ── Single build, push to both registries ────
       - name: Build and push
+        id: build-push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -95,6 +101,45 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # ── Supply-chain signing & attestation ───────
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign Docker Hub image
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: cosign sign --yes "${{ env.IMAGE_DOCKERHUB }}@${DIGEST}"
+
+      - name: Sign GHCR image
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: cosign sign --yes "${{ env.IMAGE_GHCR }}@${DIGEST}"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: "${{ env.IMAGE_DOCKERHUB }}@${{ steps.build-push.outputs.digest }}"
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Attest SBOM to Docker Hub image
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: |
+          cosign attest --yes \
+            --predicate sbom-spdx.json \
+            --type spdxjson \
+            "${{ env.IMAGE_DOCKERHUB }}@${DIGEST}"
+
+      - name: Attest SBOM to GHCR image
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: |
+          cosign attest --yes \
+            --predicate sbom-spdx.json \
+            --type spdxjson \
+            "${{ env.IMAGE_GHCR }}@${DIGEST}"
+
       # ── Job summary ──────────────────────────────
       - name: Summary
         run: |
@@ -102,6 +147,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Docker Hub:** \`${{ env.IMAGE_DOCKERHUB }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**GHCR:** \`${{ env.IMAGE_GHCR }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build-push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
           echo '${{ steps.meta.outputs.tags }}' | tr ',' '\n' | sed 's/^/- `/' | sed 's/$/`/' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Supply Chain:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Cosign keyless signature (Sigstore/Fulcio)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SBOM attestation (SPDX JSON)" >> $GITHUB_STEP_SUMMARY

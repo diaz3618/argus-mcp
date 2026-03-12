@@ -10,7 +10,23 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'argus_mcp/**'
+      - 'mods/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
   pull_request:
+    paths:
+      - 'argus_mcp/**'
+      - 'mods/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

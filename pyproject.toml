@@ -42,6 +42,7 @@ test = [
     "pytest-cov>=7.0.0",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.5.0",
+    "hypothesis>=6.100.0",
 ]
 
 [tool.black]
@@ -122,6 +123,10 @@ markers = [
     "live_server: tests that require a running argus-mcp gateway (deselect in CI)",
     "semgrep: tests requiring Semgrep CLI or API authentication",
     "slow: tests that take more than 10 seconds",
+    "fuzz: property-based / fuzz tests (Hypothesis)",
+    "security: security-focused tests (auth, token scope, negative)",
+    "e2e: end-to-end tests requiring full stack",
+    "stress: stress / load tests (concurrent, rapid-fire)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:anyio",

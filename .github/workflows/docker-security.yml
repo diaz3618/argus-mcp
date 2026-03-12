@@ -1,0 +1,217 @@
+# =============================================================================
+# Docker Security — Container image supply-chain hardening
+# =============================================================================
+#
+# Pipeline: Hadolint (Dockerfile lint) → Build → Dockle (CIS best practices)
+#           → Syft (SBOM generation) → Trivy (vulnerability scan)
+#
+# Runs on:
+#   - Push to main (path-filtered to Dockerfile changes)
+#   - Pull requests touching Dockerfile or docker-related files
+#   - Manual dispatch
+#
+# NOTE: The ci.yml container-scan job covers PR/push Trivy image scans.
+#       This workflow adds deeper supply-chain analysis: Hadolint, Dockle,
+#       Syft SBOM, and optionally Grype.
+# =============================================================================
+
+name: Docker Security
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - '.github/workflows/docker-security.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - '.github/workflows/docker-security.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: argus-mcp:security-check
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Hadolint — Dockerfile best-practices linter
+  # ──────────────────────────────────────────────
+  hadolint:
+    name: Hadolint (Dockerfile lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+          ignore: DL3008,DL3013
+          # DL3008: Pin versions in apt-get (we use --no-install-recommends)
+          # DL3013: Pin pip package versions (we pin pip explicitly)
+
+  # ──────────────────────────────────────────────
+  # Build — required for Dockle, Syft, Trivy
+  # ──────────────────────────────────────────────
+  build:
+    name: Build image
+    needs: [hadolint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (local)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save image tarball
+        run: docker save ${{ env.IMAGE_TAG }} -o /tmp/image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/image.tar
+          retention-days: 1
+
+  # ──────────────────────────────────────────────
+  # Dockle — CIS Docker Benchmark checks
+  # ──────────────────────────────────────────────
+  dockle:
+    name: Dockle (CIS benchmark)
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/image.tar
+
+      - name: Run Dockle
+        uses: erzz/dockle-action@v1
+        with:
+          image: ${{ env.IMAGE_TAG }}
+          failure-threshold: WARN
+          accept-keys: NGINX_GPGKEYS,NGINX_GPGKEY_PATH
+          # Accept some informational findings that are expected
+          exit-code: 1
+
+  # ──────────────────────────────────────────────
+  # Syft — SBOM generation (SPDX + CycloneDX)
+  # ──────────────────────────────────────────────
+  sbom:
+    name: Syft (SBOM)
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/image.tar
+
+      - name: Generate SBOM (SPDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_TAG }}
+          format: spdx-json
+          output-file: sbom-spdx.json
+
+      - name: Generate SBOM (CycloneDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_TAG }}
+          format: cyclonedx-json
+          output-file: sbom-cyclonedx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            sbom-spdx.json
+            sbom-cyclonedx.json
+          retention-days: 90
+
+  # ──────────────────────────────────────────────
+  # Trivy — deep image vulnerability scan
+  # ──────────────────────────────────────────────
+  trivy:
+    name: Trivy (vulnerability scan)
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load -i /tmp/image.tar
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: trivy-results.sarif
+          category: docker-security-trivy
+
+  # ──────────────────────────────────────────────
+  # Gate — all security checks must pass
+  # ──────────────────────────────────────────────
+  docker-security-passed:
+    name: Docker Security Passed
+    if: always()
+    needs:
+      - hadolint
+      - dockle
+      - sbom
+      - trivy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all security checks passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
