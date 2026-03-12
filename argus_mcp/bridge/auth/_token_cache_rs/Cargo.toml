@@ -1,0 +1,19 @@
+[package]
+name = "token-cache-rs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "token_cache_rs"
+crate-type = ["cdylib"]
+
+[dependencies.pyo3]
+version = "0.28"
+features = ["extension-module", "abi3-py311"]
+
+[dependencies]
+zeroize = "1"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
