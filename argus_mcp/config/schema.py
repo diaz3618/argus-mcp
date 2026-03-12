@@ -49,6 +49,7 @@ from argus_mcp.config.schema_server import (  # noqa: F401
     ManagementSettings,
     ServerSettings,
 )
+from argus_mcp.plugins.models import PluginsConfig  # noqa: F401
 
 __all__ = [
     # schema_backends
@@ -86,6 +87,7 @@ __all__ = [
     "TelemetrySettings",
     "SecretsConfig",
     "ArgusConfig",
+    "PluginsConfig",
 ]
 
 # ── Models that remain in this file (small, tightly coupled to top-level) ──
@@ -387,6 +389,10 @@ class ArgusConfig(BaseModel):
     feature_flags: Dict[str, bool] = Field(
         default_factory=dict,
         description="Feature flag overrides (flag_name → enabled).",
+    )
+    plugins: PluginsConfig = Field(
+        default_factory=PluginsConfig,
+        description="Plugin framework configuration.",
     )
 
     @field_validator("backends")

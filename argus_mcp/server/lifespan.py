@@ -240,13 +240,34 @@ async def _attach_to_mcp_server(
 
     mcp_svr_instance.telemetry_enabled = telemetry_enabled
 
-    # ── Middleware chain: Auth (opt.) → Recovery → Telemetry (opt.) → Audit → Routing
+    # ── Middleware chain: Auth (opt.) → Recovery → Plugin (opt.) → Telemetry (opt.) → Audit → Routing
     middlewares: list = []
     if auth_registry is not None:
         from argus_mcp.bridge.middleware.auth import AuthMiddleware
 
         middlewares.append(AuthMiddleware(auth_registry, auth_mode=auth_mode))
     middlewares.append(RecoveryMiddleware())
+
+    # ── Plugin framework (Phase 3) ──────────────────────────────────
+    plugin_manager: Any = None
+    if full_cfg is not None and full_cfg.plugins.enabled and full_cfg.plugins.entries:
+        try:
+            from argus_mcp.plugins import PluginManager, PluginMiddleware, PluginRegistry
+
+            plugin_registry = PluginRegistry()
+            plugin_registry.load_from_config(full_cfg.plugins.entries)
+            await plugin_registry.load_all()
+            plugin_manager = PluginManager(plugin_registry)
+            middlewares.append(PluginMiddleware(plugin_manager))
+            logger.info(
+                "Plugin framework enabled: %d plugin(s) loaded.",
+                plugin_registry.count,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Plugin framework init failed; continuing without plugins.", exc_info=True
+            )
+
     if telemetry_enabled:
         middlewares.append(TelemetryMiddleware())
     middlewares.append(AuditMiddleware(audit_logger=audit_logger))
@@ -359,6 +380,7 @@ async def _attach_to_mcp_server(
         optimizer_enabled=optimizer_enabled,
         optimizer_keep_list=keep_list,
         telemetry_enabled=telemetry_enabled,
+        plugin_manager=plugin_manager,
         composite_tools=getattr(mcp_svr_instance, "composite_tools", []),
     )
 

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from argus_mcp.bridge.optimizer import ToolIndex
     from argus_mcp.bridge.version_checker import VersionChecker
     from argus_mcp.config.flags import FeatureFlags
+    from argus_mcp.plugins.manager import PluginManager
     from argus_mcp.server.session import SessionManager
     from argus_mcp.skills.manager import SkillManager
 
@@ -39,6 +40,7 @@ class ServerState:
     optimizer_enabled: bool = False
     optimizer_keep_list: List[str] = field(default_factory=list)
     telemetry_enabled: bool = False
+    plugin_manager: Optional[PluginManager] = None
     composite_tools: List[Any] = field(default_factory=list)
 
 
@@ -66,5 +68,6 @@ def get_state(mcp_server: Any) -> ServerState:
         optimizer_enabled=getattr(mcp_server, "optimizer_enabled", False),
         optimizer_keep_list=getattr(mcp_server, "optimizer_keep_list", []),
         telemetry_enabled=getattr(mcp_server, "telemetry_enabled", False),
+        plugin_manager=getattr(mcp_server, "plugin_manager", None),
         composite_tools=getattr(mcp_server, "composite_tools", None) or [],
     )
