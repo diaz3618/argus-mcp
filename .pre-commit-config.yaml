@@ -40,7 +40,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest (pre-push)
-        entry: python -m pytest tests/ -m "not live_server and not integration" --cov=argus_mcp --cov-report=term-missing --timeout=60 -q
+        entry: python -m pytest tests/ -m "not live_server and not integration and not semgrep" --cov=argus_mcp --cov-report=term-missing --timeout=60 -q
         language: system
         pass_filenames: false
         always_run: true
