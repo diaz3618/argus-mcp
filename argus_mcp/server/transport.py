@@ -19,11 +19,16 @@ from argus_mcp.server.auth_context import (
     current_session_id,
     current_user,
 )
+from argus_mcp.server.sse_resilience import SseResilience
 
 logger = logging.getLogger(__name__)
 
 # Module-level SSE transport instance
 sse_transport = SseServerTransport(POST_MESSAGES_PATH)
+
+# Module-level SSE resilience guard. Configured during startup by lifespan
+# from ``sse_resilience`` config section; defaults are safe.
+_sse_resilience: SseResilience = SseResilience()
 
 # Module-level incoming auth provider. Set during startup by lifespan
 # when ``incoming_auth.type`` is not ``anonymous``.
@@ -67,7 +72,7 @@ async def _authenticate_request(scope: dict) -> None:
 
 
 async def handle_sse(request: Request) -> None:
-    """Handle incoming SSE connection requests."""
+    """Handle incoming SSE connection requests with resilience guards."""
     from argus_mcp.server.app import mcp_server
 
     logger.debug("Received new SSE connection request (GET): %s", request.url)
@@ -110,6 +115,11 @@ async def handle_sse(request: Request) -> None:
         request.receive,
         request._send,
     ) as (read_stream, write_stream):
+        # ── Wrap streams with resilience guards ──────────────────────
+        guarded_read, guarded_write, metrics = _sse_resilience.wrap_streams(
+            read_stream, write_stream
+        )
+
         try:
             srv_caps = {}
             if mcp_server.registry:
@@ -135,11 +145,19 @@ async def handle_sse(request: Request) -> None:
             "Running mcp_server.run (MCP main loop) for SSE connection with options: %s",
             init_opts,
         )
-        await mcp_server.run(read_stream, write_stream, init_opts)
-    # ── Clean up session on disconnect ───────────────────────────────
+        await mcp_server.run(guarded_read, guarded_write, init_opts)
+
+    # ── Clean up session with deadline ───────────────────────────────
     if session is not None and session_mgr is not None:
-        session_mgr.remove_session(session.id)
-    logger.debug("SSE connection closed: %s", request.url)
+
+        async def _do_cleanup() -> None:
+            session_mgr.remove_session(session.id)
+
+        await _sse_resilience.cleanup_with_deadline(
+            _do_cleanup(), label=f"session {session.id} cleanup"
+        )
+
+    _sse_resilience.log_connection_summary(metrics, url=str(request.url))
 
 
 async def handle_streamable_http(scope: Any, receive: Any, send: Any) -> None:

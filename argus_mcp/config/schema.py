@@ -79,6 +79,10 @@ __all__ = [
     "ConflictResolutionConfig",
     "AuditConfig",
     "OptimizerConfig",
+    "SessionPoolConfig",
+    "HttpPoolConfig",
+    "RetryConfig",
+    "SseResilienceConfig",
     "TelemetrySettings",
     "SecretsConfig",
     "ArgusConfig",
@@ -149,6 +153,143 @@ class TelemetrySettings(BaseModel):
     service_name: str = Field(
         default="argus-mcp",
         description="Service name reported to the OTel collector.",
+    )
+
+
+class RetryConfig(BaseModel):
+    """HTTP retry manager settings.
+
+    Controls automatic retry behaviour for retryable HTTP errors
+    (429, 502, 503, 504, 408) with exponential backoff and jitter.
+    """
+
+    enabled: bool = Field(default=True, description="Enable automatic HTTP retry.")
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum retry attempts per request.",
+    )
+    base_delay: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=30.0,
+        description="Initial delay in seconds before the first retry.",
+    )
+    backoff_factor: float = Field(
+        default=2.0,
+        ge=1.0,
+        le=10.0,
+        description="Multiplier applied to the delay after each retry.",
+    )
+    max_delay: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=300.0,
+        description="Upper bound on computed delay in seconds.",
+    )
+    jitter: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of delay used for random jitter.",
+    )
+
+
+class SseResilienceConfig(BaseModel):
+    """SSE stream resilience settings.
+
+    Configures cleanup deadlines, send timeouts, keepalive intervals,
+    and spin-loop detection for SSE transport connections.
+    """
+
+    enabled: bool = Field(default=True, description="Enable SSE stream resilience guards.")
+    send_timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=300.0,
+        description="Max seconds to push a single SSE frame before timeout.",
+    )
+    cleanup_deadline: float = Field(
+        default=15.0,
+        ge=1.0,
+        le=120.0,
+        description="Max seconds for post-disconnect session cleanup.",
+    )
+    keepalive_interval: float = Field(
+        default=30.0,
+        ge=0.0,
+        le=600.0,
+        description="Seconds between keepalive pings (0 disables).",
+    )
+    spin_loop_window: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=30.0,
+        description="Sliding window in seconds for spin-loop detection.",
+    )
+    spin_loop_threshold: int = Field(
+        default=200,
+        ge=10,
+        le=10000,
+        description="Max write calls within the spin window before warning.",
+    )
+
+
+class HttpPoolConfig(BaseModel):
+    """HTTP connection pool settings.
+
+    Controls the shared ``httpx.AsyncClient`` used for backend HTTP
+    traffic, registry calls, and management API requests.
+    """
+
+    enabled: bool = Field(default=True, description="Enable shared HTTP connection pooling.")
+    max_connections: int = Field(
+        default=200,
+        ge=1,
+        le=2000,
+        description="Maximum total simultaneous connections.",
+    )
+    max_keepalive: int = Field(
+        default=100,
+        ge=0,
+        le=2000,
+        description="Maximum idle keep-alive connections.",
+    )
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        le=300.0,
+        description="Default request timeout in seconds.",
+    )
+
+
+class SessionPoolConfig(BaseModel):
+    """MCP session pool settings.
+
+    Controls pooling of ``ClientSession`` objects so that reconnections
+    to the same backend endpoint can be avoided when the transport is
+    still healthy.
+    """
+
+    enabled: bool = Field(default=True, description="Enable MCP session pooling.")
+    per_key_max: int = Field(
+        default=4,
+        ge=1,
+        le=64,
+        description="Maximum pooled sessions per (url, identity, transport) key.",
+    )
+    ttl: float = Field(
+        default=300.0,
+        ge=10.0,
+        le=3600.0,
+        description="Time-to-live in seconds for idle pooled sessions.",
+    )
+    circuit_breaker_threshold: int = Field(
+        default=3,
+        ge=1,
+        le=50,
+        description="Consecutive failures before the pool circuit breaker opens for a key.",
     )
 
 
@@ -226,6 +367,22 @@ class ArgusConfig(BaseModel):
     authorization: AuthorizationConfig = Field(
         default_factory=AuthorizationConfig,
         description="Role-based authorization policy evaluation.",
+    )
+    session_pool: SessionPoolConfig = Field(
+        default_factory=SessionPoolConfig,
+        description="MCP session pool settings.",
+    )
+    http_pool: HttpPoolConfig = Field(
+        default_factory=HttpPoolConfig,
+        description="HTTP connection pool settings.",
+    )
+    retry: RetryConfig = Field(
+        default_factory=RetryConfig,
+        description="HTTP retry manager settings.",
+    )
+    sse_resilience: SseResilienceConfig = Field(
+        default_factory=SseResilienceConfig,
+        description="SSE stream resilience settings.",
     )
     feature_flags: Dict[str, bool] = Field(
         default_factory=dict,

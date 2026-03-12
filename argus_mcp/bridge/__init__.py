@@ -11,7 +11,14 @@ from argus_mcp.bridge.health import (
     HealthChecker,
     HealthState,
 )
+from argus_mcp.bridge.http_pool import HttpPool
 from argus_mcp.bridge.rename import RenameMap
+from argus_mcp.bridge.retry import (
+    NonRetryableError,
+    RetriesExhaustedError,
+    RetryManager,
+)
+from argus_mcp.bridge.session_pool import SessionKey, SessionPool
 
 __all__ = [
     "CapabilityFilter",
@@ -23,6 +30,12 @@ __all__ = [
     "GroupManager",
     "HealthChecker",
     "HealthState",
+    "HttpPool",
+    "NonRetryableError",
     "RenameMap",
+    "RetriesExhaustedError",
+    "RetryManager",
+    "SessionKey",
+    "SessionPool",
     "create_strategy",
 ]
