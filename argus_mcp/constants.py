@@ -17,6 +17,9 @@ STREAMABLE_HTTP_PATH = "/mcp"
 # Management API
 MANAGEMENT_API_PREFIX = "/manage/v1"
 
+# RFC 9728 OAuth Protected Resource Metadata (well-known endpoint)
+WELL_KNOWN_OAUTH_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
+
 # Logging defaults
 LOG_DIR = "logs"
 DEFAULT_LOG_FILE = "unknown_argus.log"

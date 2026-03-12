@@ -15,12 +15,14 @@ from argus_mcp.constants import (
     SERVER_NAME,
     SSE_PATH,
     STREAMABLE_HTTP_PATH,
+    WELL_KNOWN_OAUTH_RESOURCE_PATH,
 )
 from argus_mcp.server.handlers import register_handlers
 from argus_mcp.server.lifespan import app_lifespan
 from argus_mcp.server.management import create_management_app
 from argus_mcp.server.origin import OriginValidationMiddleware
 from argus_mcp.server.transport import handle_sse, handle_streamable_http, sse_transport
+from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ def create_app() -> Starlette:
     application = Starlette(
         lifespan=app_lifespan,
         routes=[
+            Route(WELL_KNOWN_OAUTH_RESOURCE_PATH, endpoint=handle_well_known_oauth_resource),
             Route(SSE_PATH, endpoint=handle_sse),
             Mount(POST_MESSAGES_PATH, app=sse_transport.handle_post_message),
             Mount(STREAMABLE_HTTP_PATH, app=_streamable_http_app),

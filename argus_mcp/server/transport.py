@@ -14,6 +14,7 @@ from starlette.responses import Response
 from argus_mcp.constants import POST_MESSAGES_PATH, SERVER_NAME, SERVER_VERSION
 from argus_mcp.server.auth.providers import AuthenticationError, AuthProviderRegistry
 from argus_mcp.server.auth_context import (
+    current_auth_mode,
     current_auth_token,
     current_client_ip,
     current_session_id,
@@ -34,6 +35,31 @@ _sse_resilience: SseResilience = SseResilience()
 # when ``incoming_auth.type`` is not ``anonymous``.
 _incoming_auth_provider: Optional[AuthProviderRegistry] = None
 
+# Module-level auth mode. Set during startup by lifespan from
+# ``incoming_auth.auth_mode``; defaults to "strict".
+_auth_mode: str = "strict"
+
+# Module-level issuer URL for WWW-Authenticate headers (RFC 6750).
+# Set during startup from ``incoming_auth.issuer``.
+_auth_issuer: Optional[str] = None
+
+
+def _build_www_authenticate(error: Optional[str] = None) -> str:
+    """Build a ``WWW-Authenticate: Bearer`` header value per RFC 6750 §3.
+
+    Includes ``realm`` (from configured issuer) and optional ``error``.
+    """
+    parts = ["Bearer"]
+    params: list[str] = []
+    if _auth_issuer:
+        params.append(f'realm="{_auth_issuer}"')
+    if error:
+        params.append(f'error="{error}"')
+    if params:
+        parts.append(" ")
+        parts.append(", ".join(params))
+    return "".join(parts)
+
 
 def _extract_bearer_token(scope: dict) -> Optional[str]:
     """Extract a bearer token from the ASSI scope's ``headers``."""
@@ -52,6 +78,9 @@ async def _authenticate_request(scope: dict) -> None:
     No-op when ``_incoming_auth_provider`` is *None* (anonymous mode).
     Raises :class:`AuthenticationError` on failure.
     """
+    # Always publish the configured auth mode so downstream handlers can read it.
+    current_auth_mode.set(_auth_mode)
+
     # Extract session-id and client IP regardless of auth mode
     for name, value in scope.get("headers", []):
         if name == b"mcp-session-id":
@@ -82,7 +111,15 @@ async def handle_sse(request: Request) -> None:
         await _authenticate_request(request.scope)
     except AuthenticationError as exc:
         logger.warning("SSE auth rejected: %s", exc)
-        response = Response(status_code=401, content="Unauthorized")
+        # Determine error type: missing token vs invalid token
+        token = _extract_bearer_token(request.scope)
+        error_type = "invalid_token" if token else None
+        www_auth = _build_www_authenticate(error=error_type)
+        response = Response(
+            status_code=401,
+            content="Unauthorized",
+            headers={"WWW-Authenticate": www_auth},
+        )
         await response(request.scope, request.receive, request._send)
         return
 
@@ -186,7 +223,14 @@ async def handle_streamable_http(scope: Any, receive: Any, send: Any) -> None:
         await _authenticate_request(scope)
     except AuthenticationError as exc:
         logger.warning("Streamable-HTTP auth rejected: %s", exc)
-        response = Response(status_code=401, content="Unauthorized")
+        token = _extract_bearer_token(scope)
+        error_type = "invalid_token" if token else None
+        www_auth = _build_www_authenticate(error=error_type)
+        response = Response(
+            status_code=401,
+            content="Unauthorized",
+            headers={"WWW-Authenticate": www_auth},
+        )
         await response(scope, receive, send)
         return
 

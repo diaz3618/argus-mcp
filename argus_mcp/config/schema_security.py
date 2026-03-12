@@ -17,6 +17,16 @@ class IncomingAuthConfig(BaseModel):
         default="anonymous",
         description="Auth type: anonymous (no auth), local (static token), jwt, or oidc.",
     )
+    auth_mode: Literal["strict", "permissive"] = Field(
+        default="strict",
+        description=(
+            "Auth enforcement mode. "
+            "'strict': reject all unauthenticated requests (default). "
+            "'permissive': allow unauthenticated access to public resources, "
+            "but OAuth-protected resources still require auth. "
+            "Invalid bearer tokens are ALWAYS rejected in both modes."
+        ),
+    )
     token: Optional[str] = Field(
         default=None,
         description="Static bearer token (for 'local' type). Supports ${ENV_VAR}.",

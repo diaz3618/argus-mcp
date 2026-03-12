@@ -9,7 +9,7 @@ handler code (``handlers.py``) reads it to populate
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import Optional
+from typing import Literal, Optional
 
 from argus_mcp.server.auth.providers import UserIdentity
 
@@ -20,3 +20,7 @@ current_auth_token: ContextVar[Optional[str]] = ContextVar("current_auth_token",
 current_session_id: ContextVar[Optional[str]] = ContextVar("current_session_id", default=None)
 
 current_client_ip: ContextVar[Optional[str]] = ContextVar("current_client_ip", default=None)
+
+current_auth_mode: ContextVar[Literal["strict", "permissive"]] = ContextVar(
+    "current_auth_mode", default="strict"
+)

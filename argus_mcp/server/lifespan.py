@@ -188,17 +188,30 @@ async def _attach_to_mcp_server(
     # transport module so the ASGI-level auth gate validates requests
     # before they reach the MCP SDK.
     auth_registry: AuthProviderRegistry | None = None
+    auth_mode: str = "strict"
     if full_cfg is not None:
         incoming_auth_type = full_cfg.incoming_auth.type
+        auth_mode = full_cfg.incoming_auth.auth_mode
         if incoming_auth_type != "anonymous":
             auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
             import argus_mcp.server.transport as _transport_mod
 
             _transport_mod._incoming_auth_provider = auth_registry
+            _transport_mod._auth_mode = auth_mode
+            _transport_mod._auth_issuer = full_cfg.incoming_auth.issuer
             logger.info(
-                "Incoming auth enabled: type=%s (ASGI gate active on transports).",
+                "Incoming auth enabled: type=%s, mode=%s (ASGI gate active on transports).",
                 incoming_auth_type,
+                auth_mode,
             )
+        elif auth_mode == "permissive":
+            # Anonymous + permissive: still create a registry so the auth
+            # middleware can inject anonymous identities consistently.
+            auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
+            import argus_mcp.server.transport as _transport_mod
+
+            _transport_mod._auth_mode = auth_mode
+            logger.info("Incoming auth: anonymous with permissive mode (tracking enabled).")
         else:
             logger.info("Incoming auth: anonymous (no ASGI gate).")
     else:
@@ -232,7 +245,7 @@ async def _attach_to_mcp_server(
     if auth_registry is not None:
         from argus_mcp.bridge.middleware.auth import AuthMiddleware
 
-        middlewares.append(AuthMiddleware(auth_registry))
+        middlewares.append(AuthMiddleware(auth_registry, auth_mode=auth_mode))
     middlewares.append(RecoveryMiddleware())
     if telemetry_enabled:
         middlewares.append(TelemetryMiddleware())
