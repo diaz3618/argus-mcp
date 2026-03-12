@@ -90,8 +90,22 @@ class PluginBase(abc.ABC):
         """Called before a prompt is fetched from the backend."""
         return ctx
 
+    async def prompt_post_fetch(self, ctx: PluginContext) -> PluginContext:
+        """Called after a prompt is fetched from the backend.
+
+        ``ctx.result`` contains the backend response.
+        """
+        return ctx
+
     async def resource_pre_fetch(self, ctx: PluginContext) -> PluginContext:
         """Called before a resource is read from the backend."""
+        return ctx
+
+    async def resource_post_fetch(self, ctx: PluginContext) -> PluginContext:
+        """Called after a resource is read from the backend.
+
+        ``ctx.result`` contains the backend response.
+        """
         return ctx
 
     async def on_load(self) -> None:

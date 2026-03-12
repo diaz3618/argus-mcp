@@ -141,6 +141,18 @@ class PluginManager:
     ) -> PluginContext:
         return await self.run_hook("resource_pre_fetch", ctx)
 
+    async def run_prompt_post_fetch(
+        self,
+        ctx: PluginContext,
+    ) -> PluginContext:
+        return await self.run_hook("prompt_post_fetch", ctx)
+
+    async def run_resource_post_fetch(
+        self,
+        ctx: PluginContext,
+    ) -> PluginContext:
+        return await self.run_hook("resource_post_fetch", ctx)
+
     # ── Internal helpers ─────────────────────────────────────────────
 
     @staticmethod

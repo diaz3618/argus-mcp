@@ -18,6 +18,12 @@ _PRE_HOOKS = {
     "get_prompt": "prompt_pre_fetch",
 }
 
+_POST_HOOKS = {
+    "call_tool": "tool_post_invoke",
+    "read_resource": "resource_post_fetch",
+    "get_prompt": "prompt_post_fetch",
+}
+
 
 class PluginMiddleware:
     """MCPMiddleware that runs plugin hooks before and after the chain.
@@ -52,11 +58,12 @@ class PluginMiddleware:
         # ── Delegate to next handler ─────────────────────────────
         result = await next_handler(ctx)
 
-        # ── Post-hook (tool calls only) ──────────────────────────
-        if mcp_method == "call_tool":
+        # ── Post-hook ────────────────────────────────────────────
+        post_hook = _POST_HOOKS.get(mcp_method)
+        if post_hook:
             plugin_ctx = _request_to_plugin_ctx(ctx, result=result)
             plugin_ctx = await self._manager.run_hook(
-                "tool_post_invoke",
+                post_hook,
                 plugin_ctx,
                 capability_name=ctx.capability_name,
                 server_name=ctx.server_name or "",
