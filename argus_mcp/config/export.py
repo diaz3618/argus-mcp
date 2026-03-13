@@ -145,7 +145,6 @@ def export_config(
     data: Dict[str, Any] = {"version": config.version}
     counts: Dict[str, int] = {}
 
-    # ── Backends ────────────────────────────────────────────────────
     if "backends" in export_filter.entity_types:
         exported_backends: Dict[str, Any] = {}
         for name, backend in config.backends.items():
@@ -155,7 +154,6 @@ def export_config(
         data["backends"] = exported_backends
         counts["backends"] = len(exported_backends)
 
-    # ── Registries ──────────────────────────────────────────────────
     if "registries" in export_filter.entity_types:
         exported_registries: List[Dict[str, Any]] = []
         for reg in config.registries:
@@ -166,18 +164,15 @@ def export_config(
         data["registries"] = exported_registries
         counts["registries"] = len(exported_registries)
 
-    # ── Feature flags ───────────────────────────────────────────────
     if "feature_flags" in export_filter.entity_types:
         data["feature_flags"] = dict(config.feature_flags)
         counts["feature_flags"] = len(config.feature_flags)
 
-    # ── Plugins ─────────────────────────────────────────────────────
     if "plugins" in export_filter.entity_types:
         if hasattr(config.plugins, "model_dump"):
             data["plugins"] = config.plugins.model_dump(exclude_defaults=False)
         counts["plugins"] = 1
 
-    # ── Secret handling ─────────────────────────────────────────────
     if secret_handling == SecretHandling.MASK:
         data = _mask_secrets(data)
     elif secret_handling == SecretHandling.STRIP:

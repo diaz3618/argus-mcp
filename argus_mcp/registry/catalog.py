@@ -30,13 +30,8 @@ from argus_mcp.config.schema_backends import (
 
 logger = logging.getLogger(__name__)
 
-# ── Limits ──────────────────────────────────────────────────────────
-
 MAX_CATALOG_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
 MAX_CATALOG_ENTRIES: int = 500
-
-
-# ── Enums ───────────────────────────────────────────────────────────
 
 
 class CatalogEntryStatus(str, Enum):
@@ -48,9 +43,6 @@ class CatalogEntryStatus(str, Enum):
     FAILED = "failed"
     HEALTH_OK = "health_ok"
     HEALTH_FAILED = "health_failed"
-
-
-# ── Models ──────────────────────────────────────────────────────────
 
 
 class CatalogEntry(BaseModel):
@@ -122,9 +114,6 @@ class CatalogResult(BaseModel):
         if self.failed_count:
             parts.append(f"failed={self.failed_count}")
         return ", ".join(parts)
-
-
-# ── Parsing ─────────────────────────────────────────────────────────
 
 
 class CatalogParseError(Exception):
@@ -208,9 +197,6 @@ def _parse_entry(name: str, raw: Dict[str, Any]) -> CatalogEntry:
         raise CatalogParseError(msg) from exc
 
 
-# ── Backend conversion ──────────────────────────────────────────────
-
-
 def _entry_to_backend(
     entry: CatalogEntry,
     *,
@@ -274,8 +260,6 @@ def _entry_to_backend(
     msg = f"Unsupported transport '{transport}' for entry '{entry.name}'"
     raise ValueError(msg)
 
-
-# ── Stage & Commit ──────────────────────────────────────────────────
 
 # Type alias for optional async health-check callback.
 # Signature: (name, backend_config) → True if healthy

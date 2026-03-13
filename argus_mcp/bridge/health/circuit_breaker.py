@@ -17,8 +17,6 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration defaults ───────────────────────────────────────────────
-
 DEFAULT_FAILURE_THRESHOLD = 3
 DEFAULT_COOLDOWN_SECONDS = 60.0
 
@@ -59,8 +57,6 @@ class CircuitBreaker:
         self._last_failure_time: float = 0.0
         self._last_success_time: float = 0.0
 
-    # ── Properties ───────────────────────────────────────────────────────
-
     @property
     def state(self) -> CircuitState:
         """Current circuit state, with automatic OPEN → HALF_OPEN transition."""
@@ -87,8 +83,6 @@ class CircuitBreaker:
         """
         s = self.state  # triggers auto-transition check
         return s in (CircuitState.CLOSED, CircuitState.HALF_OPEN)
-
-    # ── Transition methods ───────────────────────────────────────────────
 
     def record_success(self) -> None:
         """Record a successful probe/request — closes the circuit."""
@@ -126,8 +120,6 @@ class CircuitBreaker:
         self._state = CircuitState.CLOSED
         self._consecutive_failures = 0
         logger.info("[%s] Circuit breaker force-reset to CLOSED", self.name)
-
-    # ── Serialisation ────────────────────────────────────────────────────
 
     def to_dict(self) -> dict[str, Any]:
         """Snapshot for the management API / TUI."""

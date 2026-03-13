@@ -18,8 +18,6 @@ from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker, CircuitState
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration defaults ───────────────────────────────────────────────
-
 DEFAULT_CHECK_INTERVAL = 30.0  # seconds
 DEFAULT_PROBE_TIMEOUT = 10.0  # seconds
 DEFAULT_DEGRADED_LATENCY_MS = 5000.0  # threshold for "degraded"
@@ -111,8 +109,6 @@ class HealthChecker:
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._stopped = asyncio.Event()
 
-    # ── Public API ───────────────────────────────────────────────────────
-
     def start(self) -> None:
         """Launch the background check loop."""
         if self._task is not None and not self._task.done():
@@ -154,8 +150,6 @@ class HealthChecker:
             h.circuit.reset()
             h.state = HealthState.UNKNOWN
             logger.info("[%s] Health reset by operator", name)
-
-    # ── Background loop ─────────────────────────────────────────────────
 
     async def _run(self) -> None:
         """Periodically probe all backends."""
@@ -239,8 +233,6 @@ class HealthChecker:
 
         self._notify(name, old_state, health.state)
 
-    # ── Status record synchronization ──────────────────────────────────
-
     def _sync_status_record(self, name: str, health: BackendHealth) -> None:
         """Update the BackendStatusRecord phase from health check results."""
         record = self._manager.get_status_record(name)
@@ -277,8 +269,6 @@ class HealthChecker:
                 "Warning",
                 f"Skipped transition to {target_phase.value}: {msg}",
             )
-
-    # ── Capability visibility ────────────────────────────────────────────
 
     def _hide_backend_capabilities(self, name: str) -> None:
         """Remove a backend's capabilities from the exposed lists."""

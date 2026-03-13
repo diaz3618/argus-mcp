@@ -71,7 +71,6 @@ class ToolbarWidget(Widget):
     """
 
     def compose(self) -> ComposeResult:
-        # ── Modes ──
         yield Label(" ", classes="_cat-label")
         yield _ToolbarAction("1·Dash", "switch_mode('dashboard')")
         yield _ToolbarAction("2·Tools", "switch_mode('tools')")
@@ -91,7 +90,6 @@ class ToolbarWidget(Widget):
         yield _ToolbarAction("P", "show_prompts")
         yield _ToolbarSep()
 
-        # ── Appearance ──
         yield Label("Appearance: ", classes="_cat-label")
         yield _ToolbarAction("Themes", "open_theme_picker")
         yield _ToolbarAction("Next", "next_theme")

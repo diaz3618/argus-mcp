@@ -64,8 +64,6 @@ class ArgusService:
         await service.stop()
     """
 
-    # ── Initialisation ──────────────────────────────────────────────
-
     def __init__(self) -> None:
         self._state: ServiceState = ServiceState.PENDING
         self._started_at: Optional[datetime] = None
@@ -106,8 +104,6 @@ class ArgusService:
         # Event IDs use uuid4 to avoid race conditions across concurrent callers
 
         logger.info("ArgusService initialized (state=%s).", self._state.value)
-
-    # ── Properties ─────────────────────────────────────────────────
 
     @property
     def state(self) -> ServiceState:
@@ -170,8 +166,6 @@ class ArgusService:
     @property
     def is_running(self) -> bool:
         return self._state == ServiceState.RUNNING
-
-    # ── State Machine ──────────────────────────────────────────────
 
     def _build_registry(self) -> CapabilityRegistry:
         """Create a new CapabilityRegistry with the current conflict strategy."""
@@ -282,8 +276,6 @@ class ArgusService:
             f"State changed: {prev.value} → {target.value}",
             severity="info",
         )
-
-    # ── Lifecycle: start ───────────────────────────────────────────
 
     async def start(
         self,
@@ -460,8 +452,6 @@ class ArgusService:
             self._ready_event.clear()
             raise
 
-    # ── Lifecycle: stop ────────────────────────────────────────────
-
     async def stop(self) -> None:
         """Execute the full shutdown sequence.
 
@@ -509,8 +499,6 @@ class ArgusService:
             self._transition(ServiceState.ERROR)
         finally:
             self._ready_event.clear()
-
-    # ── Lifecycle: reload ──────────────────────────────────────────
 
     async def reload(self) -> Dict[str, Any]:
         """Hot-reload config: re-read from disk, diff, and reconnect changed backends.
@@ -651,8 +639,6 @@ class ArgusService:
         if has_errors:
             logger.warning("Auto-reload completed with errors: %s", result["errors"])
 
-    # ── Lifecycle: reconnect single backend ────────────────────────
-
     async def reconnect_backend(self, name: str) -> Dict[str, Any]:
         """Disconnect and reconnect a single backend by name.
 
@@ -743,8 +729,6 @@ class ArgusService:
             "error": f"Failed to reconnect backend '{name}'.",
         }
 
-    # ── Lifecycle: re-authenticate single backend ──────────────────
-
     async def reauth_backend(self, name: str) -> Dict[str, Any]:
         """Trigger interactive re-authentication for a single backend.
 
@@ -793,8 +777,6 @@ class ArgusService:
             logger.error("Re-auth for '%s' failed: %s", name, msg)
             return {"name": name, "reauth_initiated": False, "error": msg}
 
-    # ── Lifecycle: shutdown (from API) ─────────────────────────────
-
     async def shutdown(self, timeout_seconds: int = SHUTDOWN_TIMEOUT) -> None:
         """Initiate graceful shutdown from the management API.
 
@@ -808,8 +790,6 @@ class ArgusService:
             logger.error("Shutdown timed out after %ds — forcing ERROR state.", timeout_seconds)
             self._error_message = f"Shutdown timed out after {timeout_seconds}s"
             self._state = ServiceState.ERROR
-
-    # ── Internal: backend connect/disconnect helpers ──────────────
 
     async def _disconnect_backend(self, name: str) -> None:
         """Disconnect a single backend by name.
@@ -834,8 +814,6 @@ class ArgusService:
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to connect backend '%s': %s", name, exc)
             return False
-
-    # ── Status reporting ──────────────────────────────────────────
 
     def get_status(self) -> ServiceStatus:
         """Build a snapshot of the current service status."""
@@ -876,8 +854,6 @@ class ArgusService:
         status.compute_uptime()
         return status
 
-    # ── Health change callback ────────────────────────────────────
-
     def _on_health_change(self, backend: str, old_state: Any, new_state: Any) -> None:
         """Called by HealthChecker when a backend's health state changes."""
         sev = "warning" if new_state.value == "unhealthy" else "info"
@@ -888,8 +864,6 @@ class ArgusService:
             backend=backend,
             details={"old": old_state.value, "new": new_state.value},
         )
-
-    # ── Event system ──────────────────────────────────────────────
 
     def emit_event(
         self,
@@ -947,8 +921,6 @@ class ArgusService:
             logger.debug("Event subscriber removed (total: %d).", len(self._event_subscribers))
         except ValueError:
             pass
-
-    # ── Readiness ─────────────────────────────────────────────────
 
     async def wait_until_ready(self, timeout: Optional[float] = None) -> bool:
         """Block until the service reaches RUNNING state.

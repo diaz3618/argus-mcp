@@ -1,12 +1,8 @@
 /* Argus MCP TUI Layout */
 
-/* ── Global ─────────────────────────────────────────────────────── */
-
 Screen {
     background: $surface;
 }
-
-/* ── Top-level layout ───────────────────────────────────────────── */
 
 #top-row {
     height: 2fr;
@@ -22,10 +18,6 @@ Screen {
 #main-area {
     height: 100%;
 }
-
-/* ── Server-info panel ──────────────────────────────────────────── */
-
-/* ── Server selector ────────────────────────────────────────────── */
 
 #srv-selector {
     height: auto;
@@ -45,8 +37,6 @@ Screen {
     max-height: 6;
     scrollbar-size: 1 1;
 }
-
-/* ── Server-info panel ──────────────────────────────────────────── */
 
 ServerInfoWidget {
     height: auto;
@@ -72,8 +62,6 @@ ServerInfoWidget #title-row {
     margin-bottom: 1;
 }
 
-/* ── Backend-status panel ───────────────────────────────────────── */
-
 BackendStatusWidget {
     height: auto;
     max-height: 12;
@@ -95,8 +83,6 @@ BackendStatusWidget #backend-table {
 BackendStatusWidget #backend-detail {
     color: $text;
 }
-
-/* ── Backend detail modal ───────────────────────────────────────── */
 
 BackendDetailModal {
     align: center middle;
@@ -133,8 +119,6 @@ BackendDetailModal #bdm-actions {
     margin-top: 1;
 }
 
-/* ── Event log ──────────────────────────────────────────────────── */
-
 EventLogWidget {
     border: round $accent;
     min-height: 8;
@@ -144,8 +128,6 @@ EventLogWidget RichLog {
     height: 100%;
     scrollbar-size: 1 1;
 }
-
-/* ── Capability tables ──────────────────────────────────────────── */
 
 #cap-section {
     height: 1fr;
@@ -165,8 +147,6 @@ EventLogWidget RichLog {
     height: 1fr;
 }
 
-/* ── Footer bindings ────────────────────────────────────────────── */
-
 Footer {
     background: $panel;
 }
@@ -175,8 +155,6 @@ Header {
     background: $panel;
     color: $text;
 }
-
-/* ── Tools mode ─────────────────────────────────────────────────── */
 
 #tools-layout {
     height: 1fr;
@@ -226,8 +204,6 @@ Header {
     color: $text-muted;
 }
 
-/* ── Registry mode ──────────────────────────────────────────────── */
-
 #registry-content {
     height: 1fr;
 }
@@ -261,8 +237,6 @@ Header {
     border: round $primary;
     padding: 1;
 }
-
-/* ── Settings mode ──────────────────────────────────────────────── */
 
 #settings-tabs {
     height: 1fr;
@@ -328,8 +302,6 @@ Header {
     padding: 0 1;
 }
 
-/* ── Skills mode ────────────────────────────────────────────────── */
-
 #skills-container {
     height: 1fr;
 }
@@ -381,8 +353,6 @@ Header {
     margin-right: 1;
 }
 
-/* ── Tool Editor mode ───────────────────────────────────────────── */
-
 #tool-list-panel {
     width: 1fr;
     border: solid $primary;
@@ -408,8 +378,6 @@ Header {
 .editor-section {
     margin-bottom: 1;
 }
-
-/* ── Audit Log mode ─────────────────────────────────────────────── */
 
 #audit-layout {
     height: 1fr;
@@ -449,14 +417,10 @@ Header {
     color: $text-muted;
 }
 
-/* ── Settings — new tabs ────────────────────────────────────────── */
-
 #registries-section {
     padding: 1 2;
     height: 1fr;
 }
-
-/* ── Security screen ────────────────────────────────────────────── */
 
 #sec-auth-section,
 #sec-authz-section {
@@ -494,13 +458,9 @@ Header {
     margin-top: 1;
 }
 
-/* ── Exit modal ─────────────────────────────────────────────────── */
-
 ExitModal {
     align: center middle;
 }
-
-/* ── Server Logs screen ──────────────────────────────────────────── */
 
 #srvlog-filter-bar {
     height: 3;
@@ -523,8 +483,6 @@ ExitModal {
 
 #srvlog-stats { dock: right; width: auto; color: $text-muted; }
 
-/* ── Export / Import screen ──────────────────────────────────────── */
-
 #ei-tabs { height: 1fr; }
 
 #export-control-bar,
@@ -543,8 +501,6 @@ ExitModal {
 
 #export-yaml-output,
 #import-yaml-input { height: 1fr; min-height: 6; }
-
-/* ── Catalog Browser screen ──────────────────────────────────────── */
 
 #catalog-control-bar {
     height: 3;
@@ -565,8 +521,6 @@ ExitModal {
 }
 
 #catalog-stats { dock: right; width: auto; color: $text-muted; }
-
-/* ── Tool Ops panel (inside Operations tab) ──────────────────────── */
 
 #toolops-control-bar {
     height: 3;

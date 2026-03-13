@@ -20,9 +20,6 @@ from argus_mcp.bridge.auth.token_cache import TokenCache
 logger = logging.getLogger(__name__)
 
 
-# ── Abstract base ─────────────────────────────────────────────────────
-
-
 class AuthProvider(abc.ABC):
     """Base class for outgoing-authentication strategies."""
 
@@ -37,9 +34,6 @@ class AuthProvider(abc.ABC):
     @abc.abstractmethod
     def redacted_repr(self) -> str:
         """Human-readable description with sensitive values masked."""
-
-
-# ── Static headers ───────────────────────────────────────────────────
 
 
 class StaticTokenProvider(AuthProvider):
@@ -67,9 +61,6 @@ class StaticTokenProvider(AuthProvider):
             else:
                 safe[k] = v
         return f"StaticTokenProvider(headers={safe})"
-
-
-# ── OAuth 2.0 Client Credentials ────────────────────────────────────
 
 
 class OAuth2Provider(AuthProvider):
@@ -143,9 +134,6 @@ class OAuth2Provider(AuthProvider):
             f"client_id={self._client_id!r}, "
             f"client_secret={_redact(self._client_secret)})"
         )
-
-
-# ── OAuth 2.0 Authorization Code + PKCE ─────────────────────────────
 
 
 class PKCEAuthProvider(AuthProvider):
@@ -314,9 +302,6 @@ class PKCEAuthProvider(AuthProvider):
         )
 
 
-# ── Factory ──────────────────────────────────────────────────────────
-
-
 def create_auth_provider(
     auth_cfg: Dict[str, Any],
     *,
@@ -376,9 +361,6 @@ def create_auth_provider(
         )
 
     raise ValueError(f"Unknown auth type: {auth_type!r}")
-
-
-# ── Helpers ──────────────────────────────────────────────────────────
 
 
 def _redact(value: str, visible: int = 4) -> str:

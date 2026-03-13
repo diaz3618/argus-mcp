@@ -17,8 +17,6 @@ from argus_mcp.tui.api_client import ApiClient
 
 logger = logging.getLogger(__name__)
 
-# ── Persistence path ────────────────────────────────────────────────
-
 _CONFIG_DIR = os.path.realpath(
     os.path.join(
         os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
@@ -26,9 +24,6 @@ _CONFIG_DIR = os.path.realpath(
     )
 )
 _SERVERS_FILE = os.path.join(_CONFIG_DIR, "servers.json")
-
-
-# ── Data classes ────────────────────────────────────────────────────
 
 
 @dataclass
@@ -40,9 +35,6 @@ class ServerEntry:
     token: Optional[str] = None
     client: Optional[ApiClient] = field(default=None, repr=False)
     connected: bool = False
-
-
-# ── ServerManager ───────────────────────────────────────────────────
 
 
 class ServerManager:
@@ -64,8 +56,6 @@ class ServerManager:
         self._config_path = os.path.realpath(config_path or _SERVERS_FILE)
         self._servers: Dict[str, ServerEntry] = {}
         self._active_name: Optional[str] = None
-
-    # ── Properties ──────────────────────────────────────────────
 
     @property
     def active_name(self) -> Optional[str]:
@@ -100,8 +90,6 @@ class ServerManager:
     @property
     def count(self) -> int:
         return len(self._servers)
-
-    # ── Add / Remove ────────────────────────────────────────────
 
     def add(
         self,
@@ -148,8 +136,6 @@ class ServerManager:
             raise KeyError(f"No server named '{name}'")
         self._active_name = name
         logger.info("Active server set to '%s'", name)
-
-    # ── Connection lifecycle ────────────────────────────────────
 
     async def connect(self, name: str) -> None:
         """Create and connect the :class:`ApiClient` for *name*."""
@@ -212,8 +198,6 @@ class ServerManager:
         if name in self._servers:
             self._servers[name].connected = True
 
-    # ── Persistence ─────────────────────────────────────────────
-
     def load(self) -> None:
         """Load the server list from ``servers.json``.
 
@@ -273,8 +257,6 @@ class ServerManager:
             logger.debug("Saved %d server(s) to %s", len(servers_list), self._config_path)
         except OSError:
             logger.warning("Could not save servers.json", exc_info=True)
-
-    # ── Convenience constructors ────────────────────────────────
 
     @classmethod
     def from_single(

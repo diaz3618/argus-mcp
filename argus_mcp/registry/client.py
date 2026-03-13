@@ -44,8 +44,6 @@ class RegistryClient:
         self._timeout = timeout
         self._client: Any = None  # lazy httpx.AsyncClient
 
-    # ── lifecycle ───────────────────────────────────────────────────
-
     async def _ensure_client(self) -> Any:
         if self._client is None:
             import httpx  # lazy import
@@ -62,8 +60,6 @@ class RegistryClient:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
-
-    # ── public API ──────────────────────────────────────────────────
 
     async def list_servers(
         self,
@@ -131,8 +127,6 @@ class RegistryClient:
             cached = self._fallback_page().servers
             q = query.lower()
             return [s for s in cached if q in s.name.lower() or q in s.description.lower()]
-
-    # ── fallbacks ───────────────────────────────────────────────────
 
     def _fallback_page(self) -> ServerPage:
         if self._cache:

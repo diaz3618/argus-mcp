@@ -44,8 +44,6 @@ _PID_FILE = os.path.join(
     "argus-mcp.pid",
 )
 
-# ── ``argus-mcp server`` ─────────────────────────────────────────────
-
 
 async def _run_server(
     host: str,
@@ -345,9 +343,6 @@ def _cmd_server(args: argparse.Namespace) -> None:
         module_logger.info("%s application finished.", SERVER_NAME)
 
 
-# ── ``argus-mcp stop`` ────────────────────────────────────────────────
-
-
 def _cleanup_pid_file() -> None:
     """Remove the legacy PID file, ignoring missing files."""
     try:
@@ -460,9 +455,6 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     _stop_legacy_pid()
 
 
-# ── ``argus-mcp status`` ──────────────────────────────────────────────
-
-
 def _cmd_status(_args: argparse.Namespace) -> None:
     """Entry-point for ``argus-mcp status``."""
     from argus_mcp.sessions import list_sessions
@@ -487,9 +479,6 @@ def _cmd_status(_args: argparse.Namespace) -> None:
         )
 
     print(f"\n{len(sessions)} session(s) running.")
-
-
-# ── ``argus-mcp tui`` ────────────────────────────────────────────────
 
 
 def _load_client_config(
@@ -589,9 +578,6 @@ def _cmd_tui(args: argparse.Namespace) -> None:
         module_logger.info("%s TUI finished.", SERVER_NAME)
 
 
-# ── Terminal restoration helper ──────────────────────────────────────────
-
-
 def _restore_terminal(saved_termios: object | None) -> None:
     """Best-effort terminal restoration after Textual exits.
 
@@ -640,12 +626,6 @@ def _restore_terminal(saved_termios: object | None) -> None:
         print()
     except Exception:  # noqa: BLE001
         pass
-
-
-# ── CLI parser construction ──────────────────────────────────────────────
-
-
-# ── ``argus-mcp build`` ──────────────────────────────────────────────
 
 
 def _cmd_build(args: argparse.Namespace) -> None:
@@ -733,9 +713,6 @@ def _cmd_build(args: argparse.Namespace) -> None:
     asyncio.run(_build_all())
 
 
-# ── ``argus-mcp secret`` ─────────────────────────────────────────────
-
-
 def _cmd_secret(args: argparse.Namespace) -> None:
     """Entry-point for ``argus-mcp secret set/get/list/delete``."""
     from argus_mcp.secrets.store import SecretStore
@@ -778,9 +755,6 @@ def _cmd_secret(args: argparse.Namespace) -> None:
         print(f"Secret '{args.name}' deleted.")
 
 
-# ── ``argus-mcp clean`` ─────────────────────────────────────────────
-
-
 def _cmd_clean(args: argparse.Namespace) -> None:
     """Remove containers and images created by argus-mcp.
 
@@ -798,7 +772,6 @@ def _cmd_clean(args: argparse.Namespace) -> None:
     if all_flag:
         images_flag = network_flag = True
 
-    # ── Detect runtime ───────────────────────────────────────────
     runtime = "docker"
     for candidate in ("docker", "podman"):
         try:
@@ -814,7 +787,6 @@ def _cmd_clean(args: argparse.Namespace) -> None:
         except (FileNotFoundError, subprocess.SubprocessError):
             continue
 
-    # ── Remove containers ────────────────────────────────────────
     # Find all containers (running + stopped) whose image starts
     # with the arguslocal/ prefix.
     result = subprocess.run(
@@ -873,7 +845,6 @@ def _cmd_clean(args: argparse.Namespace) -> None:
     else:
         print("No argus-mcp containers found.")
 
-    # ── Remove images ────────────────────────────────────────────
     if images_flag:
         img_result = subprocess.run(
             [
@@ -908,7 +879,6 @@ def _cmd_clean(args: argparse.Namespace) -> None:
         else:
             print("\nNo arguslocal images found.")
 
-    # ── Remove network ───────────────────────────────────────────
     if network_flag:
         from argus_mcp.bridge.container.network import ARGUS_NETWORK
 
@@ -931,9 +901,6 @@ def _cmd_clean(args: argparse.Namespace) -> None:
             print(f"\nNo '{ARGUS_NETWORK}' network found.")
 
 
-# ── CLI parser construction ──────────────────────────────────────────────
-
-
 def _build_parser() -> argparse.ArgumentParser:
     """Build the argparse parser with server/tui subcommands."""
     parser = argparse.ArgumentParser(
@@ -942,7 +909,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    # ── server ──────────────────────────────────────────────────
     sp_server = subparsers.add_parser(
         "server",
         help="Run the headless Argus server (Uvicorn + MCP bridge, with container isolation)",
@@ -1012,7 +978,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sp_server.set_defaults(func=_cmd_server)
 
-    # ── build ────────────────────────────────────────────────────
     sp_build = subparsers.add_parser(
         "build",
         help="Pre-build container images for all stdio backends",
@@ -1026,7 +991,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sp_build.set_defaults(func=_cmd_build)
 
-    # ── stop ─────────────────────────────────────────────────────
     sp_stop = subparsers.add_parser(
         "stop",
         help="Stop a detached Argus server",
@@ -1040,14 +1004,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sp_stop.set_defaults(func=_cmd_stop)
 
-    # ── status ───────────────────────────────────────────────────
     sp_status = subparsers.add_parser(
         "status",
         help="List all running Argus server sessions",
     )
     sp_status.set_defaults(func=_cmd_status)
 
-    # ── tui ─────────────────────────────────────────────────────
     sp_tui = subparsers.add_parser(
         "tui",
         help="Launch the Textual TUI connected to a running Argus server",
@@ -1076,7 +1038,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sp_tui.set_defaults(func=_cmd_tui)
 
-    # ── secret ──────────────────────────────────────────────────
     sp_secret = subparsers.add_parser(
         "secret",
         help="Manage encrypted secrets (set, get, list, delete)",
@@ -1110,7 +1071,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sp_secret.set_defaults(func=_cmd_secret)
 
-    # ── clean ───────────────────────────────────────────────────
     sp_clean = subparsers.add_parser(
         "clean",
         help="Remove containers and images created by argus-mcp",

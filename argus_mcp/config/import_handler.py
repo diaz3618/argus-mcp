@@ -226,7 +226,6 @@ def import_config(
         conflict_strategy=conflict_strategy.value,
     )
 
-    # ── Bulk limits ─────────────────────────────────────────────────
     limit_errors = _validate_import_limits(
         payload,
         max_backends=max_backends,
@@ -236,7 +235,6 @@ def import_config(
         result.errors.extend(limit_errors)
         return result
 
-    # ── Backends ────────────────────────────────────────────────────
     if "backends" in entity_types and "backends" in payload:
         raw_backends = payload["backends"]
         if isinstance(raw_backends, dict):
@@ -326,7 +324,6 @@ def import_config(
                     )
                 )
 
-    # ── Registries ──────────────────────────────────────────────────
     if "registries" in entity_types and "registries" in payload:
         raw_registries = payload["registries"]
         if isinstance(raw_registries, list):
@@ -420,7 +417,6 @@ def import_config(
                     )
                 )
 
-    # ── Feature flags ───────────────────────────────────────────────
     if "feature_flags" in entity_types and "feature_flags" in payload:
         raw_flags = payload["feature_flags"]
         if isinstance(raw_flags, dict):

@@ -18,7 +18,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-# ── Container user defaults ──────────────────────────────────────────────
 #
 # Industry-standard UID used by Google distroless and Chainguard images.
 # Using a well-known UID (rather than an arbitrary one like 10001) makes
@@ -37,9 +36,6 @@ CONTAINER_USER: str = "nonroot"
 
 CONTAINER_HOME: str = "/home/nonroot"
 """Home directory for the container user."""
-
-
-# ── Per-transport runtime defaults ───────────────────────────────────────
 
 RUNTIME_DEFAULTS: Dict[str, Dict[str, object]] = {
     "uvx": {

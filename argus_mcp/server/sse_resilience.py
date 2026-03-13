@@ -27,16 +27,11 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 
 logger = logging.getLogger(__name__)
 
-# ── Defaults ─────────────────────────────────────────────────────────────
-
 DEFAULT_SEND_TIMEOUT: float = 30.0  # seconds — max time to push a single SSE frame
 DEFAULT_CLEANUP_DEADLINE: float = 15.0  # seconds — max time for post-disconnect cleanup
 DEFAULT_KEEPALIVE_INTERVAL: float = 30.0  # seconds — SSE keepalive ping interval
 DEFAULT_SPIN_LOOP_WINDOW: float = 1.0  # seconds — sliding window for spin detection
 DEFAULT_SPIN_LOOP_THRESHOLD: int = 200  # max writes in the sliding window
-
-
-# ── Metrics ──────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -53,9 +48,6 @@ class SseStreamMetrics:
     def elapsed(self) -> float:
         """Seconds since the connection was opened."""
         return time.monotonic() - self.started_at
-
-
-# ── Write wrapper with send timeout + spin detection ─────────────────────
 
 
 class GuardedWriteStream:
@@ -91,8 +83,6 @@ class GuardedWriteStream:
         self._metrics = metrics
         self._write_timestamps: list[float] = []
 
-    # ── anyio MemoryObjectSendStream protocol surface ────────────────
-
     async def send(self, item: Any) -> None:
         """Send with timeout and spin-loop detection."""
         now = time.monotonic()
@@ -116,8 +106,6 @@ class GuardedWriteStream:
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
 
-    # ── spin detection ───────────────────────────────────────────────
-
     def _detect_spin_loop(self, now: float) -> None:
         """Track write rate and log a warning if threshold is exceeded."""
         cutoff = now - self._spin_window
@@ -134,9 +122,6 @@ class GuardedWriteStream:
                     self._spin_threshold,
                     self._metrics.spin_loop_warnings,
                 )
-
-
-# ── Read wrapper (thin — only counts) ───────────────────────────────────
 
 
 class GuardedReadStream:
@@ -161,9 +146,6 @@ class GuardedReadStream:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
-
-
-# ── Top-level orchestrator ───────────────────────────────────────────────
 
 
 class SseResilience:

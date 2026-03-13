@@ -37,8 +37,6 @@ from argus_mcp.tui.screens.base import ArgusScreen
 
 logger = logging.getLogger(__name__)
 
-# ── Templates ────────────────────────────────────────────────────────────
-
 _STDIO_TEMPLATE = """\
   {name}:
     type: stdio
@@ -90,16 +88,13 @@ backends:
   # Use the "Add Backend" tab for quick templates.
   {}
 
-# ── Conflict Resolution ──────────────────────────────────────────────
 conflict_resolution:
   strategy: first-wins
 
-# ── Audit Logging ────────────────────────────────────────────────────
 audit:
   enabled: true
   file: "logs/audit.jsonl"
 
-# ── Feature Flags ────────────────────────────────────────────────────
 feature_flags:
   hot_reload: true
 """
@@ -145,9 +140,6 @@ def _validate_yaml(text: str) -> str | None:
         return f"YAML parse error: {exc}"
 
 
-# ── Main Screen ──────────────────────────────────────────────────────────
-
-
 class SetupWizardScreen(ArgusScreen):
     """Configuration setup wizard with editor, templates, and import/export."""
 
@@ -159,9 +151,6 @@ class SetupWizardScreen(ArgusScreen):
                 yield _BackendBuilderPanel(id="wizard-backend-panel")
             with TabPane("Quick Start", id="tab-wizard-quickstart"):
                 yield _QuickStartPanel(id="wizard-quickstart-panel")
-
-
-# ── Config Editor Panel ──────────────────────────────────────────────────
 
 
 class _ConfigEditorPanel(Static):
@@ -378,9 +367,6 @@ class _ConfigEditorPanel(Static):
             self.app.notify("Editor reset to saved config.", severity="information")
 
 
-# ── Backend Builder Panel ────────────────────────────────────────────────
-
-
 class _BackendBuilderPanel(Static):
     """Quick-add backend templates by filling in a few fields."""
 
@@ -562,9 +548,6 @@ class _BackendBuilderPanel(Static):
         return str(v) if v is not None and v != Select.BLANK else ""
 
 
-# ── Quick Start Panel ────────────────────────────────────────────────────
-
-
 class _QuickStartPanel(Static):
     """Quick-start guides and common config snippets."""
 
@@ -663,9 +646,6 @@ class _QuickStartPanel(Static):
             self._load_template(text, name)
         else:
             self.app.notify(f"File not found: {path}", severity="error")
-
-
-# ── File Path Modal ──────────────────────────────────────────────────────
 
 
 class _FilePathModal(ModalScreen[Optional[str]]):

@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 AUDIT_LEVEL = 35  # between WARNING (30) and ERROR (40)
 logging.addLevelName(AUDIT_LEVEL, "AUDIT")
 
-# ── Defaults ─────────────────────────────────────────────────────────────
-
 DEFAULT_AUDIT_DIR = "logs"
 DEFAULT_AUDIT_FILE = "audit.jsonl"
 

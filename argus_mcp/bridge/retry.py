@@ -32,15 +32,11 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ── Status code classification ───────────────────────────────────────────
-
 RETRYABLE_STATUS_CODES: Set[int] = {408, 429, 502, 503, 504}
 """HTTP status codes that warrant automatic retry."""
 
 NON_RETRYABLE_STATUS_CODES: Set[int] = {400, 401, 403, 404}
 """HTTP status codes that should never be retried."""
-
-# ── Defaults ─────────────────────────────────────────────────────────────
 
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_BASE_DELAY = 1.0  # seconds
@@ -99,8 +95,6 @@ class RetryManager:
         self._backoff_factor = backoff_factor
         self._max_delay = max_delay
         self._jitter = jitter
-
-    # ── Public API ───────────────────────────────────────────────────────
 
     async def execute(
         self,
@@ -184,8 +178,6 @@ class RetryManager:
 
         # Should not reach here, but satisfy type checker
         raise RetriesExhaustedError(last_status=last_status, attempts=self._max_retries + 1)
-
-    # ── Helpers ──────────────────────────────────────────────────────────
 
     async def _wait(self, attempt: int, *, retry_after: Optional[float]) -> None:
         """Sleep with exponential backoff + jitter, or honour Retry-After."""

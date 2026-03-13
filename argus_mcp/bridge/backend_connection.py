@@ -36,9 +36,6 @@ logger = logging.getLogger(__name__)
 _looks_like_auth_failure = ad.looks_like_auth_failure
 
 
-# ── Status helpers ───────────────────────────────────────────────────────
-
-
 def ensure_status_record(
     svr_name: str,
     status_records: Dict[str, Any],
@@ -96,9 +93,6 @@ def record_auth_pending_or_failure(
             progress_cb(svr_name, "initializing", msg)
     else:
         record_failure(svr_name, record, msg, progress_cb)
-
-
-# ── Error handlers ───────────────────────────────────────────────────────
 
 
 async def handle_cancelled_error(
@@ -180,9 +174,6 @@ async def handle_base_exception(
     return fail_reason
 
 
-# ── Transport init thin wrappers ─────────────────────────────────────────
-
-
 def apply_network_env(
     svr_name: str,
     svr_conf: Dict[str, Any],
@@ -234,9 +225,6 @@ async def init_streamablehttp_backend(
 ) -> Tuple[Any, ClientSession]:
     """Initialize and connect to a streamable-http backend server."""
     return await tf.init_streamablehttp(svr_name, url, stack, headers=headers)
-
-
-# ── Pre-build container image ────────────────────────────────────────────
 
 
 async def pre_build_container_image(
@@ -296,9 +284,6 @@ async def pre_build_container_image(
     svr_conf["_prebuild_isolated"] = was_isolated
 
 
-# ── Backend stack management ─────────────────────────────────────────────
-
-
 async def prepare_backend_stack(
     svr_name: str,
     backend_stacks: Dict[str, AsyncExitStack],
@@ -317,9 +302,6 @@ async def prepare_backend_stack(
     backend_stack = AsyncExitStack()
     backend_stacks[svr_name] = backend_stack
     return backend_stack
-
-
-# ── Core connect flow ────────────────────────────────────────────────────
 
 
 async def connect_backend(

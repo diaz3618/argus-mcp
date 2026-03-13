@@ -19,9 +19,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# ── Public helpers ───────────────────────────────────────────────────────
-
-
 def looks_like_auth_failure(exc: BaseException) -> bool:
     """Return ``True`` if *exc* appears to be an HTTP authentication error.
 
@@ -136,7 +133,6 @@ async def attempt_auth_discovery(
     if svr_type not in ("sse", "streamable-http"):
         return default_reason
 
-    # ── Deduplicate: reuse existing running task ────────────────
     existing_task = auth_discovery_tasks.get(svr_name)
     if existing_task is not None and not existing_task.done():
         logger.info(
@@ -146,7 +142,6 @@ async def attempt_auth_discovery(
         )
         return "Auth discovery already running — will retry after browser authentication completes."
 
-    # ── Start a new auth discovery task (non-blocking) ──────────
     # The PKCE browser flow can take minutes while the user
     # interacts with the authorization page.  We launch it as a
     # background task so the concurrency semaphore is released
@@ -252,7 +247,6 @@ async def try_auth_discovery(
             redirect_uri,
         )
 
-        # ── Dynamic Client Registration (if available) ──────────
         client_id = ""
         client_secret = ""
 
@@ -279,7 +273,6 @@ async def try_auth_discovery(
             )
             return False
 
-        # ── Run PKCE flow ───────────────────────────────────────
         flow._client_id = client_id  # noqa: SLF001
         flow._client_secret = client_secret  # noqa: SLF001
 

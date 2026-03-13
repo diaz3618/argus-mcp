@@ -86,7 +86,6 @@ class BearerAuthMiddleware:
                 MGMT_TOKEN_ENV_VAR,
             )
 
-    # ── State delegation ────────────────────────────────────────────
     # When this middleware wraps a Starlette app and is stored as the
     # ``mgmt_app`` reference, callers that access ``mgmt_app.state``
     # (e.g. lifespan propagation, route handlers) transparently reach

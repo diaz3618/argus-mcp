@@ -34,8 +34,6 @@ class PluginRegistry:
         self._plugins: Dict[str, PluginBase] = {}
         self._load_order: List[str] = []
 
-    # ── Loading ──────────────────────────────────────────────────────
-
     def load_from_config(self, entries: List[PluginConfig]) -> None:
         """Instantiate plugins from config entries.
 
@@ -58,8 +56,6 @@ class PluginRegistry:
             self._plugins[entry.name] = plugin
             self._load_order.append(entry.name)
             logger.info("Loaded plugin '%s' (priority=%d).", entry.name, entry.priority)
-
-    # ── Querying ─────────────────────────────────────────────────────
 
     def get(self, name: str) -> Optional[PluginBase]:
         return self._plugins.get(name)
@@ -88,8 +84,6 @@ class PluginRegistry:
     @property
     def count(self) -> int:
         return len(self._plugins)
-
-    # ── Lifecycle ────────────────────────────────────────────────────
 
     async def load_all(self) -> None:
         """Call on_load() for every loaded plugin."""

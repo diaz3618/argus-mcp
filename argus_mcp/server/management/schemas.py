@@ -8,8 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
-# ── /manage/v1/health ────────────────────────────────────────────────────
-
 
 class HealthBackends(BaseModel):
     total: int = 0
@@ -24,15 +22,9 @@ class HealthResponse(BaseModel):
     backends: HealthBackends = Field(default_factory=HealthBackends)
 
 
-# ── /manage/v1/ready ─────────────────────────────────────────────────────
-
-
 class ReadyResponse(BaseModel):
     ready: bool = False
     reason: str = ""
-
-
-# ── /manage/v1/status ───────────────────────────────────────────────────
 
 
 class StatusService(BaseModel):
@@ -63,9 +55,6 @@ class StatusResponse(BaseModel):
     feature_flags: Dict[str, bool] = Field(default_factory=dict)
 
 
-# ── /manage/v1/backends ─────────────────────────────────────────────────
-
-
 class BackendCapabilities(BaseModel):
     tools: int = 0
     resources: int = 0
@@ -94,9 +83,6 @@ class BackendDetail(BaseModel):
 
 class BackendsResponse(BaseModel):
     backends: List[BackendDetail] = Field(default_factory=list)
-
-
-# ── /manage/v1/capabilities ─────────────────────────────────────────────
 
 
 class ToolDetail(BaseModel):
@@ -132,9 +118,6 @@ class CapabilitiesResponse(BaseModel):
     mcp_visible_tool_count: int = 0
 
 
-# ── /manage/v1/events ────────────────────────────────────────────────────
-
-
 class EventItem(BaseModel):
     id: str
     timestamp: str  # ISO-8601
@@ -149,16 +132,10 @@ class EventsResponse(BaseModel):
     events: List[EventItem] = Field(default_factory=list)
 
 
-# ── Error responses ──────────────────────────────────────────────────────
-
-
 class ErrorResponse(BaseModel):
     error: str
     message: str
     details: Optional[Dict[str, Any]] = None
-
-
-# ── /manage/v1/reload (POST) ────────────────────────────────────────────
 
 
 class ReloadResponse(BaseModel):
@@ -169,25 +146,16 @@ class ReloadResponse(BaseModel):
     errors: List[str] = Field(default_factory=list)
 
 
-# ── /manage/v1/reconnect/{name} (POST) ──────────────────────────────────
-
-
 class ReconnectResponse(BaseModel):
     name: str
     reconnected: bool = False
     error: Optional[str] = None
 
 
-# ── /manage/v1/reauth/{name} (POST) ──────────────────────────────────────
-
-
 class ReAuthResponse(BaseModel):
     name: str
     reauth_initiated: bool = False
     error: Optional[str] = None
-
-
-# ── /manage/v1/shutdown (POST) ──────────────────────────────────────────
 
 
 class ShutdownRequest(BaseModel):
@@ -198,9 +166,6 @@ class ShutdownRequest(BaseModel):
 
 class ShutdownResponse(BaseModel):
     shutting_down: bool = True
-
-
-# ── /manage/v1/sessions ─────────────────────────────────────────────────
 
 
 class SessionDetail(BaseModel):

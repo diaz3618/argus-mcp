@@ -58,8 +58,6 @@ class ToolOpsPanel(Static):
         if event.input.id == "toolops-filter":
             self._refresh_data()
 
-    # ── Helpers ─────────────────────────────────────────────────────
-
     def _get_tools(self) -> List[Dict[str, Any]]:
         """Extract tool dicts from app._last_caps."""
         caps = getattr(self.app, "_last_caps", None)

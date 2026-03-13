@@ -41,8 +41,6 @@ class RateLimiterPlugin(PluginBase):
         # keyed (server, tool) → counter
         self._windows: Dict[Tuple[str, str], _WindowCounter] = {}
 
-    # ── Hook ─────────────────────────────────────────────────────────
-
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         key = (ctx.server_name, ctx.capability_name)
         now = time.monotonic()
@@ -68,8 +66,6 @@ class RateLimiterPlugin(PluginBase):
 
         ctx.metadata["rate_limit_remaining"] = self._max_requests - counter.count
         return ctx
-
-    # ── Lifecycle ────────────────────────────────────────────────────
 
     async def on_unload(self) -> None:
         self._windows.clear()

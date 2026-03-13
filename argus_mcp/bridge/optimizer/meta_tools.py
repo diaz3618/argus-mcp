@@ -14,9 +14,6 @@ from mcp import types as mcp_types
 
 logger = logging.getLogger(__name__)
 
-
-# ── Tool definitions ─────────────────────────────────────────────────────
-
 FIND_TOOL_NAME = "find_tool"
 CALL_TOOL_NAME = "call_tool"
 
@@ -68,9 +65,6 @@ CALL_TOOL_DEF = mcp_types.Tool(
 )
 
 META_TOOLS: List[mcp_types.Tool] = [FIND_TOOL_DEF, CALL_TOOL_DEF]
-
-
-# ── Builder ──────────────────────────────────────────────────────────────
 
 DispatchFn = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, Any]]
 

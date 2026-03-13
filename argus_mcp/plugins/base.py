@@ -69,8 +69,6 @@ class PluginBase(abc.ABC):
     def name(self) -> str:
         return self.config.name
 
-    # ── Hook methods (override as needed) ───────────────────────────
-
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         """Called before a tool invocation reaches the backend.
 

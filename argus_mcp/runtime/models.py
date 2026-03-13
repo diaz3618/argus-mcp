@@ -62,9 +62,6 @@ class BackendInfo(BaseModel):
     }
 
 
-# ── Backend lifecycle ────────────────────────────────────────────────────
-
-
 class BackendPhase(str, Enum):
     """7-state lifecycle phases for individual backend servers.
 

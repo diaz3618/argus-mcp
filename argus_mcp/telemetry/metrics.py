@@ -79,9 +79,6 @@ def record_request(
         _error_counter.add(1, attrs)
 
 
-# ── No-op fallbacks ─────────────────────────────────────────────────────
-
-
 class _NoOpCounter:
     def add(self, _amount: int, attributes: Optional[dict[str, Any]] = None) -> None:
         pass

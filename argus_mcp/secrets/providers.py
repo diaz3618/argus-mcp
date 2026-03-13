@@ -46,9 +46,6 @@ class SecretProvider(ABC):
         """Return all stored secret names."""
 
 
-# ── Environment variable provider ───────────────────────────────────────
-
-
 class EnvProvider(SecretProvider):
     """Reads secrets from environment variables.
 
@@ -73,9 +70,6 @@ class EnvProvider(SecretProvider):
         return [
             k[len(prefix) :].lower().replace("_", "-") for k in os.environ if k.startswith(prefix)
         ]
-
-
-# ── Fernet-encrypted file provider ──────────────────────────────────────
 
 
 class FileProvider(SecretProvider):
@@ -169,9 +163,6 @@ class FileProvider(SecretProvider):
 
     def list_names(self) -> List[str]:
         return list(self._load().keys())
-
-
-# ── OS keyring provider ─────────────────────────────────────────────────
 
 
 class KeyringProvider(SecretProvider):

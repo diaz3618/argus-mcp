@@ -43,9 +43,6 @@ class MetadataProvenance(BaseModel):
     )
 
 
-# ── Shared per-backend configs ───────────────────────────────────────────
-
-
 class TimeoutConfig(BaseModel):
     """Per-backend timeout configuration. Defaults are used when not specified."""
 
@@ -117,9 +114,6 @@ class ToolOverrideEntry(BaseModel):
     )
 
 
-# ── Outgoing authentication ──────────────────────────────────────────────
-
-
 class StaticAuthConfig(BaseModel):
     """Static header-based authentication."""
 
@@ -183,9 +177,6 @@ AuthConfig = Annotated[
     Union[StaticAuthConfig, OAuth2AuthConfig, PKCEAuthConfig],
     Field(discriminator="type"),
 ]
-
-
-# ── Container isolation ──────────────────────────────────────────────────
 
 
 class ContainerConfig(BaseModel):
@@ -319,9 +310,6 @@ class ContainerConfig(BaseModel):
         if v is not None:
             v = v.strip()
         return v
-
-
-# ── Backend server configs ───────────────────────────────────────────────
 
 
 class StdioBackendConfig(MetadataProvenance):

@@ -38,8 +38,6 @@ class PluginManager:
     def __init__(self, registry: PluginRegistry) -> None:
         self._registry = registry
 
-    # ── Public API ───────────────────────────────────────────────────
-
     async def run_hook(
         self,
         hook_name: str,
@@ -115,8 +113,6 @@ class PluginManager:
         accumulated.metadata.update(aggregated_metadata)
         return accumulated
 
-    # ── Convenience wrappers ─────────────────────────────────────────
-
     async def run_tool_pre_invoke(
         self,
         ctx: PluginContext,
@@ -152,8 +148,6 @@ class PluginManager:
         ctx: PluginContext,
     ) -> PluginContext:
         return await self.run_hook("resource_post_fetch", ctx)
-
-    # ── Internal helpers ─────────────────────────────────────────────
 
     @staticmethod
     def _matches_conditions(

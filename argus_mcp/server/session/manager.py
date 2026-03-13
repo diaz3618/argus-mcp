@@ -38,8 +38,6 @@ class SessionManager:
         self._cleanup_interval = cleanup_interval
         self._cleanup_task: Optional[asyncio.Task[None]] = None
 
-    # ── Lifecycle ────────────────────────────────────────────────────
-
     def start(self) -> None:
         """Start the background cleanup loop."""
         if self._cleanup_task is None or self._cleanup_task.done():
@@ -63,8 +61,6 @@ class SessionManager:
         count = len(self._sessions)
         self._sessions.clear()
         logger.info("SessionManager stopped. Cleared %d session(s).", count)
-
-    # ── Session CRUD ─────────────────────────────────────────────────
 
     def create_session(
         self,
@@ -126,8 +122,6 @@ class SessionManager:
         """
         return self._remove(session_id)
 
-    # ── Queries ──────────────────────────────────────────────────────
-
     @property
     def active_count(self) -> int:
         """Number of non-expired sessions."""
@@ -136,8 +130,6 @@ class SessionManager:
     def list_sessions(self) -> List[Dict[str, Any]]:
         """Return a list of session summaries for the management API."""
         return [s.to_dict() for s in self._sessions.values() if not s.expired]
-
-    # ── Internal ─────────────────────────────────────────────────────
 
     def _remove(self, session_id: str) -> bool:
         if session_id in self._sessions:

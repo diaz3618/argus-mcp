@@ -156,7 +156,6 @@ async def _attach_to_mcp_server(
     mcp_svr_instance.manager = service.manager
     mcp_svr_instance.registry = service.registry
 
-    # ── Load full config once (used by multiple sections below) ──────
     config_path = getattr(service, "_config_path", None)
     full_cfg: ArgusConfig | None = None
     if config_path:
@@ -167,11 +166,9 @@ async def _attach_to_mcp_server(
                 "Could not load full config; sub-features will use defaults.", exc_info=True
             )
 
-    # ── Structured audit logger ──────────────────────────────────────
     audit_logger = AuditLogger()
     mcp_svr_instance.audit_logger = audit_logger
 
-    # ── Deferred management-API token (C-1) ──────────────────────────
     # At app-factory time only the env var is checked.  Now that the
     # full config is loaded, apply the config-file token if the env var
     # was unset.
@@ -183,7 +180,6 @@ async def _attach_to_mcp_server(
             if not mgmt_app.auth_enabled and cfg_token:
                 mgmt_app.set_token(cfg_token)
 
-    # ── Incoming auth for MCP data plane (C-2) ──────────────────────
     # Create an AuthProviderRegistry from config and set it on the
     # transport module so the ASGI-level auth gate validates requests
     # before they reach the MCP SDK.
@@ -217,7 +213,6 @@ async def _attach_to_mcp_server(
     else:
         logger.debug("No full config loaded; incoming auth defaults to anonymous.")
 
-    # ── Telemetry initialization (Task 4.3 wiring) ───────────────────
     telemetry_enabled = False
     if full_cfg is not None and full_cfg.telemetry.enabled:
         try:
@@ -240,7 +235,6 @@ async def _attach_to_mcp_server(
 
     mcp_svr_instance.telemetry_enabled = telemetry_enabled
 
-    # ── Middleware chain: Auth (opt.) → Recovery → Plugin (opt.) → Telemetry (opt.) → Audit → Routing
     middlewares: list = []
     if auth_registry is not None:
         from argus_mcp.bridge.middleware.auth import AuthMiddleware
@@ -248,7 +242,6 @@ async def _attach_to_mcp_server(
         middlewares.append(AuthMiddleware(auth_registry, auth_mode=auth_mode))
     middlewares.append(RecoveryMiddleware())
 
-    # ── Plugin framework (Phase 3) ──────────────────────────────────
     plugin_manager: Any = None
     if full_cfg is not None and full_cfg.plugins.enabled and full_cfg.plugins.entries:
         try:
@@ -280,7 +273,6 @@ async def _attach_to_mcp_server(
         "enabled" if telemetry_enabled else "disabled",
     )
 
-    # ── Optimizer ─────────────────────────────────────────
     optimizer_enabled = full_cfg.optimizer.enabled if full_cfg else False
     keep_list: list[str] = list(full_cfg.optimizer.keep_tools) if full_cfg else []
 
@@ -313,7 +305,6 @@ async def _attach_to_mcp_server(
         mcp_svr_instance.optimizer_index = None
         logger.debug("Optimizer disabled.")
 
-    # ── Session Manager ───────────────────────────────────
     from argus_mcp.server.session import SessionManager
 
     session_manager = SessionManager()
@@ -321,7 +312,6 @@ async def _attach_to_mcp_server(
     mcp_svr_instance.session_manager = session_manager
     logger.info("SessionManager attached to mcp_server instance.")
 
-    # ── Feature Flags ─────────────────────────────────────
     from argus_mcp.config.flags import FeatureFlags
 
     ff_overrides = dict(full_cfg.feature_flags) if full_cfg else {}
@@ -345,13 +335,11 @@ async def _attach_to_mcp_server(
             "(build_on_startup=false). Run 'argus-mcp build' to pre-build images."
         )
 
-    # ── Version Drift Detection (Task 5.4 wiring) ────────────────────
     from argus_mcp.bridge.version_checker import VersionChecker
 
     mcp_svr_instance.version_checker = VersionChecker()
     logger.info("VersionChecker attached (registry_client=None — drift available on demand).")
 
-    # ── Skills Manager (Task 5.6 wiring) ─────────────────────────────
     from argus_mcp.skills.manager import SkillManager
 
     skill_manager = SkillManager()
@@ -359,10 +347,8 @@ async def _attach_to_mcp_server(
     mcp_svr_instance.skill_manager = skill_manager
     logger.info("SkillManager attached: %d skill(s) discovered.", len(skill_manager.list_skills()))
 
-    # ── Composite Workflows (Task 6) ────────────────────────────────
     _load_composite_workflows(mcp_svr_instance, chain)
 
-    # ── Typed state bundle ────────────────────────────────────────────
     # Attach a single typed object so consumers can access state with
     # proper typing instead of ad-hoc getattr(mcp_server, ...) calls.
     from argus_mcp.server.state import ServerState
@@ -385,9 +371,7 @@ async def _attach_to_mcp_server(
     )
 
 
-# ──────────────────────────────────────────────────────────────────────
 # Startup-Phase Signal Override
-# ──────────────────────────────────────────────────────────────────────
 
 
 def _install_startup_signal_override(
@@ -632,16 +616,13 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     err_detail_msg: Optional[str] = None
 
     try:
-        # ── Display: initializing ────────────────────────────────────
         status_info_init = gen_status_info(app_state, "Server is starting...")
         disp_console_status("Initialization", status_info_init)
         log_file_status(status_info_init)
 
-        # ── Verbose installer display ────────────────
         verbosity: int = getattr(app_state, "verbosity", 0)
         installer_display, progress_callback = _setup_installer_display(config_path, verbosity)
 
-        # ── Delegate full startup to ArgusService ─────────────────
         # Install a temporary signal override so Ctrl+C works during
         # the (potentially very long) backend-connection phase.
         # See module docstring for the full rationale.
@@ -658,10 +639,8 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         if installer_display is not None:
             installer_display.finalize()
 
-        # ── Monkey-patch bridge components onto mcp_server ───────────
         await _attach_to_mcp_server(mcp_server, service, app_state)
 
-        # ── Create & start the SDK streamable-HTTP session manager ───
         # This must happen *after* handlers are attached so that
         # mcp_server.run() (called internally per session) can serve
         # tools/resources/prompts.
@@ -679,7 +658,6 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         logger.info("Lifespan startup phase completed successfully.")
         startup_ok = True
 
-        # ── Ensure uvicorn doesn't auto-exit after successful startup ─
         # During the (potentially very long) startup phase, a stale
         # should_exit flag may have been set (e.g. by signal handler
         # overlap, or by uvicorn's own LifespanOn error detection).
@@ -701,7 +679,6 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
             logger.warning("Clearing stale should_exit flag on uvicorn lifespan.")
             _lifespan.should_exit = False
 
-        # ── Display: ready ───────────────────────────────────────────
         status_info_ready = gen_status_info(
             app_state,
             "Server started successfully and is ready.",
@@ -774,7 +751,6 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         disp_console_status("🛑 Shutting Down", status_info_shutdown, is_final=False)
         log_file_status(status_info_shutdown, log_lvl=logging.WARNING)
 
-        # ── Delegate shutdown to ArgusService ─────────────────────
         # Stop SDK streamable-HTTP session manager first (closes all
         # active MCP sessions and their task groups).
         _es = _exit_stack if "_exit_stack" in dir() else None

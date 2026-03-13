@@ -21,8 +21,6 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ────────────────────────────────────────────────────────────
-
 
 def _state_base() -> str:
     """Return a writable base directory for Argus runtime state.
@@ -40,9 +38,6 @@ def _state_base() -> str:
 _SESSION_DIR = os.path.join(_state_base(), "sessions")
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{0,31}$")
-
-
-# ── Data ─────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -66,9 +61,6 @@ class SessionInfo:
             return False
         except PermissionError:
             return True  # exists but not ours
-
-
-# ── Public API ───────────────────────────────────────────────────────────
 
 
 def validate_name(name: str) -> str:

@@ -49,16 +49,11 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ────────────────────────────────────────────────────────────
-
 _VERIFIER_LENGTH = 64  # bytes → 86 chars base64url (RFC 7636: 43–128)
 _CALLBACK_PATH = "/callback"
 _CALLBACK_HOST = "127.0.0.1"
 _DEFAULT_PORT = 0  # OS picks ephemeral port
 _AUTH_TIMEOUT = 120.0  # seconds to wait for browser callback
-
-
-# ── Data classes ─────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -82,9 +77,6 @@ class PKCEChallenge:
     method: str = "S256"
 
 
-# ── PKCE helpers ─────────────────────────────────────────────────────────
-
-
 def generate_pkce_challenge() -> PKCEChallenge:
     """Generate a PKCE S256 code-verifier / code-challenge pair.
 
@@ -102,9 +94,6 @@ def generate_pkce_challenge() -> PKCEChallenge:
 def generate_state() -> str:
     """Generate a cryptographic state parameter for CSRF protection."""
     return secrets.token_urlsafe(32)
-
-
-# ── Callback server ─────────────────────────────────────────────────────
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
@@ -180,9 +169,6 @@ class _CallbackHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         """Silence default stderr logging — use our logger instead."""
         logger.debug("OAuth callback: %s", format % args)
-
-
-# ── Main flow ────────────────────────────────────────────────────────────
 
 
 class PKCEFlow:

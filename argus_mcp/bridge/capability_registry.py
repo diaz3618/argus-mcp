@@ -340,8 +340,6 @@ class CapabilityRegistry:
         """
         return self._route_map.get(exp_cap_name)
 
-    # ── Dynamic capability management (health checks) ────────────────────
-
     def remove_backend(self, svr_name: str) -> int:
         """Remove all capabilities belonging to *svr_name*.
 

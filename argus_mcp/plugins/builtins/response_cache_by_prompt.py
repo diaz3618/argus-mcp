@@ -32,9 +32,7 @@ class ResponseCachePlugin(PluginBase):
         # _cache: key -> (result, timestamp)
         self._cache: dict[str, tuple[object, float]] = {}
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _make_key(server: str, capability: str, arguments: dict) -> str:
@@ -58,9 +56,7 @@ class ResponseCachePlugin(PluginBase):
             oldest_key = min(self._cache, key=lambda k: self._cache[k][1])
             del self._cache[oldest_key]
 
-    # ------------------------------------------------------------------
     # Hooks
-    # ------------------------------------------------------------------
 
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         self._evict_expired()

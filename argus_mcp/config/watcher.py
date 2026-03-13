@@ -57,8 +57,6 @@ class ConfigWatcher:
         self._last_mtime: float = 0.0
         self._stop_event = asyncio.Event()
 
-    # ── Lifecycle ────────────────────────────────────────────────────
-
     def start(self) -> None:
         """Begin watching.  Safe to call multiple times."""
         if self._task is not None and not self._task.done():
@@ -84,8 +82,6 @@ class ConfigWatcher:
     @property
     def watching(self) -> bool:
         return self._task is not None and not self._task.done()
-
-    # ── Internal ─────────────────────────────────────────────────────
 
     def _current_mtime(self) -> float:
         try:

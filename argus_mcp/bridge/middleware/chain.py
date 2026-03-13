@@ -11,8 +11,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
 
-# ── Type protocol ────────────────────────────────────────────────────────
-
 
 class MCPHandler(Protocol):
     """Async callable that takes a RequestContext and returns a result."""
@@ -24,9 +22,6 @@ class MCPMiddleware(Protocol):
     """Async callable that wraps the next handler in the chain."""
 
     async def __call__(self, ctx: RequestContext, next_handler: MCPHandler) -> Any: ...
-
-
-# ── Request context ─────────────────────────────────────────────────────
 
 
 @dataclass
@@ -59,9 +54,6 @@ class RequestContext:
     def elapsed_ms(self) -> float:
         """Milliseconds since request start."""
         return (time.monotonic() - self.start_time) * 1000.0
-
-
-# ── Chain builder ────────────────────────────────────────────────────────
 
 
 def build_chain(

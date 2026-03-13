@@ -19,7 +19,6 @@ _F = TypeVar("_F", bound=Callable[..., object])
 
 _logger = logging.getLogger(__name__)
 
-
 # TUI helpers
 
 

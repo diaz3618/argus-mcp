@@ -37,19 +37,12 @@ from argus_mcp.bridge.container.templates.models import CONTAINER_HOME
 
 logger = logging.getLogger(__name__)
 
-# ── Security defaults ────────────────────────────────────────────────────
-
 _DEFAULT_CAP_DROP = ["ALL"]
 _DEFAULT_MEMORY = "512m"
 _DEFAULT_CPUS = "1"
 
-# ── Container tracking ───────────────────────────────────────────────────
-
 #: Maps ``svr_name`` → ``(container_runtime, container_id)`` for cleanup.
 _active_containers: Dict[str, Tuple[str, str]] = {}
-
-
-# ── Public API ───────────────────────────────────────────────────────────
 
 
 async def wrap_backend(
@@ -253,9 +246,6 @@ async def wrap_backend(
         env=None,  # env vars baked in via -e at create time
     )
     return wrapped, True
-
-
-# ── Internal helpers ─────────────────────────────────────────────────────
 
 
 def _build_create_args(

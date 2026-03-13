@@ -59,8 +59,6 @@ class ApiClient:
         self._token = token
         self._client: Optional[httpx.AsyncClient] = None
 
-    # ── Lifecycle ────────────────────────────────────────────────
-
     async def connect(self) -> None:
         """Create the underlying ``httpx.AsyncClient``."""
         headers: dict[str, str] = {"Accept": "application/json"}
@@ -86,14 +84,10 @@ class ApiClient:
         """Return *True* if the underlying client is open."""
         return self._client is not None and not self._client.is_closed
 
-    # ── Private helpers ──────────────────────────────────────────
-
     def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             raise RuntimeError("ApiClient is not connected — call connect() first")
         return self._client
-
-    # ── Read-only endpoints ──────────────────────────────────────
 
     async def get_health(self) -> HealthResponse:
         """``GET /manage/v1/health``"""
@@ -135,8 +129,6 @@ class ApiClient:
         resp = await client.get("events", params={"limit": limit})
         resp.raise_for_status()
         return EventsResponse.model_validate(resp.json())
-
-    # ── Mutating endpoints ───────────────────────────────────────
 
     async def post_reload(self) -> ReloadResponse:
         """``POST /manage/v1/reload``"""

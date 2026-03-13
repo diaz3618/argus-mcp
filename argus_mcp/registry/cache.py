@@ -50,8 +50,6 @@ class RegistryCache:
         self._cache_dir = os.path.realpath(cache_dir)
         self._ttl = ttl
 
-    # ── public interface ────────────────────────────────────────────
-
     def get(self, registry_url: str) -> Optional[List[ServerEntry]]:
         """Return cached entries for *registry_url* or ``None``."""
         path = self._path_for(registry_url)
@@ -102,8 +100,6 @@ class RegistryCache:
                         continue
                     if os.path.isfile(fp) and fp.endswith(".json"):
                         os.unlink(fp)
-
-    # ── internals ───────────────────────────────────────────────────
 
     def _path_for(self, registry_url: str) -> str:
         # Use SHA-256 hash to eliminate injection, length, and encoding issues

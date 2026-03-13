@@ -34,16 +34,11 @@ from argus_mcp.bridge.auth.pkce import TokenSet
 
 logger = logging.getLogger(__name__)
 
-# ── Defaults ─────────────────────────────────────────────────────────────
-
 _DEFAULT_TOKEN_DIR = os.path.join(
     os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
     "argus-mcp",
     "tokens",
 )
-
-
-# ── Token store ──────────────────────────────────────────────────────────
 
 
 class TokenStore:
@@ -168,8 +163,6 @@ class TokenStore:
         if not self._dir.exists():
             return []
         return [p.stem for p in self._dir.glob("*.json") if p.is_file()]
-
-    # ── Internal ─────────────────────────────────────────────────────
 
     def _path_for(self, backend_name: str) -> Path:
         """Get the token file path for a backend name."""

@@ -152,8 +152,6 @@ class RegistryScreen(ArgusScreen):
         except NoMatches:
             pass
 
-    # ── event handlers ──────────────────────────────────────────────
-
     def on_server_selected(self, event: ServerSelected) -> None:
         """Update the install panel when a server is highlighted."""
         panel = self.query_one("#install-panel", InstallPanelWidget)

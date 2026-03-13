@@ -56,7 +56,6 @@ class SettingsScreen(ArgusScreen):
 
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="settings-tabs"):
-            # ── General ──────────────────────────────────────────
             with TabPane("General", id="tab-general"):
                 with Vertical(id="general-section"):
                     yield Static("[b]General Settings[/b]", id="general-title")
@@ -124,7 +123,6 @@ class SettingsScreen(ArgusScreen):
                             variant="default",
                         )
 
-            # ── Servers ──────────────────────────────────────────
             with TabPane("Servers", id="tab-servers"):
                 with Vertical(id="servers-section"):
                     yield Static("[b]Server Connections[/b]", id="servers-title")
@@ -151,7 +149,6 @@ class SettingsScreen(ArgusScreen):
                         yield Button("Add Server", id="btn-add-server", variant="primary")
                         yield Button("Remove Selected", id="btn-remove-server", variant="error")
 
-            # ── Theme ────────────────────────────────────────────
             with TabPane("Theme", id="tab-theme"):
                 with Vertical(id="theme-section-content"):
                     yield Static("[b]Appearance[/b]", id="theme-title")
@@ -172,7 +169,6 @@ class SettingsScreen(ArgusScreen):
                             variant="default",
                         )
 
-            # ── Config ───────────────────────────────────────────
             with TabPane("Config", id="tab-config"):
                 with Vertical(id="config-section"):
                     yield Static("[b]Active Configuration[/b]", id="config-title")
@@ -204,13 +200,11 @@ class SettingsScreen(ArgusScreen):
                     )
                     yield Static("", id="config-validation-result")
 
-            # ── Middleware (#16) ─────────────────────────────────────
             with TabPane("Middleware", id="tab-middleware"):
                 from argus_mcp.tui.widgets.middleware_panel import MiddlewarePipelineWidget
 
                 yield MiddlewarePipelineWidget(id="mw-pipeline-widget")
 
-            # ── Registries (#25) ─────────────────────────────────────
             with TabPane("Registries", id="tab-registries"):
                 with Vertical(id="registries-section"):
                     yield Static("[b]Registry Sources[/b]", id="registries-title")
@@ -249,7 +243,6 @@ class SettingsScreen(ArgusScreen):
                         yield Button("Add Registry", id="btn-add-registry", variant="primary")
                         yield Button("Remove Selected", id="btn-remove-registry", variant="error")
 
-            # ── About ────────────────────────────────────────────
             with TabPane("About", id="tab-about"):
                 with Vertical(id="about-section"):
                     yield Static(
@@ -266,8 +259,6 @@ class SettingsScreen(ArgusScreen):
         self._refresh_config()
         self._refresh_registries()
         self._refresh_about()
-
-    # ── Refresh helpers ──────────────────────────────────────────
 
     def _refresh_general(self) -> None:
         """Populate the General tab from current state."""
@@ -409,16 +400,12 @@ class SettingsScreen(ArgusScreen):
 
         self._set_text("#about-details", "\n".join(lines))
 
-    # ── Utility ──────────────────────────────────────────────────
-
     def _set_text(self, selector: str, text: str) -> None:
         """Safely update a Static widget's content."""
         try:
             self.query_one(selector, Static).update(text)
         except NoMatches:
             pass
-
-    # ── Button handlers ──────────────────────────────────────────
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle all settings button clicks."""
@@ -564,8 +551,6 @@ class SettingsScreen(ArgusScreen):
         except KeyError:
             self.notify(f"No server named '{name}'", severity="warning")
 
-    # ── Config editor (#20) ─────────────────────────────────────
-
     def _do_toggle_config_edit(self) -> None:
         """Toggle config viewer between read-only and edit mode."""
         try:
@@ -611,8 +596,6 @@ class SettingsScreen(ArgusScreen):
             title="Config",
             timeout=4,
         )
-
-    # ── Registries (#25) ────────────────────────────────────────
 
     def _refresh_registries(self) -> None:
         """Populate the Registries tab."""

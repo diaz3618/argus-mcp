@@ -85,9 +85,7 @@ class ArgusApp(App):
     CSS_PATH = "argus.tcss"
 
     BINDINGS = [
-        # ── App ────────────────────────────────────────────────
         Binding("q", "quit", "Quit", priority=True),
-        # ── Mode switching ─────────────────────────────────────
         Binding("1", "switch_mode('dashboard')", "Dash", key_display="1"),
         Binding("d", "switch_mode('dashboard')", "Dash", show=False),
         Binding("2", "switch_mode('tools')", "Tools", key_display="2"),
@@ -103,13 +101,10 @@ class ArgusApp(App):
         Binding("0", "switch_mode('operations')", "Ops", key_display="0"),
         Binding("o", "switch_mode('operations')", "Ops", show=False),
         Binding("w", "switch_mode('wizard')", "Wizard", show=False),
-        # ── Actions ────────────────────────────────────────────
         Binding("x", "export_client_config", "Export Config", show=False),
-        # ── Navigation (within active screen) ──────────────────
         Binding("t", "show_tools", "Tools Tab", show=False),
         Binding("r", "show_resources", "Resources Tab", show=False),
         Binding("p", "show_prompts", "Prompts Tab", show=False),
-        # ── Theme ──────────────────────────────────────────────
         Binding("n", "next_theme", "Next Theme", show=False),
         Binding("T", "open_theme_picker", "Themes", key_display="shift+t", show=False),
     ]
@@ -132,8 +127,6 @@ class ArgusApp(App):
     }
 
     DEFAULT_MODE = "dashboard"
-
-    # ── Construction ────────────────────────────────────────────
 
     def __init__(
         self,
@@ -163,19 +156,14 @@ class ArgusApp(App):
         self._last_status: Optional[Any] = None
         self._last_caps: Optional[Any] = None
 
-    # ── Compose (fallback — replaced immediately by default mode) ──
-
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
-
-    # ── System commands (Command Palette) ───────────────────────
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         """Extend the command palette with Argus MCP commands."""
         yield from super().get_system_commands(screen)
 
-        # ── Modes ──────────────────────────────────────────────
         yield SystemCommand(
             title="Dashboard Mode",
             help="Server info, backends, events, and capabilities (1/d)",
@@ -252,7 +240,6 @@ class ArgusApp(App):
             callback=self.action_export_client_config,
         )
 
-        # ── Server ─────────────────────────────────────────────
         yield SystemCommand(
             title="Show Server Details",
             help="Configuration file, log file, and log level",
@@ -264,7 +251,6 @@ class ArgusApp(App):
             callback=self._show_connection_info,
         )
 
-        # ── Navigation ─────────────────────────────────────────
         yield SystemCommand(
             title="Show Tools Tab",
             help="Switch capability tables to the Tools tab",
@@ -281,7 +267,6 @@ class ArgusApp(App):
             callback=self.action_show_prompts,
         )
 
-        # ── Appearance ─────────────────────────────────────────
         yield SystemCommand(
             title="Open Theme Picker",
             help="Browse and preview all available themes",
@@ -323,8 +308,6 @@ class ArgusApp(App):
             self.notify("\n".join(lines), title="Connection Info", timeout=8)
         except NoMatches:
             self.notify("Switch to Dashboard to view connection info.", timeout=4)
-
-    # ── Lifecycle ───────────────────────────────────────────────
 
     def on_mount(self) -> None:
         """Called after the TUI is fully mounted."""
@@ -430,8 +413,6 @@ class ArgusApp(App):
             self.screen.query_one(EventLogWidget).stop_capture()
         except NoMatches:
             pass
-
-    # ── Remote-mode polling ─────────────────────────────────────
 
     def _start_polling(self) -> None:
         """Begin the initial connection and periodic polling."""
@@ -554,8 +535,6 @@ class ArgusApp(App):
         # Refresh selector to reflect connection status changes
         self._refresh_server_selector()
 
-    # ── Response → TUI message adapters ─────────────────────────
-
     def _apply_status_response(self, status: Any) -> None:
         """Convert a StatusResponse into widget updates."""
         self._last_status = status
@@ -676,8 +655,6 @@ class ArgusApp(App):
         except NoMatches:
             pass  # Widget not in active screen
 
-    # ── Server selector ───────────────────────────────────────────
-
     def _refresh_server_selector(self) -> None:
         """Update the ServerSelectorWidget with current server entries."""
         from argus_mcp.tui.server_manager import ServerManager
@@ -744,8 +721,6 @@ class ArgusApp(App):
 
         # Refresh selector display
         self._refresh_server_selector()
-
-    # ── Message handlers ────────────────────────────────────────
 
     def on_capabilities_ready(self, event: CapabilitiesReady) -> None:
         """Explicit capability population (alternative path)."""
@@ -876,8 +851,6 @@ class ArgusApp(App):
             )
         except (OSError, ConnectionError) as exc:
             self.notify(f"Re-auth failed: {exc}", title="Error", severity="error")
-
-    # ── Key-bound actions ───────────────────────────────────────
 
     def action_show_tools(self) -> None:
         """Switch capability table to Tools tab."""

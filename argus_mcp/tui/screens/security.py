@@ -32,7 +32,6 @@ class SecurityScreen(ArgusScreen):
 
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="security-tabs"):
-            # ── Authentication ───────────────────────────────────
             with TabPane("Authentication", id="tab-sec-auth"):
                 with Vertical(id="sec-auth-section"):
                     yield Static("[b]Incoming Authentication[/b]", id="sec-incoming-title")
@@ -108,7 +107,6 @@ class SecurityScreen(ArgusScreen):
                             password=True,
                         )
 
-            # ── Authorization / Policies ─────────────────────────
             with TabPane("Policies", id="tab-sec-policies"):
                 with Vertical(id="sec-authz-section"):
                     yield Static("[b]Authorization Policies[/b]", id="sec-authz-title")
@@ -135,21 +133,17 @@ class SecurityScreen(ArgusScreen):
                             variant="primary",
                         )
 
-            # ── Secrets ──────────────────────────────────────────
             with TabPane("Secrets", id="tab-sec-secrets"):
                 from argus_mcp.tui.widgets.secrets_panel import SecretsPanel
 
                 yield SecretsPanel(id="secrets-panel-widget")
 
-            # ── Network Isolation ────────────────────────────────
             with TabPane("Network", id="tab-sec-network"):
                 from argus_mcp.tui.widgets.network_panel import (
                     NetworkIsolationPanel,
                 )
 
                 yield NetworkIsolationPanel(id="network-panel-widget")
-
-    # ── Lifecycle ────────────────────────────────────────────────
 
     def on_show(self) -> None:
         """Populate backend selector for outgoing auth."""
@@ -166,8 +160,6 @@ class SecurityScreen(ArgusScreen):
             self.query_one("#sec-backend-select", Select).set_options(options)
         except NoMatches:
             pass
-
-    # ── Button handlers ──────────────────────────────────────────
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id

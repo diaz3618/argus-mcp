@@ -40,8 +40,6 @@ class HealthPanel(Widget):
     - **Shutdown Server** — gracefully shut down the entire Argus server
     """
 
-    # ── Messages ─────────────────────────────────────────────────
-
     class BackendReconnect(Message):
         """Posted when the user wants to reconnect a specific backend."""
 
@@ -54,8 +52,6 @@ class HealthPanel(Widget):
 
     class ShutdownRequested(Message):
         """Posted when the user clicks Shutdown Server."""
-
-    # ── Styles ───────────────────────────────────────────────────
 
     DEFAULT_CSS = """
     HealthPanel {
@@ -122,8 +118,6 @@ class HealthPanel(Widget):
             table.cursor_type = "row"
             table.zebra_stripes = True
 
-    # ── Button handlers ──────────────────────────────────────────
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle action button presses."""
         btn_id = event.button.id
@@ -154,8 +148,6 @@ class HealthPanel(Widget):
         """Update the action status line below the buttons."""
         if w := safe_query(self, "#health-action-status", Static):
             w.update(text)
-
-    # ── Data update ──────────────────────────────────────────────
 
     @staticmethod
     def _classify_backend(b: Dict[str, Any]) -> tuple:

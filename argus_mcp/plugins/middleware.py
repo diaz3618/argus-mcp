@@ -42,7 +42,6 @@ class PluginMiddleware:
     async def __call__(self, ctx: RequestContext, next_handler: MCPHandler) -> Any:
         mcp_method = ctx.mcp_method
 
-        # ── Pre-hook ─────────────────────────────────────────────
         pre_hook = _PRE_HOOKS.get(mcp_method)
         if pre_hook:
             plugin_ctx = _request_to_plugin_ctx(ctx)
@@ -55,10 +54,8 @@ class PluginMiddleware:
             )
             _apply_plugin_ctx(ctx, plugin_ctx)
 
-        # ── Delegate to next handler ─────────────────────────────
         result = await next_handler(ctx)
 
-        # ── Post-hook ────────────────────────────────────────────
         post_hook = _POST_HOOKS.get(mcp_method)
         if post_hook:
             plugin_ctx = _request_to_plugin_ctx(ctx, result=result)

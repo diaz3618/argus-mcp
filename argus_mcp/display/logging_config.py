@@ -11,8 +11,6 @@ from typing import Any, Set, Tuple  # noqa: UP035
 
 from argus_mcp.constants import LOG_DIR
 
-# ── Secret redaction filter ──────────────────────────────────────────────
-
 _REDACTED = "***REDACTED***"
 
 

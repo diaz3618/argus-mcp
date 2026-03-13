@@ -43,8 +43,6 @@ class AuthRefreshService:
         self._task: asyncio.Task[None] | None = None
         self._on_reauth_required = on_reauth_required
 
-    # ── Public API ───────────────────────────────────────────────────
-
     def start(self) -> None:
         """Start the background refresh loop (idempotent)."""
         if self._task is not None and not self._task.done():
@@ -73,8 +71,6 @@ class AuthRefreshService:
     def running(self) -> bool:
         """Whether the background task is currently active."""
         return self._task is not None and not self._task.done()
-
-    # ── Internal loop ────────────────────────────────────────────────
 
     async def _run(self) -> None:
         """Main loop — runs until cancelled."""

@@ -42,8 +42,6 @@ class GroupManager:
             self._server_group[name] = group
             self._group_servers[group].add(name)
 
-    # ── Queries ───────────────────────────────────────────────────
-
     @property
     def groups(self) -> List[str]:
         """Return sorted list of group names."""
@@ -70,8 +68,6 @@ class GroupManager:
         """Return ``{group: [server_names]}`` for all groups, sorted."""
         return {g: sorted(self._group_servers[g]) for g in self.groups}
 
-    # ── Mutation ─────────────────────────────────────────────────
-
     def add_server(self, server_name: str, group: str = DEFAULT_GROUP) -> None:
         """Register a new server ↔ group mapping."""
         old_group = self._server_group.get(server_name)
@@ -89,8 +85,6 @@ class GroupManager:
             self._group_servers[group].discard(server_name)
             if not self._group_servers[group]:
                 del self._group_servers[group]
-
-    # ── Serialisation ────────────────────────────────────────────
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialise for management API responses."""

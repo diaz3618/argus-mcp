@@ -63,8 +63,6 @@ class EventLogWidget(Widget):
     def log_widget(self) -> _CaptureRichLog:
         return self.query_one("#event-rich-log", _CaptureRichLog)
 
-    # ── Capture control ─────────────────────────────────────────
-
     def start_capture(self) -> None:
         """Begin capturing ``print()`` output into this log.
 
@@ -88,8 +86,6 @@ class EventLogWidget(Widget):
             self.log_widget.end_capture_print()
         except Exception:  # noqa: BLE001
             pass
-
-    # ── Public API ──────────────────────────────────────────────
 
     def add_event(
         self,

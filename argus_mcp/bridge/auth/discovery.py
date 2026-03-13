@@ -33,9 +33,6 @@ from urllib.parse import urljoin, urlparse
 
 logger = logging.getLogger(__name__)
 
-
-# ── Metadata cache ───────────
-
 # In-memory cache for AS metadata keyed by MCP server URL.
 # Format: {url: {"metadata": OAuthMetadata, "cached_at": float}}
 # Default TTL: 3600s.
@@ -71,9 +68,6 @@ def _validate_discovery_url(url: str, *, allow_private: bool = True) -> None:
             # hostname is a DNS name, not a literal IP — allow it
 
 
-# ── Data classes ─────────────────────────────────────────────────────────
-
-
 @dataclass(frozen=True)
 class OAuthMetadata:
     """Resolved OAuth endpoint metadata."""
@@ -96,9 +90,6 @@ class OAuthMetadata:
     def supports_dynamic_registration(self) -> bool:
         """``True`` if a registration endpoint is present."""
         return bool(self.registration_endpoint)
-
-
-# ── Public API ───────────────────────────────────────────────────────────
 
 
 async def discover_oauth_metadata(
@@ -184,8 +175,6 @@ async def discover_oauth_metadata(
 
         return meta
 
-
-# ── Internal helpers ─────────────────────────────────────────────────────
 
 _MAX_REDIRECTS = 3
 
@@ -317,7 +306,6 @@ async def _discover_oidc(
     rfc8414_data: Optional[Dict[str, Any]] = None
     oidc_data: Optional[Dict[str, Any]] = None
 
-    # ── Pass 1: RFC 8414 (preferred) ────────────────────────────────
     try:
         resp = await _safe_get(client, rfc8414_url)
         if resp.status_code == 200:
@@ -334,7 +322,6 @@ async def _discover_oidc(
             exc,
         )
 
-    # ── Pass 2: OIDC (fallback / supplement) ────────────────────────
     try:
         resp = await _safe_get(client, oidc_url)
         if resp.status_code == 200:

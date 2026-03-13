@@ -29,8 +29,6 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ── Defaults ─────────────────────────────────────────────────────────────
-
 DEFAULT_MAX_CONNECTIONS: int = 200
 DEFAULT_MAX_KEEPALIVE: int = 100
 DEFAULT_TIMEOUT: float = 30.0
@@ -62,8 +60,6 @@ class HttpPool:
         self._timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
         self._lock = asyncio.Lock()
-
-    # ── Lifecycle ────────────────────────────────────────────────────
 
     async def start(self) -> None:
         """Create the underlying ``httpx.AsyncClient`` if not already running."""
@@ -108,8 +104,6 @@ class HttpPool:
     def is_running(self) -> bool:
         """``True`` when the underlying client is open."""
         return self._client is not None and not self._client.is_closed
-
-    # ── Stats ────────────────────────────────────────────────────────
 
     def stats(self) -> dict:
         """Return a snapshot of pool configuration and state."""

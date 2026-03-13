@@ -34,8 +34,6 @@ from argus_mcp.bridge.container.templates import (
 
 logger = logging.getLogger(__name__)
 
-# ── Transport type from command ──────────────────────────────────────────
-
 # Maps command basenames to the transport type used for Dockerfile selection.
 _COMMAND_TRANSPORT: Dict[str, str] = {
     "uvx": "uvx",
@@ -79,9 +77,6 @@ def is_already_containerised(command: str, args: List[str]) -> bool:
         if args and args[0] in ("run", "exec", "start", "compose"):
             return True
     return False
-
-
-# ── Image building ───────────────────────────────────────────────────────
 
 
 async def ensure_image(

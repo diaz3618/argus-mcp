@@ -21,8 +21,6 @@ from rich.live import Live
 from rich.spinner import Spinner
 from rich.text import Text
 
-# ── Phase enum (display-side, decoupled from runtime) ────────────────────
-
 
 class DisplayPhase(str, Enum):
     PENDING = "pending"
@@ -33,9 +31,6 @@ class DisplayPhase(str, Enum):
     READY = "ready"
     FAILED = "failed"
     SKIPPED = "skipped"
-
-
-# ── Runtime detection ────────────────────────────────────────────────────
 
 
 class RuntimeKind(str, Enum):
@@ -76,9 +71,6 @@ def detect_runtime(backend_conf: Dict[str, Any]) -> RuntimeKind:
         return RuntimeKind.REMOTE
 
     return RuntimeKind.UNKNOWN
-
-
-# ── Style configuration per runtime ─────────────────────────────────────
 
 
 class _RuntimeStyle:
@@ -165,9 +157,6 @@ _STYLES: Dict[RuntimeKind, _RuntimeStyle] = {
 }
 
 
-# ── Backend display entry ────────────────────────────────────────────────
-
-
 class _BackendEntry:
     """Tracks state for one backend in the display."""
 
@@ -181,9 +170,6 @@ class _BackendEntry:
         self.message = "Pending..."
         self.start_time: float = 0.0  # set on first non-PENDING phase
         self.end_time: float = 0.0  # frozen on terminal phase
-
-
-# ── Main display class ──────────────────────────────────────────────────
 
 
 class InstallerDisplay:
@@ -232,8 +218,6 @@ class InstallerDisplay:
         # Sort to match startup coordinator order: remote first, then stdio
         _type_prio = {"streamable-http": 0, "sse": 1}
         self._ordered.sort(key=lambda e: _type_prio.get(backends[e.name].get("type", "stdio"), 2))
-
-    # ── Rendering ────────────────────────────────────────────────────
 
     def _format_completed_line(self, entry: _BackendEntry) -> Text:
         """Return a Rich Text for a terminal-state backend line."""
@@ -300,8 +284,6 @@ class InstallerDisplay:
         """Push the current renderable to the Live display."""
         if self._live is not None:
             self._live.update(self._build_renderable())
-
-    # ── Public API ───────────────────────────────────────────────────
 
     def _build_runtime_summary(self) -> str:
         """Return a Rich-formatted summary of runtime-type counts."""
@@ -419,13 +401,11 @@ class InstallerDisplay:
         if message is not None:
             entry.message = message
 
-        # ── Terminal phases: collapse to completed line ───────────
         if entry.phase in (DisplayPhase.READY, DisplayPhase.FAILED):
             self._collapse_to_completed(name, entry)
             self._refresh()
             return
 
-        # ── BUILDING phase: accumulate build output ──────────────
         if entry.phase == DisplayPhase.BUILDING:
             if entry.message:
                 lines = self._build_lines.setdefault(name, [])
@@ -436,7 +416,6 @@ class InstallerDisplay:
                 if len(lines) > 200:
                     del lines[:100]
 
-        # ── Claim spinner: BUILDING always wins, others only if unclaimed ──
         if entry.phase == DisplayPhase.BUILDING:
             self._set_active(name, entry)
         elif self._active_name is None or self._active_name == name:

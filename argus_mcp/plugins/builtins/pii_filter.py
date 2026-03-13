@@ -16,8 +16,6 @@ from argus_mcp.plugins.models import PluginConfig
 
 logger = logging.getLogger(__name__)
 
-# ── Compiled PII patterns ────────────────────────────────────────────────
-
 _PII_PATTERNS: List[tuple[str, Pattern[str], str]] = [
     (
         "email",
@@ -61,8 +59,6 @@ class PiiFilterPlugin(PluginBase):
         else:
             self._active_patterns = list(self._patterns)
 
-    # ── Hooks ────────────────────────────────────────────────────────
-
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         counts = self._mask_dict(ctx.arguments)
         if counts:
@@ -76,8 +72,6 @@ class PiiFilterPlugin(PluginBase):
                 ctx.result = masked
                 ctx.metadata["pii_post_masked"] = counts
         return ctx
-
-    # ── Internals ────────────────────────────────────────────────────
 
     def _mask_dict(self, d: Dict[str, object]) -> Dict[str, int]:
         """Mask PII in string values of *d* in-place.  Returns counts."""

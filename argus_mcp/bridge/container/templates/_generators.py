@@ -32,11 +32,7 @@ from argus_mcp.bridge.container.templates.validation import (
 
 logger = logging.getLogger(__name__)
 
-# ── Image tag prefix ─────────────────────────────────────────────────────
 IMAGE_PREFIX = "arguslocal"
-
-
-# ── Package name parsing ─────────────────────────────────────────────────
 
 
 def parse_uvx_args(args: List[str]) -> Tuple[str, str, List[str]]:
@@ -166,9 +162,6 @@ def parse_go_args(
     return go_package.strip(), list(args)
 
 
-# ── Internal helpers ─────────────────────────────────────────────────────
-
-
 def _strip_version(name: str) -> str:
     """Strip version suffix from a package name.
 
@@ -265,9 +258,6 @@ def _validate_build_inputs(
             validate_build_env_value(v)
             validated_env[k] = v
     return package, validated_env, validated_deps
-
-
-# ── Dockerfile generation (using Jinja2 templates) ───────────────────────
 
 
 def generate_uvx_dockerfile(
@@ -437,9 +427,6 @@ def generate_go_dockerfile(
     )
 
     return render_template("go.dockerfile.j2", asdict(data))
-
-
-# ── Image tag computation ────────────────────────────────────────────────
 
 
 def compute_image_tag(

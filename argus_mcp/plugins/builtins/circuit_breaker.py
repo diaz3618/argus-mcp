@@ -74,8 +74,6 @@ class CircuitBreakerPlugin(PluginBase):
         self._cooldown: float = float(config.settings.get("cooldown_seconds", 30.0))
         self._breakers: Dict[Tuple[str, str], _PerToolBreaker] = {}
 
-    # ── Hooks ────────────────────────────────────────────────────────
-
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         breaker = self._get(ctx)
         if not breaker.allows():
@@ -99,8 +97,6 @@ class CircuitBreakerPlugin(PluginBase):
             breaker.record_success()
             ctx.metadata["circuit_state"] = breaker.state.value
         return ctx
-
-    # ── Internals ────────────────────────────────────────────────────
 
     def _get(self, ctx: PluginContext) -> _PerToolBreaker:
         key = (ctx.server_name, ctx.capability_name)

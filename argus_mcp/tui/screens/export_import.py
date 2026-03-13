@@ -73,9 +73,6 @@ class ExportImportScreen(ArgusScreen):
         self.app.switch_mode("dashboard")
 
 
-# ── Export Panel ─────────────────────────────────────────────────────────
-
-
 class _ExportPanel(Static):
     """Export config to YAML with filtering and secret handling."""
 
@@ -213,9 +210,6 @@ class _ExportPanel(Static):
             self.app.notify(f"Exported → {out}", timeout=4)
         except OSError as exc:
             self.app.notify(f"Save failed: {exc}", severity="error", timeout=5)
-
-
-# ── Import Panel ─────────────────────────────────────────────────────────
 
 
 class _ImportPanel(Static):

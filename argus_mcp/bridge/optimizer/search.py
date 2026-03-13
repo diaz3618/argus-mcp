@@ -23,9 +23,6 @@ try:
 except ImportError:  # pragma: no cover
     _HAS_SKLEARN = False
 
-
-# ── Simple fallback scorer ───────────────────────────────────────────────
-
 _SPLIT_RE = re.compile(r"[_\-\s]+")
 
 
@@ -49,9 +46,6 @@ def _simple_score(query_tokens: List[str], doc_tokens: List[str]) -> float:
         elif qt in doc_text:
             hits += 0.25
     return hits / len(query_tokens)
-
-
-# ── Tool definition container ────────────────────────────────────────────
 
 
 class ToolEntry:
@@ -81,9 +75,6 @@ class ToolEntry:
         }
 
 
-# ── Tool index ───────────────────────────────────────────────────────────
-
-
 class ToolIndex:
     """Searchable index of tool definitions.
 
@@ -96,8 +87,6 @@ class ToolIndex:
         self._tfidf_matrix: Any = None
         self._vectorizer: Any = None
         self._ordered_names: List[str] = []
-
-    # ── Population ───────────────────────────────────────────────────
 
     def _populate(
         self, tools: Sequence[Any], route_map: Optional[Dict[str, Tuple[str, str]]] = None
@@ -176,8 +165,6 @@ class ToolIndex:
         )
         self._tfidf_matrix = self._vectorizer.fit_transform(corpus)
 
-    # ── Search ───────────────────────────────────────────────────────
-
     def search(self, query: str, limit: int = OPTIMIZER_SEARCH_LIMIT) -> List[Dict[str, Any]]:
         """Search for tools matching *query*.
 
@@ -220,8 +207,6 @@ class ToolIndex:
 
         results.sort(key=lambda x: x[0], reverse=True)
         return [{**entry.to_dict(), "score": round(score, 4)} for score, entry in results[:limit]]
-
-    # ── Lookup ───────────────────────────────────────────────────────
 
     def get(self, name: str) -> Optional[ToolEntry]:
         """Get a tool by exact name."""

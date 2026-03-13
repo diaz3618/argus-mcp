@@ -41,9 +41,6 @@ class UserIdentity:
         return self.provider == "anonymous"
 
 
-# ── Individual providers ────────────────────────────────────────────────
-
-
 class AnonymousProvider:
     """Always returns an anonymous identity.  For development only."""
 
@@ -92,9 +89,6 @@ class JWTAuthProvider:
             provider="jwt",
             claims=claims.raw,
         )
-
-
-# ── Provider registry ──────────────────────────────────────────────────
 
 
 class AuthProviderRegistry:

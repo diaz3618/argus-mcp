@@ -61,11 +61,7 @@ logger = logging.getLogger(__name__)
 # Strong references to background tasks to prevent GC before completion
 _background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
 
-
 _BACKEND_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────
 
 
 def _get_service(request: Request) -> ArgusService:
@@ -89,9 +85,6 @@ def _get_feature_flags() -> Dict[str, bool]:
     if ff is None:
         return {}
     return ff.all_flags()
-
-
-# ── GET /manage/v1/health ────────────────────────────────────────────────
 
 
 async def handle_health(request: Request) -> JSONResponse:
@@ -130,9 +123,6 @@ async def handle_health(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
-# ── GET /manage/v1/ready ────────────────────────────────────────────────
-
-
 async def handle_ready(request: Request) -> JSONResponse:
     """Readiness probe — returns 200 when the gateway is ready to serve traffic."""
     service = _get_service(request)
@@ -143,9 +133,6 @@ async def handle_ready(request: Request) -> JSONResponse:
         ReadyResponse(ready=False, reason="backends not connected").model_dump(),
         status_code=503,
     )
-
-
-# ── GET /manage/v1/status ───────────────────────────────────────────────
 
 
 async def handle_status(request: Request) -> JSONResponse:
@@ -181,9 +168,6 @@ async def handle_status(request: Request) -> JSONResponse:
         feature_flags=_get_feature_flags(),
     )
     return JSONResponse(resp.model_dump())
-
-
-# ── GET /manage/v1/backends ─────────────────────────────────────────────
 
 
 async def handle_backends(request: Request) -> JSONResponse:
@@ -267,9 +251,6 @@ async def handle_backends(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
-# ── GET /manage/v1/groups ───────────────────────────────────────────────
-
-
 async def handle_groups(request: Request) -> JSONResponse:
     """List all server groups and their members.
 
@@ -299,9 +280,6 @@ async def handle_groups(request: Request) -> JSONResponse:
         )
 
     return JSONResponse(gm.to_dict())
-
-
-# ── GET /manage/v1/capabilities ─────────────────────────────────────────
 
 
 async def handle_capabilities(request: Request) -> JSONResponse:
@@ -389,9 +367,6 @@ async def handle_capabilities(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
-# ── GET /manage/v1/events ───────────────────────────────────────────────
-
-
 async def handle_events(request: Request) -> JSONResponse:
     """Recent events (polling)."""
     service = _get_service(request)
@@ -425,9 +400,6 @@ async def handle_events(request: Request) -> JSONResponse:
 
     resp = EventsResponse(events=items)
     return JSONResponse(resp.model_dump())
-
-
-# ── GET /manage/v1/events/stream ────────────────────────────────────────
 
 
 async def handle_events_stream(request: Request) -> StreamingResponse:
@@ -481,9 +453,6 @@ def _sse_format(
     return "\n".join(parts)
 
 
-# ── POST /manage/v1/reload ──────────────────────────────────────────────
-
-
 async def handle_reload(request: Request) -> JSONResponse:
     """Hot-reload config and reconnect changed backends."""
     service = _get_service(request)
@@ -494,9 +463,6 @@ async def handle_reload(request: Request) -> JSONResponse:
     result = await service.reload()
     resp = ReloadResponse(**result)
     return JSONResponse(resp.model_dump())
-
-
-# ── POST /manage/v1/reconnect/{name} ────────────────────────────────────
 
 
 async def handle_reconnect(request: Request) -> JSONResponse:
@@ -524,9 +490,6 @@ async def handle_reconnect(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump(), status_code=status_code)
 
 
-# ── POST /manage/v1/reauth/{name} ────────────────────────────────────────
-
-
 async def handle_reauth(request: Request) -> JSONResponse:
     """Trigger interactive re-authentication for a backend."""
     service = _get_service(request)
@@ -549,9 +512,6 @@ async def handle_reauth(request: Request) -> JSONResponse:
     resp = ReAuthResponse(**result)
     status_code = 200 if resp.reauth_initiated else 500
     return JSONResponse(resp.model_dump(), status_code=status_code)
-
-
-# ── POST /manage/v1/shutdown ────────────────────────────────────────────
 
 
 async def handle_shutdown(request: Request) -> JSONResponse:
@@ -596,9 +556,6 @@ async def _deferred_shutdown(service: ArgusService, timeout: int) -> None:
     await service.shutdown(timeout_seconds=timeout)
 
 
-# ── GET /manage/v1/sessions ─────────────────────────────────────────────
-
-
 async def handle_sessions(request: Request) -> JSONResponse:
     """List active client sessions."""
     from argus_mcp.server.app import mcp_server
@@ -614,9 +571,6 @@ async def handle_sessions(request: Request) -> JSONResponse:
         sessions=details,
     )
     return JSONResponse(resp.model_dump())
-
-
-# ── Router ───────────────────────────────────────────────────────────────
 
 
 management_routes = Router(

@@ -78,8 +78,6 @@ class InstallPanelWidget(Widget):
             config = self.selected_entry.to_backend_config()
             self.post_message(InstallConfirmed(self.selected_entry, config))
 
-    # ── internal ────────────────────────────────────────────────────
-
     def _update_detail(self, entry: Optional[ServerEntry]) -> None:
         info = safe_query(self, "#install-info", Static)
         btn = safe_query(self, "#install-btn", Button)

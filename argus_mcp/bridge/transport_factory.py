@@ -25,9 +25,6 @@ from argus_mcp.errors import BackendServerError, ConfigurationError
 logger = logging.getLogger(__name__)
 
 
-# ── Low-level transport initializers ─────────────────────────────────────
-
-
 async def init_stdio(
     svr_name: str,
     stdio_cfg: StdioServerParameters,
@@ -103,9 +100,6 @@ async def init_streamablehttp(
     return transport_ctx, session
 
 
-# ── Stdio parameter resolution ───────────────────────────────────────────
-
-
 async def resolve_stdio_params(
     svr_name: str,
     svr_conf: Dict[str, Any],
@@ -152,9 +146,6 @@ async def resolve_stdio_params(
     )
 
 
-# ── Network environment injection ────────────────────────────────────────
-
-
 def apply_network_env(
     svr_name: str,
     svr_conf: Dict[str, Any],
@@ -199,9 +190,6 @@ def apply_network_env(
         args=list(params.args) if params.args else [],
         env=env if env else None,
     )
-
-
-# ── High-level dispatcher ────────────────────────────────────────────────
 
 
 def _merge_headers(

@@ -18,13 +18,11 @@ from .response_cache_by_prompt import ResponseCachePlugin
 from .retry_with_backoff import RetryWithBackoffPlugin
 from .secrets_detection import SecretsDetectionPlugin
 
-# ---- Security plugins ----
 register_plugin("secrets_detection", SecretsDetectionPlugin)
 register_plugin("pii_filter", PiiFilterPlugin)
 register_plugin("rate_limiter", RateLimiterPlugin)
 register_plugin("circuit_breaker", CircuitBreakerPlugin)
 
-# ---- Operational plugins ----
 register_plugin("retry_with_backoff", RetryWithBackoffPlugin)
 register_plugin("response_cache_by_prompt", ResponseCachePlugin)
 register_plugin("output_length_guard", OutputLengthGuardPlugin)

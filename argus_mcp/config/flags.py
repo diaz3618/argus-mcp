@@ -41,13 +41,10 @@ class FlagSpec:
     description: str
 
 
-# ------------------------------------------------------------------
 # Flag registry
-# ------------------------------------------------------------------
 # Convention:
 #   • risk="high"  → default MUST be False (enforced in _validate_registry)
 #   • risk="low"   → default may be True or False
-# ------------------------------------------------------------------
 FLAG_REGISTRY: Dict[str, FlagSpec] = {
     "optimizer": FlagSpec(
         default=False,

@@ -20,8 +20,6 @@ from textual.widgets.option_list import Option
 
 logger = logging.getLogger(__name__)
 
-# ── Status indicators ───────────────────────────────────────────────
-
 _ICON_CONNECTED = "●"  # green dot (styled via Rich markup)
 _ICON_DISCONNECTED = "○"  # hollow dot
 _ICON_ACTIVE = "▸"  # pointer showing active
@@ -60,8 +58,6 @@ class ServerSelectorWidget(Widget):
         option_list = self.query_one("#srv-option-list", OptionList)
         option_list.can_focus = True
 
-    # ── Public API ──────────────────────────────────────────────
-
     def refresh_servers(
         self,
         servers: list[dict[str, object]],
@@ -96,8 +92,6 @@ class ServerSelectorWidget(Widget):
             )
             label = f"{pointer} {dot} {name}  [dim]{url}[/dim]"
             option_list.add_option(Option(label, id=name))
-
-    # ── Events ──────────────────────────────────────────────────
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """User clicked / pressed Enter on a server entry."""

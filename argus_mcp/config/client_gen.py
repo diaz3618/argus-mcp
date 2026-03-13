@@ -51,9 +51,6 @@ def generate_client_config(
     return json.dumps(payload, indent=2)
 
 
-# ── Internal generators ─────────────────────────────────────────────────
-
-
 def _build_url(host: str, port: int, transport: str) -> str:
     base = f"http://{host}:{port}"
     if transport == "sse":

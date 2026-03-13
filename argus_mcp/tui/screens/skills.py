@@ -100,8 +100,6 @@ class SkillsScreen(ArgusScreen):
         self._ensure_skill_manager()
         self._refresh_from_manager()
 
-    # ── Skill Manager ────────────────────────────────────────────
-
     def _ensure_skill_manager(self) -> None:
         """Lazily create a SkillManager if none was injected."""
         if self._skill_manager is not None:
@@ -118,8 +116,6 @@ class SkillsScreen(ArgusScreen):
                 self._skill_manager = SkillManager(skills_dir=_DEFAULT_SKILLS_DIR)
         except (ImportError, OSError) as exc:
             logger.warning("Could not create SkillManager: %s", exc)
-
-    # ── Data Loading ─────────────────────────────────────────────
 
     def load_skills(self, skills: List[Dict[str, Any]]) -> None:
         """Populate the table from a list of skill dicts."""
@@ -196,8 +192,6 @@ class SkillsScreen(ArgusScreen):
             logger.error("Failed to refresh skills from manager: %s", exc)
             self._set_status(f"Error loading skills: {exc}")
 
-    # ── Search & Filter ──────────────────────────────────────────
-
     def on_input_changed(self, event: Input.Changed) -> None:
         """Live-filter the skills table on search text change."""
         if event.input.id != "skills-search":
@@ -239,8 +233,6 @@ class SkillsScreen(ArgusScreen):
     def action_focus_search(self) -> None:
         if w := safe_query(self, "#skills-search", Input):
             w.focus()
-
-    # ── Selection & Detail ───────────────────────────────────────
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         key = str(event.row_key.value) if event.row_key else None
@@ -284,8 +276,6 @@ class SkillsScreen(ArgusScreen):
         if skill.get("config"):
             lines.append(f"[b]Config keys:[/b]  {', '.join(skill['config'].keys())}")
         detail.update("\n".join(lines))
-
-    # ── Actions ──────────────────────────────────────────────────
 
     def action_toggle_skill(self) -> None:
         if not self._selected_skill:
@@ -440,8 +430,6 @@ class SkillsScreen(ArgusScreen):
     def action_go_back(self) -> None:
         self.app.switch_mode("dashboard")
 
-    # ── Button handler ───────────────────────────────────────────
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-toggle":
             self.action_toggle_skill()
@@ -449,8 +437,6 @@ class SkillsScreen(ArgusScreen):
             self.action_apply_skill()
         elif event.button.id == "btn-uninstall":
             self.action_uninstall_skill()
-
-    # ── Helpers ──────────────────────────────────────────────────
 
     def _set_status(self, text: str) -> None:
         if w := safe_query(self, "#skills-status-bar", Static):

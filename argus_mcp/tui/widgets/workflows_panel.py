@@ -23,8 +23,6 @@ from argus_mcp._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 
-# ── Workflow discovery helpers ────────────────────────────────────
-
 _YAML_EXTS = (".yaml", ".yml")
 _SEARCH_DIRS = ("workflows", "examples/workflows")
 
@@ -264,8 +262,6 @@ class WorkflowsPanel(Widget):
         if detail := safe_query(self, "#wf-detail", Static):
             detail.update("\n".join(lines))
 
-    # ── Button handlers ──────────────────────────────────────────────
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle New / Run / Delete button presses."""
         btn_id = event.button.id
@@ -275,8 +271,6 @@ class WorkflowsPanel(Widget):
             self._action_run_workflow()
         elif btn_id == "btn-wf-delete":
             self._action_delete_workflow()
-
-    # ── Output log helpers ───────────────────────────────────────────
 
     def _log_output(self, text: str | Text) -> None:
         """Write a line to the execution output log."""
@@ -528,9 +522,6 @@ class WorkflowsPanel(Widget):
         self._workflows.pop(idx)
         self.update_workflows(self._workflows)
         self.app.notify(f"Workflow '{name}' removed.", severity="information")
-
-
-# ── Modal screen for editing workflow YAML ───────────────────────
 
 
 class WorkflowEditorModal(ModalScreen[Optional[str]]):

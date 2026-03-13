@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── Network modes ────────────────────────────────────────────────────────
 #
 # "bridge" — default Docker bridge network.  Allows general outbound
 #            (HTTP, DNS, etc.).  Suitable for most MCP servers.

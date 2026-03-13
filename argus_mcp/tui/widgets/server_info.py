@@ -81,8 +81,6 @@ class ServerInfoWidget(Widget):
     def on_mount(self) -> None:
         self._refresh_display()
 
-    # ── Public helpers ──────────────────────────────────────────
-
     def apply_status_info(self, info: dict) -> None:
         """Bulk-update from a ``gen_status_info`` dict."""
         import os

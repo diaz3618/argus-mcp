@@ -79,7 +79,6 @@ def _read_config_file(cfg_fpath: str) -> Dict[str, Any]:
     return raw_data
 
 
-# ── Post-validation conversion ──────────────────────────────────────────
 # Downstream code expects Dict[str, Dict[str, Any]] with
 # StdioServerParameters objects — convert Pydantic models to that format.
 
@@ -183,9 +182,6 @@ def _maybe_resolve_secrets(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         return resolve_secrets(raw_data, store, strict=strict)
     except Exception as exc:  # noqa: BLE001
         raise ConfigurationError(f"Secret resolution failed: {exc}") from exc
-
-
-# ── Public API ───────────────────────────────────────────────────────────
 
 
 def load_and_validate_config(cfg_fpath: str) -> Dict[str, Dict[str, Any]]:

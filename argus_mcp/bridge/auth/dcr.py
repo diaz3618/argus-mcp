@@ -38,15 +38,10 @@ from argus_mcp.bridge.auth.discovery import (
 
 logger = logging.getLogger(__name__)
 
-# ── Cache ────────────────────────────────────────────────────────────────
-
 _DEFAULT_CACHE_TTL: float = 3600.0
 
 # {registration_endpoint: {"registration": ClientRegistration, "cached_at": float}}
 _registration_cache: Dict[str, Dict[str, Any]] = {}
-
-
-# ── Grant types the gateway can use ──────────────────────────────────────
 
 _GATEWAY_GRANT_TYPES: FrozenSet[str] = frozenset(
     {
@@ -55,9 +50,6 @@ _GATEWAY_GRANT_TYPES: FrozenSet[str] = frozenset(
         "refresh_token",
     }
 )
-
-
-# ── Data classes ─────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -80,9 +72,6 @@ class ClientRegistration:
         if self.client_secret_expires_at == 0:
             return False  # No expiry set
         return time.time() > self.client_secret_expires_at
-
-
-# ── DCR Client ───────────────────────────────────────────────────────────
 
 
 class DCRClient:
@@ -115,8 +104,6 @@ class DCRClient:
         self._cache_ttl = max(0.0, cache_ttl)
         self._client_name = client_name
         self._redirect_uris = redirect_uris or []
-
-    # ── Public API ───────────────────────────────────────────────────
 
     async def register(
         self,
@@ -185,8 +172,6 @@ class DCRClient:
     def clear_cache(self) -> None:
         """Remove all cached registrations."""
         _registration_cache.clear()
-
-    # ── Internal helpers ─────────────────────────────────────────────
 
     def _negotiate_grant_types(
         self,

@@ -17,8 +17,6 @@ from argus_mcp.plugins.models import PluginConfig
 
 logger = logging.getLogger(__name__)
 
-# ── Compiled patterns ────────────────────────────────────────────────────
-
 _PATTERNS: List[tuple[str, Pattern[str]]] = [
     (
         "AWS Access Key",
@@ -46,8 +44,6 @@ class SecretsDetectionPlugin(PluginBase):
         super().__init__(config)
         self._block: bool = config.settings.get("block", True)
 
-    # ── Hooks ────────────────────────────────────────────────────────
-
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         self._scan_arguments(ctx)
         return ctx
@@ -55,8 +51,6 @@ class SecretsDetectionPlugin(PluginBase):
     async def tool_post_invoke(self, ctx: PluginContext) -> PluginContext:
         self._scan_result(ctx)
         return ctx
-
-    # ── Internals ────────────────────────────────────────────────────
 
     def _scan_arguments(self, ctx: PluginContext) -> None:
         for key, value in list(ctx.arguments.items()):

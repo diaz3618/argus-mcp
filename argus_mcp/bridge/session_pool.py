@@ -37,8 +37,6 @@ from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
-# ── Types ────────────────────────────────────────────────────────────────
-
 
 class SessionKey(NamedTuple):
     """Composite key for pooled sessions."""
@@ -67,15 +65,10 @@ class PoolEntry:
         return time.monotonic() - self.last_used
 
 
-# ── Configuration defaults ───────────────────────────────────────────────
-
 DEFAULT_PER_KEY_MAX = 4
 DEFAULT_TTL = 300.0  # seconds
 DEFAULT_REAP_INTERVAL = 30.0  # seconds
 DEFAULT_CB_THRESHOLD = 3
-
-
-# ── Pool implementation ──────────────────────────────────────────────────
 
 
 class SessionPool:
@@ -111,8 +104,6 @@ class SessionPool:
         self._lock = asyncio.Lock()
         self._closed = False
 
-    # ── Lifecycle ────────────────────────────────────────────────────────
-
     async def start(self) -> None:
         """Start the background reaper task."""
         if self._reaper_task is not None:
@@ -145,8 +136,6 @@ class SessionPool:
             self._circuit_breakers.clear()
 
         logger.info("SessionPool stopped — all sessions closed.")
-
-    # ── Public API ───────────────────────────────────────────────────────
 
     async def acquire(self, key: SessionKey) -> Optional[PoolEntry]:
         """Acquire an idle session from the pool for *key*.
@@ -247,8 +236,6 @@ class SessionPool:
             logger.info("SessionPool: removed %d session(s) for %s.", closed, key)
         return closed
 
-    # ── Metrics / introspection ──────────────────────────────────────────
-
     @property
     def total_sessions(self) -> int:
         """Total number of sessions across all keys."""
@@ -272,8 +259,6 @@ class SessionPool:
     def get_circuit_breaker(self, key: SessionKey) -> CircuitBreaker:
         """Expose the circuit breaker for a key (read-only diagnostics)."""
         return self._get_circuit_breaker(key)
-
-    # ── Internals ────────────────────────────────────────────────────────
 
     def _get_circuit_breaker(self, key: SessionKey) -> CircuitBreaker:
         cb = self._circuit_breakers.get(key)

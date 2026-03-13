@@ -47,9 +47,6 @@ def start_span(
         yield span
 
 
-# ── No-op fallbacks ─────────────────────────────────────────────────────
-
-
 class _NoOpSpan:
     """Dummy span when OTel is not installed."""
 

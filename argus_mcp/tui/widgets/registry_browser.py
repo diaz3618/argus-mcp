@@ -117,8 +117,6 @@ class RegistryBrowserWidget(Widget):
         if w := safe_query(self, "#registry-status", Static):
             w.update(text)
 
-    # ── internal ────────────────────────────────────────────────────
-
     def _filtered_entries(self) -> List[ServerEntry]:
         q = self.search_query.lower().strip()
         if not q:

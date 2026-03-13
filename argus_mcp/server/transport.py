@@ -106,7 +106,6 @@ async def handle_sse(request: Request) -> None:
 
     logger.debug("Received new SSE connection request (GET): %s", request.url)
 
-    # ── Incoming auth gate ───────────────────────────────────────────
     try:
         await _authenticate_request(request.scope)
     except AuthenticationError as exc:
@@ -130,7 +129,6 @@ async def handle_sse(request: Request) -> None:
         )
         return
 
-    # ── Session management ───────────────────────────────────────────
     session_mgr = getattr(mcp_server, "session_manager", None)
     session = None
     if session_mgr is not None:
@@ -152,7 +150,6 @@ async def handle_sse(request: Request) -> None:
         request.receive,
         request._send,
     ) as (read_stream, write_stream):
-        # ── Wrap streams with resilience guards ──────────────────────
         guarded_read, guarded_write, metrics = _sse_resilience.wrap_streams(
             read_stream, write_stream
         )
@@ -184,7 +181,6 @@ async def handle_sse(request: Request) -> None:
         )
         await mcp_server.run(guarded_read, guarded_write, init_opts)
 
-    # ── Clean up session with deadline ───────────────────────────────
     if session is not None and session_mgr is not None:
 
         async def _do_cleanup() -> None:
@@ -218,7 +214,6 @@ async def handle_streamable_http(scope: Any, receive: Any, send: Any) -> None:
         await response(scope, receive, send)
         return
 
-    # ── Incoming auth gate ───────────────────────────────────────────
     try:
         await _authenticate_request(scope)
     except AuthenticationError as exc:

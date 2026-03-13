@@ -72,16 +72,12 @@ class HealthScreen(ArgusScreen):
 
         app.run_worker(_fetch(), exclusive=False, name="health-refresh")
 
-    # ── Helper: get active API client ────────────────────────────
-
     def _get_api_client(self):
         """Return the active :class:`ApiClient` or *None*."""
         mgr = getattr(self.app, "_server_manager", None)
         if mgr is None:
             return None
         return getattr(mgr, "active_client", None)
-
-    # ── Lifecycle action handlers ────────────────────────────────
 
     def on_health_panel_backend_reconnect(self, event: HealthPanel.BackendReconnect) -> None:
         """Reconnect a single backend via the management API."""

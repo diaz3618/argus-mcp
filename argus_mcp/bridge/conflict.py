@@ -23,9 +23,6 @@ from argus_mcp.errors import CapabilityConflictError
 logger = logging.getLogger(__name__)
 
 
-# ── Return value for handle_conflict ─────────────────────────────────────
-
-
 class ConflictAction:
     """Result of conflict resolution."""
 
@@ -57,9 +54,6 @@ class ConflictAction:
         return cls(cls.RENAME, new_name)
 
 
-# ── Strategy interface ───────────────────────────────────────────────────
-
-
 class ConflictStrategy(ABC):
     """Base class for conflict resolution strategies."""
 
@@ -82,9 +76,6 @@ class ConflictStrategy(ABC):
 
         Returns a :class:`ConflictAction` indicating the resolution.
         """
-
-
-# ── Concrete strategies ─────────────────────────────────────────────────
 
 
 class FirstWinsStrategy(ConflictStrategy):
@@ -218,8 +209,6 @@ class ErrorStrategy(ConflictStrategy):
     ) -> ConflictAction:
         raise CapabilityConflictError(exposed_name, existing_server, new_server)
 
-
-# ── Factory ──────────────────────────────────────────────────────────────
 
 _STRATEGY_MAP = {
     "first-wins": "FirstWinsStrategy",

@@ -23,7 +23,6 @@ from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-# ── Re-exports from sub-modules ─────────────────────────────────────────
 from argus_mcp.config.schema_backends import (  # noqa: F401
     AuthConfig,
     BackendConfig,
@@ -91,8 +90,6 @@ __all__ = [
     "ArgusConfig",
     "PluginsConfig",
 ]
-
-# ── Models that remain in this file (small, tightly coupled to top-level) ──
 
 
 class ConflictResolutionConfig(BaseModel):
@@ -320,9 +317,6 @@ class SecretsConfig(BaseModel):
         default=False,
         description="Raise an error if a referenced secret cannot be resolved.",
     )
-
-
-# ── Top-level config ────────────────────────────────────────────────────
 
 
 class ArgusConfig(BaseModel):

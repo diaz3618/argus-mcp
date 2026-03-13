@@ -65,8 +65,6 @@ class ClientManager:
         """Inject HTTP_PROXY / NO_PROXY env vars from network isolation config."""
         return bc.apply_network_env(svr_name, svr_conf, params)
 
-    # ── Per-backend connect (delegates to backend_connection) ────────
-
     async def _start_backend_svr(self, svr_name: str, svr_conf: Dict[str, Any]) -> bool:
         """Start and initialize a single backend server connection."""
         return await bc.start_backend_svr(
@@ -87,8 +85,6 @@ class ClientManager:
         """Pre-build the container image for a stdio backend."""
         await bc.pre_build_container_image(svr_name, svr_conf, self._progress_cb)
 
-    # ── Startup orchestration (delegates to startup_coordinator) ─────
-
     async def start_all(
         self,
         config_data: Dict[str, Dict[str, Any]],
@@ -107,8 +103,6 @@ class ClientManager:
             progress_callback=progress_callback,
             shutdown_requested_fn=lambda: self._shutdown_requested,
         )
-
-    # ── Background token refresh ─────────────────────────────────────
 
     def start_refresh_service(
         self,
@@ -293,13 +287,9 @@ class ClientManager:
         """Get a dictionary copy of all active sessions."""
         return self._sessions.copy()
 
-    # ── Status records ───────────────────────────────────────────────────
-
     def get_status_record(self, svr_name: str) -> Optional[Any]:
         """Get the status record for a backend (or ``None``)."""
         return self._status_records.get(svr_name)
-
-    # ── Outgoing authentication (delegates to auth_discovery module) ──
 
     async def _resolve_auth_headers(
         self, svr_name: str, svr_conf: Dict[str, Any]
@@ -353,7 +343,5 @@ class ClientManager:
             redirect_uri,
         )
 
-
-# ── Module-level helpers ─────────────────────────────────────────────────
 
 _looks_like_auth_failure = ad.looks_like_auth_failure

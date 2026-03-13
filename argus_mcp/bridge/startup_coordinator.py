@@ -25,9 +25,6 @@ logger = logging.getLogger(__name__)
 _TYPE_PRIORITY = {"streamable-http": 0, "sse": 1, "stdio": 2}
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────
-
-
 def _sort_backends(
     config_data: Dict[str, Dict[str, Any]],
 ) -> Tuple[List[Tuple[str, Dict[str, Any]]], List[Tuple[str, Dict[str, Any]]]]:
@@ -39,9 +36,6 @@ def _sort_backends(
     remote = [(n, c) for n, c in sorted_items if c.get("type") != "stdio"]
     stdio = [(n, c) for n, c in sorted_items if c.get("type") == "stdio"]
     return remote, stdio
-
-
-# ── Launch helpers ───────────────────────────────────────────────────────
 
 
 def launch_remote_tasks(
@@ -147,9 +141,6 @@ async def gather_remote_results(
     return results_map
 
 
-# ── Auth discovery wait ──────────────────────────────────────────────────
-
-
 async def await_auth_discoveries(
     failed_names: List[str],
     auth_discovery_tasks: Dict[str, "asyncio.Task[Any]"],
@@ -211,9 +202,6 @@ async def await_auth_discoveries(
                         )
     except Exception as exc:  # noqa: BLE001
         logger.debug("Error while waiting for auth discovery tasks: %s", exc)
-
-
-# ── Retry logic ──────────────────────────────────────────────────────────
 
 
 def signal_retry_phase(

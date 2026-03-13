@@ -97,8 +97,6 @@ class CatalogBrowserScreen(ArgusScreen):
     def action_commit(self) -> None:
         self._run_commit()
 
-    # ── Helpers ─────────────────────────────────────────────────────
-
     def _load_config(self) -> Any:
         try:
             path = find_config_file()
@@ -157,8 +155,6 @@ class CatalogBrowserScreen(ArgusScreen):
             self.app.notify("Example catalog loaded", timeout=2)
         except NoMatches:
             pass
-
-    # ── Core actions ────────────────────────────────────────────────
 
     def _run_stage(self) -> None:
         """Parse YAML and run stage_catalog (dry-run preview)."""

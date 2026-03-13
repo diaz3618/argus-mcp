@@ -39,11 +39,7 @@ from typing import Callable, ClassVar, List, Optional, Type
 
 logger = logging.getLogger(__name__)
 
-# ── Health-check timeout ─────────────────────────────────────────────────
 _HEALTH_CHECK_TIMEOUT: float = 10.0
-
-
-# ── Runtime type enum ────────────────────────────────────────────────────
 
 
 class RuntimeType(str, enum.Enum):
@@ -64,9 +60,6 @@ class RuntimeType(str, enum.Enum):
         except ValueError:
             valid = ", ".join(m.value for m in cls)
             raise ValueError(f"Unknown container runtime '{value}'. Valid: {valid}") from None
-
-
-# ── Abstract runtime ─────────────────────────────────────────────────────
 
 
 class ContainerRuntime(abc.ABC):
@@ -140,9 +133,6 @@ class ContainerRuntime(abc.ABC):
     @abc.abstractmethod
     async def list_images(self, prefix: str = "") -> List[str]:
         """List local image tags matching an optional prefix."""
-
-
-# ── Docker / Podman runtime ──────────────────────────────────────────────
 
 
 class DockerRuntime(ContainerRuntime):
@@ -404,9 +394,6 @@ class DockerRuntime(ContainerRuntime):
             return []
 
 
-# ── Kubernetes runtime (placeholder) ─────────────────────────────────────
-
-
 class KubernetesRuntime(ContainerRuntime):
     """Kubernetes container runtime (Pod-based).
 
@@ -508,9 +495,6 @@ class KubernetesRuntime(ContainerRuntime):
 
     async def list_images(self, prefix: str = "") -> List[str]:
         return []
-
-
-# ── Runtime registry and factory ─────────────────────────────────────────
 
 
 class _RuntimeEntry:
@@ -664,7 +648,6 @@ class RuntimeFactory:
         return None
 
 
-# ── Backward-compatible module-level functions ───────────────────────────
 # Used by existing callers.  Delegate to the factory / DockerRuntime.
 
 

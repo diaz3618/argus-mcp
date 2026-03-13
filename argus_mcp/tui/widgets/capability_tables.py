@@ -70,8 +70,6 @@ class CapabilitySection(Widget):
         dt_prompts.cursor_type = "row"
         dt_prompts.zebra_stripes = True
 
-    # ── Tab label updates ───────────────────────────────────────
-
     def _update_tab_labels(self) -> None:
         """Re-label tabs with current counts.
 
@@ -93,8 +91,6 @@ class CapabilitySection(Widget):
 
     def watch_prompts_count(self) -> None:
         self._update_tab_labels()
-
-    # ── Data population ─────────────────────────────────────────
 
     def _populate_tools_table(self, tools: List[Any], rmap: Dict[str, Tuple[str, str]]) -> int:
         """Fill the Tools DataTable and return the conflict count."""
