@@ -53,6 +53,12 @@ class HealthPanel(Widget):
     class ShutdownRequested(Message):
         """Posted when the user clicks Shutdown Server."""
 
+    class AddBackendRequested(Message):
+        """Posted when the user clicks Add Backend."""
+
+    class RestartRequested(Message):
+        """Posted when the user clicks Restart Server."""
+
     DEFAULT_CSS = """
     HealthPanel {
         height: auto;
@@ -107,7 +113,9 @@ class HealthPanel(Widget):
             yield DataTable(id="health-table")
             with Horizontal(id="health-actions-bar"):
                 yield Button("Reconnect", id="btn-health-reconnect", variant="warning")
+                yield Button("Add Backend", id="btn-health-add-backend", variant="success")
                 yield Button("Reload Config", id="btn-health-reload", variant="primary")
+                yield Button("Restart Server", id="btn-health-restart", variant="warning")
                 yield Button("Shutdown Server", id="btn-health-shutdown", variant="error")
             yield Static("", id="health-action-status")
             yield Static("", id="circuit-breaker-info")
@@ -123,8 +131,12 @@ class HealthPanel(Widget):
         btn_id = event.button.id
         if btn_id == "btn-health-reconnect":
             self._action_reconnect_selected()
+        elif btn_id == "btn-health-add-backend":
+            self.post_message(self.AddBackendRequested())
         elif btn_id == "btn-health-reload":
             self.post_message(self.ReloadRequested())
+        elif btn_id == "btn-health-restart":
+            self.post_message(self.RestartRequested())
         elif btn_id == "btn-health-shutdown":
             self.post_message(self.ShutdownRequested())
 

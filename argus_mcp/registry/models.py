@@ -96,8 +96,10 @@ class ServerEntry:
                 "type": self.transport,
                 "url": self.url,
             }
-        # Fallback
-        return {"type": self.transport, "url": self.url}
+        # Unknown transport — default to streamable-http if URL present, else stdio
+        if self.url:
+            return {"type": "streamable-http", "url": self.url}
+        return {"type": "stdio", "command": self.command}
 
 
 @dataclass(frozen=True)

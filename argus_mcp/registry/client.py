@@ -137,7 +137,7 @@ def _entry_from_raw(
                 "url": server.get("homepage", ""),
                 "icon_url": server.get("iconUrl", ""),
                 "version": "",
-                "transport": "remote" if server.get("remote") else "stdio",
+                "transport": "streamable-http" if server.get("remote") else "stdio",
                 "tools": [],
                 "categories": [],
                 "_source": "smithery",
@@ -155,7 +155,7 @@ def _entry_from_raw(
 def _glama_transport(server: Dict[str, Any]) -> str:
     attrs = server.get("attributes") or []
     if "hosting:remote-capable" in attrs:
-        return "remote"
+        return "streamable-http"
     return "stdio"
 
 
@@ -255,6 +255,23 @@ class RegistryClient:
                 exc,
             )
             return self._fallback_page()
+
+    async def list_all_servers(self, *, limit: int = 50, max_pages: int = 20) -> List[ServerEntry]:
+        """Fetch all pages of servers from the registry.
+
+        Follows pagination cursors up to *max_pages* pages.
+        """
+        all_entries: List[ServerEntry] = []
+        cursor: Optional[str] = None
+        for _ in range(max_pages):
+            page = await self.list_servers(cursor=cursor, limit=limit)
+            all_entries.extend(page.servers)
+            if not page.next_cursor:
+                break
+            cursor = page.next_cursor
+        if self._cache and all_entries:
+            self._cache.put(self._base_url, all_entries)
+        return all_entries
 
     async def get_server(self, name: str) -> Optional[ServerEntry]:
         """Fetch a single server by name."""

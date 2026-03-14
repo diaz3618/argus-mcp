@@ -26,8 +26,11 @@ from argus_mcp.registry.cache import RegistryCache
 from argus_mcp.registry.client import RegistryClient
 from argus_mcp.registry.models import ServerEntry
 from argus_mcp.tui.api_client import ApiClientError
+from argus_mcp.tui.screens.backend_config import BackendConfigModal
 from argus_mcp.tui.screens.base import ArgusScreen
-from argus_mcp.tui.screens.server_detail import ServerDetailModal
+from argus_mcp.tui.screens.server_detail import (
+    ServerDetailModal,  # noqa: F401 — kept for external refs
+)
 from argus_mcp.tui.widgets.install_panel import InstallConfirmed, InstallPanelWidget
 from argus_mcp.tui.widgets.registry_browser import (
     InstallRequested,
@@ -99,9 +102,9 @@ class RegistryScreen(ArgusScreen):
             rtype = rcfg.get("type", "auto")
             client = RegistryClient(url, registry_type=rtype, cache=self._cache)
             self._clients.append(client)
-            page = await client.list_servers()
-            if page.servers:
-                all_entries.extend(page.servers)
+            entries = await client.list_all_servers()
+            if entries:
+                all_entries.extend(entries)
                 ok_count += 1
 
         browser.entries = all_entries
@@ -182,19 +185,26 @@ class RegistryScreen(ArgusScreen):
         panel.selected_entry = event.entry
 
     def on_install_requested(self, event: InstallRequested) -> None:
-        """Handle Enter key on a server row — open detail modal."""
+        """Handle Enter key on a server row — open config modal."""
         entry = event.entry
 
-        def _on_detail_result(config: dict | None) -> None:
-            if config is not None:
-                # User clicked Install in the modal
-                self._do_install(entry.name, entry, config)
+        def _on_config_result(result: tuple | None) -> None:
+            if result is not None:
+                name, config = result
+                self._do_install(name, entry, config)
 
-        self.app.push_screen(ServerDetailModal(entry), _on_detail_result)
+        self.app.push_screen(BackendConfigModal(entry=entry), _on_config_result)
 
     def on_install_confirmed(self, event: InstallConfirmed) -> None:
-        """Add the server to the config file and trigger hot-reload."""
-        self._do_install(event.entry.name, event.entry, event.config)
+        """Side panel install — open config modal for review/edit."""
+        entry = event.entry
+
+        def _on_config_result(result: tuple | None) -> None:
+            if result is not None:
+                name, config = result
+                self._do_install(name, entry, config)
+
+        self.app.push_screen(BackendConfigModal(entry=entry), _on_config_result)
 
     def _do_install(
         self,

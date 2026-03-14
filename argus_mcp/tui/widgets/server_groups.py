@@ -81,6 +81,11 @@ class ServerGroupsWidget(Widget):
         backend_map = {b.get("name"): b for b in backends}
 
         for group_name, members in sorted(groups.items()):
+            # Defensive: members might be a dict {servers: [...], count: N}
+            if isinstance(members, dict):
+                members = members.get("servers", [])
+            elif not isinstance(members, list):
+                continue
             total = len(members)
 
             group_label = f"{group_name} ({total})"

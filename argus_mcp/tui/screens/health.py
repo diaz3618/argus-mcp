@@ -96,7 +96,16 @@ class HealthScreen(ArgusScreen):
             groups_resp = getattr(app, "_last_groups", None)
             if groups_resp is not None:
                 try:
-                    self.query_one(ServerGroupsWidget).update_groups([], groups=groups_resp)
+                    inner = groups_resp.get("groups", {}) if isinstance(groups_resp, dict) else {}
+                    # Normalize: API returns {name: {servers: [...], count: N}}
+                    # but widget expects {name: [server_name, ...]}
+                    normalized: dict[str, list[str]] = {}
+                    for gname, gval in inner.items():
+                        if isinstance(gval, dict):
+                            normalized[gname] = gval.get("servers", [])
+                        elif isinstance(gval, list):
+                            normalized[gname] = gval
+                    self.query_one(ServerGroupsWidget).update_groups([], groups=normalized)
                 except NoMatches:
                     pass
 
@@ -205,3 +214,127 @@ class HealthScreen(ArgusScreen):
                 logger.debug("Expected error after shutdown: %s", exc)
 
         self.app.run_worker(_shutdown(), name="shutdown-server", exclusive=False)
+
+    def on_health_panel_add_backend_requested(
+        self,
+        event: HealthPanel.AddBackendRequested,
+    ) -> None:
+        """Open the backend config modal to add a new backend."""
+        from argus_mcp.tui.screens.backend_config import BackendConfigModal
+
+        def _on_result(result: tuple | None) -> None:
+            if result is None:
+                return
+            name, config = result
+            self._add_backend_to_config(name, config)
+
+        self.app.push_screen(BackendConfigModal(entry=None), _on_result)
+
+    def _add_backend_to_config(self, name: str, config: dict) -> None:
+        """Write a new backend to config.yaml and trigger hot-reload."""
+        import json
+        import os
+
+        import yaml  # type: ignore[import-untyped]
+
+        from argus_mcp.config.loader import find_config_file
+
+        panel = self.query_one(HealthPanel)
+        config_path = find_config_file()
+        if config_path is None:
+            self.app.notify("Cannot find config.yaml", severity="error")
+            return
+
+        try:
+            with open(config_path) as fh:
+                data = yaml.safe_load(fh) or {}
+        except Exception as exc:
+            self.app.notify(f"Config read error: {exc}", severity="error")
+            return
+
+        backends = data.setdefault("backends", {})
+        if name in backends:
+            self.app.notify(f"Backend '{name}' already exists", severity="warning")
+            return
+
+        backends[name] = config
+        try:
+            with open(config_path, "w") as fh:
+                yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
+        except Exception as exc:
+            self.app.notify(f"Config write error: {exc}", severity="error")
+            return
+
+        logger.info("Added backend '%s' to %s: %s", name, config_path, json.dumps(config))
+        panel.set_action_status(f"Added [b]{name}[/b] — reloading…")
+        self.app.notify(
+            f"Added [b]{name}[/b] to {os.path.basename(config_path)}",
+            title="Backend Added",
+        )
+
+        # Trigger hot-reload
+        client = self._get_api_client()
+        if client is None:
+            return
+
+        async def _reload() -> None:
+            try:
+                resp = await client.post_reload()
+                if resp.reloaded:
+                    panel.set_action_status(
+                        f"[green]✓[/green] Backend '{name}' added and config reloaded"
+                    )
+                else:
+                    errs = "; ".join(resp.errors) if resp.errors else "unknown"
+                    panel.set_action_status(f"[red]✕[/red] Reload failed: {errs}")
+            except (OSError, ConnectionError, ApiClientError) as exc:
+                panel.set_action_status(f"[red]✕[/red] Reload error: {exc}")
+            self._refresh_from_app()
+
+        self.app.run_worker(_reload(), name="add-backend-reload", exclusive=False)
+
+    def on_health_panel_restart_requested(
+        self,
+        event: HealthPanel.RestartRequested,
+    ) -> None:
+        """Restart the Argus server — shutdown then poll for reconnection."""
+        client = self._get_api_client()
+        if client is None:
+            self.app.notify("Not connected to a server.", severity="error")
+            return
+
+        panel = self.query_one(HealthPanel)
+        panel.set_action_status("[yellow]⏻[/yellow] Restarting server…")
+        self.app.notify("Restarting server — sending shutdown…", severity="warning")
+
+        async def _restart() -> None:
+            import asyncio
+
+            # Send shutdown
+            try:
+                await client.post_shutdown(timeout_seconds=5.0)
+            except (OSError, ConnectionError, ApiClientError):
+                pass  # expected — connection drops after shutdown
+
+            panel.set_action_status("[yellow]…[/yellow] Server down — waiting for restart…")
+
+            # Poll until the server comes back (container auto-restart / systemd)
+            for attempt in range(30):
+                await asyncio.sleep(2)
+                try:
+                    health = await client.get_health()
+                    if health:
+                        panel.set_action_status("[green]✓[/green] Server restarted successfully")
+                        self.app.notify("Server restarted!", severity="information")
+                        self._refresh_from_app()
+                        return
+                except (OSError, ConnectionError, ApiClientError):
+                    continue
+
+            panel.set_action_status("[red]✕[/red] Server did not come back within 60 seconds")
+            self.app.notify(
+                "Server did not restart within timeout. Check container/systemd.",
+                severity="error",
+            )
+
+        self.app.run_worker(_restart(), name="restart-server", exclusive=False)
