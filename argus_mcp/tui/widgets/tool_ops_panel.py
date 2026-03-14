@@ -134,16 +134,7 @@ class ToolOpsPanel(Static):
             param_count = len(schema.get("properties", {})) if isinstance(schema, dict) else 0
             schema_type = schema.get("type", "—") if isinstance(schema, dict) else "—"
 
-            issues: List[str] = []
-            description = tool.get("description", "")
-            if not description:
-                issues.append("no description")
-            if not isinstance(schema, dict) or "properties" not in schema:
-                issues.append("no input schema")
-            elif schema_type != "object":
-                issues.append(f"schema type={schema_type}")
-            if backend == "—":
-                issues.append("unrouted")
+            issues = self._check_tool_issues(tool, schema, backend)
 
             if issues:
                 issue_count += 1
@@ -161,3 +152,17 @@ class ToolOpsPanel(Static):
             pass
 
         self.app.notify(f"Validation: {issue_count} issue(s) in {len(tools)} tools", timeout=3)
+
+    @staticmethod
+    def _check_tool_issues(tool: dict, schema: Any, backend: str) -> List[str]:
+        """Check a single tool's metadata for quality issues."""
+        issues: List[str] = []
+        if not tool.get("description", ""):
+            issues.append("no description")
+        if not isinstance(schema, dict) or "properties" not in schema:
+            issues.append("no input schema")
+        elif schema.get("type", "—") != "object":
+            issues.append(f"schema type={schema.get('type', '—')}")
+        if backend == "—":
+            issues.append("unrouted")
+        return issues

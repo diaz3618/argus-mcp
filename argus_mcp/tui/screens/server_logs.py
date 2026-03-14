@@ -187,36 +187,41 @@ class ServerLogsScreen(ArgusScreen):
     def _apply_filters(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Apply server/method/search filters."""
         result = events
+        result = self._filter_by_server(result)
+        result = self._filter_by_method(result)
+        result = self._filter_by_text(result)
+        return result
 
-        # Server filter
+    def _filter_by_server(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter events by selected server."""
         try:
             srv_sel = self.query_one("#srvlog-server-filter", Select)
             srv_val = srv_sel.value
             if srv_val and srv_val != "all":
-                result = [
-                    e for e in result if (e.get("server") or e.get("backend") or "") == srv_val
-                ]
+                return [e for e in events if (e.get("server") or e.get("backend") or "") == srv_val]
         except NoMatches:
             pass
+        return events
 
-        # Method filter
+    def _filter_by_method(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter events by selected method or error status."""
         try:
             method_sel = self.query_one("#srvlog-method-filter", Select)
             method_val = method_sel.value
             if method_val and method_val != "all":
                 if method_val == "error":
-                    result = [e for e in result if e.get("status") in ("error", "failed")]
-                else:
-                    result = [e for e in result if e.get("method", e.get("type")) == method_val]
+                    return [e for e in events if e.get("status") in ("error", "failed")]
+                return [e for e in events if e.get("method", e.get("type")) == method_val]
         except NoMatches:
             pass
+        return events
 
-        # Text search
-        if self._filter_search:
-            q = self._filter_search.lower()
-            result = [e for e in result if q in _json.dumps(e, default=str).lower()]
-
-        return result
+    def _filter_by_text(self, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter events by free-text search."""
+        if not self._filter_search:
+            return events
+        q = self._filter_search.lower()
+        return [e for e in events if q in _json.dumps(e, default=str).lower()]
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Update search filter on input change."""
