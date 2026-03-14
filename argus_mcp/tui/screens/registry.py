@@ -92,7 +92,6 @@ class RegistryScreen(ArgusScreen):
             return
 
         all_entries: List[ServerEntry] = []
-        registry_configs = self._get_registry_configs()
         ok_count = 0
 
         for rcfg in registry_configs:
@@ -123,14 +122,21 @@ class RegistryScreen(ArgusScreen):
     def _get_registry_configs(self) -> List[Dict[str, Any]]:
         """Retrieve configured registry entries as dicts with url and type.
 
-        Resolution order:
+        Merges registries from all sources, deduplicating by URL:
         1. ``registries`` list in TUI settings (``settings.json``)
         2. ``registries`` section in the loaded ``ArgusConfig``
-        3. Default well-known MCP registries
+        3. Default well-known MCP registries (only if no other source found)
         """
+        seen_urls: set[str] = set()
         configs: List[Dict[str, Any]] = []
 
-        # 1. Try TUI settings.json registries
+        def _add(url: str, rtype: str = "auto") -> None:
+            normalized = url.rstrip("/").lower()
+            if normalized not in seen_urls:
+                seen_urls.add(normalized)
+                configs.append({"url": url.rstrip("/"), "type": rtype})
+
+        # 1. TUI settings.json registries
         try:
             from argus_mcp.tui.settings import load_settings
 
@@ -138,32 +144,28 @@ class RegistryScreen(ArgusScreen):
             cfg_registries = settings.get("registries", [])
             if cfg_registries:
                 sorted_regs = sorted(cfg_registries, key=lambda r: r.get("priority", 100))
-                configs = [
-                    {"url": r["url"], "type": r.get("type", "auto")}
-                    for r in sorted_regs
-                    if r.get("url")
-                ]
+                for r in sorted_regs:
+                    if r.get("url"):
+                        _add(r["url"], r.get("type", "auto"))
         except (KeyError, ValueError, OSError):
             logger.debug("Could not read registries from settings", exc_info=True)
 
-        # 2. Also check if the ArgusConfig has registries via app state
-        if not configs:
-            try:
-                argus_cfg = getattr(self.app, "_argus_config", None)
-                if argus_cfg is not None:
-                    sorted_regs = sorted(argus_cfg.registries, key=lambda r: r.priority)
-                    configs = [
-                        {"url": r.url, "type": getattr(r, "type", "auto")} for r in sorted_regs
-                    ]
-            except (AttributeError, KeyError):
-                logger.debug("Could not read registries from config", exc_info=True)
+        # 2. ArgusConfig registries from config.yaml (merge, not override)
+        try:
+            from argus_mcp.config.loader import find_config_file, load_argus_config
 
-        # 3. Fall back to well-known registries
+            cfg_path = find_config_file()
+            argus_cfg = load_argus_config(cfg_path)
+            sorted_regs = sorted(argus_cfg.registries, key=lambda r: r.priority)
+            for r in sorted_regs:
+                _add(r.url, getattr(r, "type", "auto"))
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not read registries from config.yaml", exc_info=True)
+
+        # 3. Fall back to well-known registries only if nothing found
         if not configs:
-            configs = [
-                {"url": "https://glama.ai/api/mcp", "type": "glama"},
-                {"url": "https://registry.smithery.ai", "type": "smithery"},
-            ]
+            _add("https://glama.ai/api/mcp", "glama")
+            _add("https://registry.smithery.ai", "smithery")
 
         return configs
 
