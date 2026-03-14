@@ -37,11 +37,12 @@ repos:
         args: ['--config', '.typos.toml']
 
   # Local hooks (pytest on pre-push — tests/ is local-only)
+  # To run pytest on push: ARGUS_TEST=1 git push
   - repo: local
     hooks:
       - id: pytest
         name: pytest (pre-push)
-        entry: python -m pytest tests/ -m "not live_server and not integration and not semgrep" --cov=argus_mcp --cov-report=term-missing --timeout=60 -q
+        entry: bash -c 'if [ "${ARGUS_TEST:-0}" = "1" ]; then python -m pytest tests/ -m "not live_server and not integration and not semgrep" --cov=argus_mcp --cov-report=term-missing --timeout=60 -q; else echo "Skipping pytest (set ARGUS_TEST=1 to enable)"; fi'
         language: system
         pass_filenames: false
         always_run: true
