@@ -155,6 +155,8 @@ class ArgusApp(App):
         # Cached data for cross-screen access
         self._last_status: Optional[Any] = None
         self._last_caps: Optional[Any] = None
+        self._last_sessions: Optional[Any] = None
+        self._last_groups: Optional[Any] = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -521,6 +523,20 @@ class ArgusApp(App):
                 self._apply_backends_response(backends_resp)
             except (OSError, ConnectionError):
                 pass  # Non-critical — status poll already covers basics
+
+            # Fetch sessions for health screen
+            try:
+                sessions_resp = await client.get_sessions()
+                self._last_sessions = sessions_resp
+            except (OSError, ConnectionError):
+                pass
+
+            # Fetch groups for health screen
+            try:
+                groups_resp = await client.get_groups()
+                self._last_groups = groups_resp
+            except (OSError, ConnectionError):
+                pass
 
         except (OSError, ConnectionError) as exc:
             was_connected = self._connected

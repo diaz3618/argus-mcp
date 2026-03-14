@@ -70,6 +70,35 @@ class HealthScreen(ArgusScreen):
             except (OSError, ConnectionError):
                 pass
 
+            # Feed sessions into SessionsPanel
+            sessions_resp = getattr(app, "_last_sessions", None)
+            if sessions_resp is not None:
+                sessions_list = []
+                for s in getattr(sessions_resp, "sessions", []):
+                    d = s.model_dump() if hasattr(s, "model_dump") else s
+                    sessions_list.append(
+                        {
+                            "session_id": d.get("id", "?"),
+                            "user": d.get("transport_type", "—"),
+                            "tool_count": d.get("tool_count", 0),
+                            "created": f"{d.get('age_seconds', 0):.0f}s ago",
+                            "ttl_remaining": d.get("ttl", 0) - d.get("age_seconds", 0),
+                            "active": not d.get("expired", False),
+                        }
+                    )
+                try:
+                    self.query_one(SessionsPanel).update_sessions(sessions_list)
+                except NoMatches:
+                    pass
+
+            # Feed groups into ServerGroupsWidget from cached groups data
+            groups_resp = getattr(app, "_last_groups", None)
+            if groups_resp is not None:
+                try:
+                    self.query_one(ServerGroupsWidget).update_groups([], groups=groups_resp)
+                except NoMatches:
+                    pass
+
         app.run_worker(_fetch(), exclusive=False, name="health-refresh")
 
     def _get_api_client(self):

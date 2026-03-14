@@ -17,9 +17,11 @@ from argus_mcp.server.management.schemas import (
     CapabilitiesResponse,
     EventsResponse,
     HealthResponse,
+    ReadyResponse,
     ReAuthResponse,
     ReconnectResponse,
     ReloadResponse,
+    SessionsResponse,
     ShutdownResponse,
     StatusResponse,
 )
@@ -129,6 +131,36 @@ class ApiClient:
         resp = await client.get("events", params={"limit": limit})
         resp.raise_for_status()
         return EventsResponse.model_validate(resp.json())
+
+    async def get_ready(self) -> ReadyResponse:
+        """``GET /manage/v1/ready``"""
+        client = self._ensure_client()
+        resp = await client.get("ready")
+        resp.raise_for_status()
+        return ReadyResponse.model_validate(resp.json())
+
+    async def get_sessions(self) -> SessionsResponse:
+        """``GET /manage/v1/sessions``"""
+        client = self._ensure_client()
+        resp = await client.get("sessions")
+        resp.raise_for_status()
+        return SessionsResponse.model_validate(resp.json())
+
+    async def get_groups(self, group: Optional[str] = None) -> dict:
+        """``GET /manage/v1/groups``
+
+        Parameters
+        ----------
+        group:
+            Optional group name to filter by.
+        """
+        client = self._ensure_client()
+        params = {}
+        if group is not None:
+            params["group"] = group
+        resp = await client.get("groups", params=params)
+        resp.raise_for_status()
+        return resp.json()
 
     async def post_reload(self) -> ReloadResponse:
         """``POST /manage/v1/reload``"""

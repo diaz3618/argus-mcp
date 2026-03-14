@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class ServerLogsScreen(ArgusScreen):
     """Per-server operational log viewer with filtering and correlation IDs."""
 
+    INITIAL_FOCUS = "#srvlog-table"
+
     BINDINGS = [
         ("slash", "focus_search", "Search"),
         ("escape", "go_back", "Back"),

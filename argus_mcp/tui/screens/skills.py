@@ -48,6 +48,8 @@ class SkillsScreen(ArgusScreen):
     (auto-configure backends), and uninstall.
     """
 
+    INITIAL_FOCUS = "#skills-table"
+
     BINDINGS = [
         ("escape", "go_back", "Back"),
         ("e", "toggle_skill", "Enable/Disable"),

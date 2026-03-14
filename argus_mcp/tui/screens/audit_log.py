@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class AuditLogScreen(ArgusScreen):
     """Dedicated audit log viewer with filtering and export."""
 
+    INITIAL_FOCUS = "#audit-table"
+
     BINDINGS = [
         ("slash", "focus_search", "Search"),
         ("escape", "go_back", "Back"),

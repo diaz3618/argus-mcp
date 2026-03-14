@@ -14,7 +14,12 @@ class ArgusScreen(Screen):
 
     Subclasses override :meth:`compose_content` to supply mode-specific
     widgets.  The chrome is rendered automatically.
+
+    Subclasses that want a non-Input widget to receive initial focus
+    should set ``INITIAL_FOCUS`` to a CSS selector string.
     """
+
+    INITIAL_FOCUS: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -25,3 +30,23 @@ class ArgusScreen(Screen):
     def compose_content(self) -> ComposeResult:
         """Override in subclasses to add mode-specific content."""
         yield from ()
+
+    def on_screen_resume(self) -> None:
+        """Focus the widget specified by INITIAL_FOCUS after the screen
+        is fully displayed.  This runs *after* Textual's built-in
+        auto-focus and avoids the bug where AUTO_FOCUS is not picked up.
+        """
+        selector = self.INITIAL_FOCUS
+        if selector is not None:
+            self.call_after_refresh(self._apply_initial_focus)
+
+    def _apply_initial_focus(self) -> None:
+        """Deferred focus to INITIAL_FOCUS widget."""
+        selector = self.INITIAL_FOCUS
+        if selector is None:
+            return
+        try:
+            widget = self.query_one(selector)
+            widget.focus()
+        except Exception:
+            pass

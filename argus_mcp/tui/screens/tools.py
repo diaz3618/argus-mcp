@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 class ToolsScreen(ArgusScreen):
     """Tools mode — capability tables with search, filtering, and detail view."""
 
+    INITIAL_FOCUS = "#dt-tools"
+
     BINDINGS = [
         ("slash", "focus_search", "Search"),
         ("escape", "clear_search", "Clear"),
