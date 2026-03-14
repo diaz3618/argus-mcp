@@ -114,13 +114,13 @@ class RegistryScreen(ArgusScreen):
         """Retrieve configured registry URLs.
 
         Resolution order:
-        1. ``registries`` section in the loaded ``ArgusConfig``
-        2. ``registries`` list in TUI settings (``settings.json``)
-        3. Empty list (no registries configured)
+        1. ``registries`` list in TUI settings (``settings.json``)
+        2. ``registries`` section in the loaded ``ArgusConfig``
+        3. Default well-known MCP registries
         """
         urls: List[str] = []
 
-        # 1. Try config.yaml registries (loaded at server startup)
+        # 1. Try TUI settings.json registries
         try:
             from argus_mcp.tui.settings import load_settings
 
@@ -142,6 +142,13 @@ class RegistryScreen(ArgusScreen):
                     urls = [r.url for r in sorted_regs]
             except (AttributeError, KeyError):
                 logger.debug("Could not read registries from config", exc_info=True)
+
+        # 3. Fall back to well-known registries
+        if not urls:
+            urls = [
+                "https://registry.mcp.so/api",
+                "https://registry.smithery.ai/api",
+            ]
 
         return urls
 

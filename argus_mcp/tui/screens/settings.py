@@ -260,6 +260,10 @@ class SettingsScreen(ArgusScreen):
         self._refresh_registries()
         self._refresh_about()
 
+    def on_screen_resume(self) -> None:
+        """Refresh theme display when returning from modal (e.g. theme picker)."""
+        self._refresh_theme()
+
     def _refresh_general(self) -> None:
         """Populate the General tab from current state."""
         app = self.app

@@ -317,7 +317,7 @@ class SkillsScreen(ArgusScreen):
             if backend_name and backend_name not in backends:
                 backends[backend_name] = {
                     "command": f"python -m {backend_name.replace('-', '_')}",
-                    "transport": "stdio",
+                    "type": "stdio",
                 }
         return backends
 

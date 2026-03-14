@@ -413,7 +413,7 @@ class ArgusApp(App):
         # Stop capturing print()
         try:
             self.screen.query_one(EventLogWidget).stop_capture()
-        except NoMatches:
+        except Exception:  # NoMatches, ScreenStackError, etc.
             pass
 
     def _start_polling(self) -> None:
