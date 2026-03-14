@@ -22,7 +22,7 @@ from argus_mcp.registry.models import ServerEntry
 logger = logging.getLogger(__name__)
 
 
-class ServerSelected(Message):
+class RegistryServerHighlighted(Message):
     """Posted when a server row is highlighted in the browser table."""
 
     def __init__(self, entry: ServerEntry) -> None:
@@ -104,7 +104,7 @@ class RegistryBrowserWidget(Widget):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         filtered = self._filtered_entries()
         if event.cursor_row < len(filtered):
-            self.post_message(ServerSelected(filtered[event.cursor_row]))
+            self.post_message(RegistryServerHighlighted(filtered[event.cursor_row]))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Pressing Enter on a row triggers install request."""

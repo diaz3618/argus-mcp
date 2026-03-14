@@ -32,7 +32,7 @@ from argus_mcp.tui.widgets.install_panel import InstallConfirmed, InstallPanelWi
 from argus_mcp.tui.widgets.registry_browser import (
     InstallRequested,
     RegistryBrowserWidget,
-    ServerSelected,
+    RegistryServerHighlighted,
 )
 
 logger = logging.getLogger(__name__)
@@ -176,7 +176,7 @@ class RegistryScreen(ArgusScreen):
         except NoMatches:
             pass
 
-    def on_server_selected(self, event: ServerSelected) -> None:
+    def on_registry_server_highlighted(self, event: RegistryServerHighlighted) -> None:
         """Update the install panel when a server is highlighted."""
         panel = self.query_one("#install-panel", InstallPanelWidget)
         panel.selected_entry = event.entry
