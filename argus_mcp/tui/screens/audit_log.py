@@ -212,7 +212,7 @@ class AuditLogScreen(ArgusScreen):
         filtered = self._apply_filters(self._events)
         try:
             path = "audit_export.json"
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 _json.dump(filtered, f, indent=2, default=str)
             self.notify(
                 f"Exported {len(filtered)} events to {path}", title="Export", severity="information"

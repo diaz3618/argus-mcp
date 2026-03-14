@@ -13,6 +13,7 @@ from textual.app import ComposeResult
 from textual.css.query import NoMatches
 from textual.widgets import TabbedContent, TabPane
 
+from argus_mcp.tui.api_client import ApiClientError
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.health_panel import HealthPanel
 from argus_mcp.tui.widgets.server_groups import ServerGroupsWidget
@@ -67,7 +68,7 @@ class HealthScreen(ArgusScreen):
                     self.query_one(ServerGroupsWidget).update_groups(details)
                 except NoMatches:
                     pass
-            except (OSError, ConnectionError):
+            except (OSError, ConnectionError, ApiClientError):
                 pass
 
             # Feed sessions into SessionsPanel
@@ -132,7 +133,7 @@ class HealthScreen(ArgusScreen):
                     err = resp.error or "unknown error"
                     panel.set_action_status(f"[red]✕[/red] Reconnect failed: {err}")
                     self.app.notify(f"Reconnect failed: {err}", severity="error")
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, ApiClientError) as exc:
                 panel.set_action_status(f"[red]✕[/red] Reconnect error: {exc}")
                 self.app.notify(f"Reconnect error: {exc}", severity="error")
             # Refresh the health table
@@ -169,7 +170,7 @@ class HealthScreen(ArgusScreen):
                     errs = "; ".join(resp.errors) if resp.errors else "unknown"
                     panel.set_action_status(f"[red]✕[/red] Reload failed: {errs}")
                     self.app.notify(f"Reload failed: {errs}", severity="error")
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, ApiClientError) as exc:
                 panel.set_action_status(f"[red]✕[/red] Reload error: {exc}")
                 self.app.notify(f"Reload error: {exc}", severity="error")
             self._refresh_from_app()
@@ -198,7 +199,7 @@ class HealthScreen(ArgusScreen):
                     )
                 else:
                     panel.set_action_status("[red]✕[/red] Shutdown request rejected")
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, ApiClientError) as exc:
                 # Connection errors are expected after shutdown
                 panel.set_action_status("[yellow]⏻[/yellow] Shutdown sent (connection closed)")
                 logger.debug("Expected error after shutdown: %s", exc)

@@ -8,9 +8,10 @@ hosting one in-process.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional, Type, TypeVar
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from argus_mcp.server.management.schemas import (
     BackendsResponse,
@@ -35,13 +36,16 @@ _DEFAULT_TIMEOUT = 10.0
 _MUTATING_TIMEOUT = 30.0
 
 
-class ApiClientError(Exception):
-    """Raised when the management API returns an unexpected status."""
+_M = TypeVar("_M", bound=BaseModel)
 
-    def __init__(self, status_code: int, detail: str = "") -> None:
+
+class ApiClientError(Exception):
+    """Raised when a management API request fails."""
+
+    def __init__(self, message: str, *, status_code: int | None = None, detail: str = "") -> None:
         self.status_code = status_code
         self.detail = detail
-        super().__init__(f"HTTP {status_code}: {detail}")
+        super().__init__(message)
 
 
 class ApiClient:
@@ -88,36 +92,51 @@ class ApiClient:
 
     def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            raise RuntimeError("ApiClient is not connected — call connect() first")
+            raise ApiClientError("ApiClient is not connected — call connect() first")
         return self._client
+
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        """Execute an HTTP request, translating errors to :class:`ApiClientError`."""
+        client = self._ensure_client()
+        try:
+            resp = await getattr(client, method)(path, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except httpx.HTTPStatusError as exc:
+            raise ApiClientError(
+                f"HTTP {exc.response.status_code}: {path}",
+                status_code=exc.response.status_code,
+                detail=exc.response.text[:500],
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise ApiClientError(f"Request failed ({path}): {exc}") from exc
+
+    def _validate(self, model: Type[_M], data: Any, path: str) -> _M:
+        """Deserialize *data* into *model*, wrapping validation errors."""
+        try:
+            return model.model_validate(data)
+        except ValidationError as exc:
+            raise ApiClientError(f"Invalid response from {path}: {exc}") from exc
 
     async def get_health(self) -> HealthResponse:
         """``GET /manage/v1/health``"""
-        client = self._ensure_client()
-        resp = await client.get("health")
-        resp.raise_for_status()
-        return HealthResponse.model_validate(resp.json())
+        resp = await self._request("get", "health")
+        return self._validate(HealthResponse, resp.json(), "health")
 
     async def get_status(self) -> StatusResponse:
         """``GET /manage/v1/status``"""
-        client = self._ensure_client()
-        resp = await client.get("status")
-        resp.raise_for_status()
-        return StatusResponse.model_validate(resp.json())
+        resp = await self._request("get", "status")
+        return self._validate(StatusResponse, resp.json(), "status")
 
     async def get_backends(self) -> BackendsResponse:
         """``GET /manage/v1/backends``"""
-        client = self._ensure_client()
-        resp = await client.get("backends")
-        resp.raise_for_status()
-        return BackendsResponse.model_validate(resp.json())
+        resp = await self._request("get", "backends")
+        return self._validate(BackendsResponse, resp.json(), "backends")
 
     async def get_capabilities(self) -> CapabilitiesResponse:
         """``GET /manage/v1/capabilities``"""
-        client = self._ensure_client()
-        resp = await client.get("capabilities")
-        resp.raise_for_status()
-        return CapabilitiesResponse.model_validate(resp.json())
+        resp = await self._request("get", "capabilities")
+        return self._validate(CapabilitiesResponse, resp.json(), "capabilities")
 
     async def get_events(self, limit: int = 50) -> EventsResponse:
         """``GET /manage/v1/events``
@@ -127,24 +146,18 @@ class ApiClient:
         limit:
             Maximum number of recent events to retrieve.
         """
-        client = self._ensure_client()
-        resp = await client.get("events", params={"limit": limit})
-        resp.raise_for_status()
-        return EventsResponse.model_validate(resp.json())
+        resp = await self._request("get", "events", params={"limit": limit})
+        return self._validate(EventsResponse, resp.json(), "events")
 
     async def get_ready(self) -> ReadyResponse:
         """``GET /manage/v1/ready``"""
-        client = self._ensure_client()
-        resp = await client.get("ready")
-        resp.raise_for_status()
-        return ReadyResponse.model_validate(resp.json())
+        resp = await self._request("get", "ready")
+        return self._validate(ReadyResponse, resp.json(), "ready")
 
     async def get_sessions(self) -> SessionsResponse:
         """``GET /manage/v1/sessions``"""
-        client = self._ensure_client()
-        resp = await client.get("sessions")
-        resp.raise_for_status()
-        return SessionsResponse.model_validate(resp.json())
+        resp = await self._request("get", "sessions")
+        return self._validate(SessionsResponse, resp.json(), "sessions")
 
     async def get_groups(self, group: Optional[str] = None) -> dict:
         """``GET /manage/v1/groups``
@@ -154,48 +167,33 @@ class ApiClient:
         group:
             Optional group name to filter by.
         """
-        client = self._ensure_client()
-        params = {}
+        params: dict[str, str] = {}
         if group is not None:
             params["group"] = group
-        resp = await client.get("groups", params=params)
-        resp.raise_for_status()
+        resp = await self._request("get", "groups", params=params)
         return resp.json()
 
     async def post_reload(self) -> ReloadResponse:
         """``POST /manage/v1/reload``"""
-        client = self._ensure_client()
-        resp = await client.post("reload", timeout=_MUTATING_TIMEOUT)
-        resp.raise_for_status()
-        return ReloadResponse.model_validate(resp.json())
+        resp = await self._request("post", "reload", timeout=_MUTATING_TIMEOUT)
+        return self._validate(ReloadResponse, resp.json(), "reload")
 
     async def post_reconnect(self, backend_name: str) -> ReconnectResponse:
         """``POST /manage/v1/reconnect/{name}``"""
-        client = self._ensure_client()
-        resp = await client.post(
-            f"reconnect/{backend_name}",
-            timeout=_MUTATING_TIMEOUT,
-        )
-        resp.raise_for_status()
-        return ReconnectResponse.model_validate(resp.json())
+        resp = await self._request("post", f"reconnect/{backend_name}", timeout=_MUTATING_TIMEOUT)
+        return self._validate(ReconnectResponse, resp.json(), "reconnect")
 
     async def post_reauth(self, backend_name: str) -> ReAuthResponse:
         """``POST /manage/v1/reauth/{name}``"""
-        client = self._ensure_client()
-        resp = await client.post(
-            f"reauth/{backend_name}",
-            timeout=_MUTATING_TIMEOUT,
-        )
-        resp.raise_for_status()
-        return ReAuthResponse.model_validate(resp.json())
+        resp = await self._request("post", f"reauth/{backend_name}", timeout=_MUTATING_TIMEOUT)
+        return self._validate(ReAuthResponse, resp.json(), "reauth")
 
     async def post_shutdown(self, timeout_seconds: float = 5.0) -> ShutdownResponse:
         """``POST /manage/v1/shutdown``"""
-        client = self._ensure_client()
-        resp = await client.post(
+        resp = await self._request(
+            "post",
             "shutdown",
             json={"timeout_seconds": timeout_seconds},
             timeout=_MUTATING_TIMEOUT,
         )
-        resp.raise_for_status()
-        return ShutdownResponse.model_validate(resp.json())
+        return self._validate(ShutdownResponse, resp.json(), "shutdown")

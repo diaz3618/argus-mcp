@@ -15,6 +15,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+import httpx
 import yaml  # type: ignore[import-untyped]
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -25,6 +26,7 @@ from argus_mcp.config.loader import find_config_file
 from argus_mcp.registry.cache import RegistryCache
 from argus_mcp.registry.client import RegistryClient
 from argus_mcp.registry.models import ServerEntry
+from argus_mcp.tui.api_client import ApiClientError
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.screens.server_detail import ServerDetailModal
 from argus_mcp.tui.widgets.install_panel import InstallConfirmed, InstallPanelWidget
@@ -98,7 +100,7 @@ class RegistryScreen(ArgusScreen):
             try:
                 page = await client.list_servers()
                 all_entries.extend(page.servers)
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, httpx.HTTPError) as exc:
                 logger.warning("Failed to fetch registry %s: %s", url, exc)
 
         browser.entries = all_entries
@@ -275,7 +277,7 @@ class RegistryScreen(ArgusScreen):
                     errors = "; ".join(result.errors) if result.errors else "unknown"
                     self._set_status(f"Reload failed: {errors}")
                     self.notify(f"Reload errors: {errors}", severity="warning")
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, ApiClientError) as exc:
                 logger.warning("Reload request failed: %s", exc)
                 self._set_status(f"Reload failed: {exc}")
 

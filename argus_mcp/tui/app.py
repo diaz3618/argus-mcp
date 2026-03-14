@@ -19,6 +19,7 @@ from argus_mcp.constants import (
     SERVER_NAME,
     SERVER_VERSION,
 )
+from argus_mcp.tui.api_client import ApiClientError
 from argus_mcp.tui.events import (
     CapabilitiesReady,
     ConfigSyncUpdate,
@@ -458,7 +459,7 @@ class ArgusApp(App):
 
                 events = await client.get_events(limit=100)
                 self._apply_events_response(events)
-            except (OSError, ConnectionError) as exc:
+            except (OSError, ConnectionError, ApiClientError) as exc:
                 logger.warning("Initial data fetch failed: %s", exc)
                 self.post_message(ConnectionLost(reason=f"Cannot reach server: {exc}"))
         else:
@@ -493,7 +494,7 @@ class ArgusApp(App):
             try:
                 await mgr.connect(name)
                 client = mgr.active_client
-            except (OSError, ConnectionError):
+            except (OSError, ConnectionError, ApiClientError):
                 return
 
         if client is None:
@@ -521,24 +522,24 @@ class ArgusApp(App):
             try:
                 backends_resp = await client.get_backends()
                 self._apply_backends_response(backends_resp)
-            except (OSError, ConnectionError):
+            except (OSError, ConnectionError, ApiClientError):
                 pass  # Non-critical — status poll already covers basics
 
             # Fetch sessions for health screen
             try:
                 sessions_resp = await client.get_sessions()
                 self._last_sessions = sessions_resp
-            except (OSError, ConnectionError):
+            except (OSError, ConnectionError, ApiClientError):
                 pass
 
             # Fetch groups for health screen
             try:
                 groups_resp = await client.get_groups()
                 self._last_groups = groups_resp
-            except (OSError, ConnectionError):
+            except (OSError, ConnectionError, ApiClientError):
                 pass
 
-        except (OSError, ConnectionError) as exc:
+        except (OSError, ConnectionError, ApiClientError) as exc:
             was_connected = self._connected
             self._connected = False
             self._caps_loaded = False
@@ -740,7 +741,10 @@ class ArgusApp(App):
 
     def on_capabilities_ready(self, event: CapabilitiesReady) -> None:
         """Explicit capability population (alternative path)."""
-        cap = self.screen.query_one(CapabilitySection)
+        try:
+            cap = self.screen.query_one(CapabilitySection)
+        except NoMatches:
+            return
         cap.populate(
             event.tools,
             event.resources,
@@ -829,7 +833,7 @@ class ArgusApp(App):
                 event_log.add_event("🔄 Reconnect", f"Requested reconnect for '{name}'")
             except NoMatches:
                 pass
-        except (OSError, ConnectionError) as exc:
+        except (OSError, ConnectionError, ApiClientError) as exc:
             self.notify(f"Reconnect failed: {exc}", title="Error", severity="error")
 
     def on_re_auth_required(self, event: ReAuthRequired) -> None:
@@ -865,7 +869,7 @@ class ArgusApp(App):
                 title="Re-auth",
                 severity="information",
             )
-        except (OSError, ConnectionError) as exc:
+        except (OSError, ConnectionError, ApiClientError) as exc:
             self.notify(f"Re-auth failed: {exc}", title="Error", severity="error")
 
     def action_show_tools(self) -> None:
@@ -943,7 +947,7 @@ class ArgusApp(App):
             if client is not None:
                 try:
                     await client.post_shutdown()
-                except (OSError, ConnectionError) as exc:
+                except (OSError, ConnectionError, ApiClientError) as exc:
                     logger.warning("Shutdown request failed: %s", exc)
         from argus_mcp.tui.settings import load_settings, save_settings
 
