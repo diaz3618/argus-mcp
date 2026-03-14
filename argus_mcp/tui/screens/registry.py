@@ -15,7 +15,6 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-import httpx
 import yaml  # type: ignore[import-untyped]
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -82,9 +81,9 @@ class RegistryScreen(ArgusScreen):
         browser = self.query_one("#registry-browser", RegistryBrowserWidget)
         browser.set_status("Loading registry…")
 
-        registry_urls = self._get_registry_urls()
+        registry_configs = self._get_registry_configs()
 
-        if not registry_urls:
+        if not registry_configs:
             browser.set_status(
                 "[yellow]No registries configured.[/yellow]  "
                 "Add one in Settings → Registries or in config.yaml under 'registries:'."
@@ -93,34 +92,43 @@ class RegistryScreen(ArgusScreen):
             return
 
         all_entries: List[ServerEntry] = []
+        registry_configs = self._get_registry_configs()
+        ok_count = 0
 
-        for url in registry_urls:
-            client = RegistryClient(url, cache=self._cache)
+        for rcfg in registry_configs:
+            url = rcfg["url"]
+            rtype = rcfg.get("type", "auto")
+            client = RegistryClient(url, registry_type=rtype, cache=self._cache)
             self._clients.append(client)
-            try:
-                page = await client.list_servers()
+            page = await client.list_servers()
+            if page.servers:
                 all_entries.extend(page.servers)
-            except (OSError, ConnectionError, httpx.HTTPError) as exc:
-                logger.warning("Failed to fetch registry %s: %s", url, exc)
+                ok_count += 1
 
         browser.entries = all_entries
-        status_msg = (
-            f"Loaded {len(all_entries)} servers from {len(registry_urls)} registries"
-            if all_entries
-            else "No servers found. Registry may be unavailable — showing cached data."
-        )
+        if all_entries:
+            status_msg = (
+                f"Loaded {len(all_entries)} servers from "
+                f"{ok_count}/{len(registry_configs)} registries"
+            )
+        elif registry_configs:
+            status_msg = (
+                "No servers found — registries may be unavailable.  Check logs for details."
+            )
+        else:
+            status_msg = "No registries configured."
         browser.set_status(status_msg)
         self._set_status(status_msg)
 
-    def _get_registry_urls(self) -> List[str]:
-        """Retrieve configured registry URLs.
+    def _get_registry_configs(self) -> List[Dict[str, Any]]:
+        """Retrieve configured registry entries as dicts with url and type.
 
         Resolution order:
         1. ``registries`` list in TUI settings (``settings.json``)
         2. ``registries`` section in the loaded ``ArgusConfig``
         3. Default well-known MCP registries
         """
-        urls: List[str] = []
+        configs: List[Dict[str, Any]] = []
 
         # 1. Try TUI settings.json registries
         try:
@@ -129,30 +137,35 @@ class RegistryScreen(ArgusScreen):
             settings = load_settings()
             cfg_registries = settings.get("registries", [])
             if cfg_registries:
-                # Sort by priority (lower = first)
                 sorted_regs = sorted(cfg_registries, key=lambda r: r.get("priority", 100))
-                urls = [r["url"] for r in sorted_regs if r.get("url")]
+                configs = [
+                    {"url": r["url"], "type": r.get("type", "auto")}
+                    for r in sorted_regs
+                    if r.get("url")
+                ]
         except (KeyError, ValueError, OSError):
             logger.debug("Could not read registries from settings", exc_info=True)
 
         # 2. Also check if the ArgusConfig has registries via app state
-        if not urls:
+        if not configs:
             try:
                 argus_cfg = getattr(self.app, "_argus_config", None)
                 if argus_cfg is not None:
                     sorted_regs = sorted(argus_cfg.registries, key=lambda r: r.priority)
-                    urls = [r.url for r in sorted_regs]
+                    configs = [
+                        {"url": r.url, "type": getattr(r, "type", "auto")} for r in sorted_regs
+                    ]
             except (AttributeError, KeyError):
                 logger.debug("Could not read registries from config", exc_info=True)
 
         # 3. Fall back to well-known registries
-        if not urls:
-            urls = [
-                "https://registry.mcp.so/api",
-                "https://registry.smithery.ai/api",
+        if not configs:
+            configs = [
+                {"url": "https://glama.ai/api/mcp", "type": "glama"},
+                {"url": "https://registry.smithery.ai", "type": "smithery"},
             ]
 
-        return urls
+        return configs
 
     def _set_status(self, text: str) -> None:
         """Update the status bar below the header."""

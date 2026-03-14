@@ -31,6 +31,14 @@ class RegistryEntryConfig(MetadataProvenance):
         min_length=1,
         description="Base URL of the registry API (e.g. 'https://glama.ai/api/mcp').",
     )
+    type: Literal["auto", "glama", "smithery", "generic"] = Field(
+        default="auto",
+        description=(
+            "Registry backend type.  'auto' detects from URL (glama.ai → glama, "
+            "smithery.ai → smithery, else generic).  Set explicitly if auto-detect "
+            "picks wrong type."
+        ),
+    )
     priority: int = Field(
         default=100,
         ge=0,
