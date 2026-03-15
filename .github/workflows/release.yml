@@ -29,20 +29,32 @@ jobs:
           fetch-depth: 0
 
       # Verify CI passed on this commit before releasing
+      # Uses polling since CI may still be running when the tag is pushed
       - name: Verify CI status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           COMMIT_SHA=$(git rev-list -n 1 "${GITHUB_REF#refs/tags/}")
           echo "Checking CI status for commit ${COMMIT_SHA}"
-          STATUS=$(gh api \
-            "repos/${{ github.repository }}/commits/${COMMIT_SHA}/status" \
-            --jq '.state')
-          echo "Combined status: ${STATUS}"
-          if [ "${STATUS}" != "success" ]; then
-            echo "::error::CI has not passed on this commit (status: ${STATUS}). Aborting release."
-            exit 1
-          fi
+          MAX_ATTEMPTS=30
+          SLEEP_SECONDS=30
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            STATUS=$(gh api \
+              "repos/${{ github.repository }}/commits/${COMMIT_SHA}/status" \
+              --jq '.state')
+            echo "Attempt ${i}/${MAX_ATTEMPTS}: status=${STATUS}"
+            if [ "${STATUS}" = "success" ]; then
+              echo "CI passed."
+              exit 0
+            elif [ "${STATUS}" = "failure" ] || [ "${STATUS}" = "error" ]; then
+              echo "::error::CI failed on this commit (status: ${STATUS}). Aborting release."
+              exit 1
+            fi
+            echo "Waiting ${SLEEP_SECONDS}s for CI to complete..."
+            sleep $SLEEP_SECONDS
+          done
+          echo "::error::CI did not complete within $((MAX_ATTEMPTS * SLEEP_SECONDS))s (status: ${STATUS}). Aborting release."
+          exit 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
