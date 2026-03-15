@@ -2,7 +2,7 @@ module github.com/hack23/argus-mcp/tools/docker-adapter
 
 go 1.25.0
 
-require github.com/docker/docker v28.3.2+incompatible
+require github.com/docker/docker v28.3.3+incompatible
 
 require (
 	github.com/Microsoft/go-winio v0.4.14 // indirect
