@@ -64,7 +64,10 @@ RUN apt-get update && \
     npm cache clean --force && \
     apt-get purge -y curl gnupg && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* \
+           /etc/apt/keyrings/nodesource.gpg \
+           /etc/apt/sources.list.d/nodesource.list
 
 # Pin pip to known-good version
 RUN pip install --no-cache-dir pip==25.1.1

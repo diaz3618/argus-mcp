@@ -116,7 +116,7 @@ jobs:
         with:
           image: ${{ env.IMAGE_TAG }}
           failure-threshold: WARN
-          accept-keys: NGINX_GPGKEYS,NGINX_GPGKEY_PATH
+          accept-keywords: GPG_KEY
           # Accept some informational findings that are expected
           exit-code: 1
 
