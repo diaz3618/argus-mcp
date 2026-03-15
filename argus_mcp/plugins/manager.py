@@ -123,9 +123,9 @@ class PluginManager:
         self,
         ctx: PluginContext,
     ) -> PluginContext:
-        return await self.run_hook(
+        return await self.run_hook(  # nosemgrep: mcp-unsanitized-tool-output
             "tool_post_invoke", ctx
-        )  # nosemgrep: mcp-unsanitized-tool-output
+        )
 
     async def run_prompt_pre_fetch(
         self,

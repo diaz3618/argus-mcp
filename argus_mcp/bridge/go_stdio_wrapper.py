@@ -106,7 +106,7 @@ async def manage_subproc_go(
         # Fallback to pure-Python implementation.
         from argus_mcp.bridge.subprocess_utils import manage_subproc
 
-        async with manage_subproc(server_name, command, env) as proc:
+        async with manage_subproc(command[0], command[1:], env, server_name) as proc:
             yield proc
         return
 
