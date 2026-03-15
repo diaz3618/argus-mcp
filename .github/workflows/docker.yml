@@ -31,9 +31,10 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write           # Attach SBOM to GitHub release
+  actions: read              # Download workflow artifacts (SBOM)
+  contents: write            # Attach SBOM to GitHub release
   packages: write
-  id-token: write          # Cosign keyless (Sigstore/Fulcio OIDC)
+  id-token: write            # Cosign keyless (Sigstore/Fulcio OIDC)
 
 env:
   IMAGE_DOCKERHUB: diaz3618/argus-mcp
