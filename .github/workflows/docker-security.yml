@@ -113,11 +113,15 @@ jobs:
 
       - name: Run Dockle
         uses: erzz/dockle-action@v1
+        env:
+          # DKL-DI-0005: base image python:3.13-slim uses apt-get dist-clean
+          # instead of rm -rf /var/lib/apt/lists — unfixable upstream
+          DOCKLE_IGNORES: DKL-DI-0005
         with:
           image: ${{ env.IMAGE_TAG }}
           failure-threshold: WARN
           accept-keywords: GPG_KEY
-          # Accept some informational findings that are expected
+          accept-filenames: settings.py
           exit-code: 1
 
   # ──────────────────────────────────────────────

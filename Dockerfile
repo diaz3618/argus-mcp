@@ -67,7 +67,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* \
            /etc/apt/keyrings/nodesource.gpg \
-           /etc/apt/sources.list.d/nodesource.list
+           /etc/apt/sources.list.d/nodesource.list \
+           /root/.npm
 
 # Pin pip to known-good version
 RUN pip install --no-cache-dir pip==25.1.1
