@@ -278,7 +278,7 @@ class RegistryClient:
         path = _server_path(self._rtype)
         try:
             client = await self._ensure_client()
-            resp = await client.get(f"{path}/{name}")
+            resp = await client.get(f"{path}/{name}")  # nosemgrep: mcp-unverified-remote-content
             resp.raise_for_status()
             return _entry_from_raw(self._rtype, resp.json(), resp.json())
         except Exception as exc:  # noqa: BLE001

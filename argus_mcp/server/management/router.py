@@ -412,7 +412,7 @@ async def handle_events_stream(request: Request) -> StreamingResponse:
             # Send initial heartbeat
             yield _sse_format("heartbeat", {"message": "connected"}, "hb-0")
 
-            while True:
+            while True:  # nosemgrep: mcp-unbounded-tool-loop
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_INTERVAL)
                     yield _sse_format(

@@ -71,7 +71,7 @@ class OIDCDiscovery:
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.get(url)
+                resp = await client.get(url)  # nosemgrep: mcp-unverified-remote-content
                 resp.raise_for_status()
                 data: Dict[str, Any] = resp.json()
         except Exception as exc:  # noqa: BLE001

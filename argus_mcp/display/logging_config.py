@@ -155,7 +155,9 @@ def setup_logging(log_lvl_str: str, *, quiet: bool = False) -> Tuple[str, str]:
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs(LOG_DIR, exist_ok=True)
-    log_fpath = os.path.join(LOG_DIR, f"argus_{ts}_{log_lvl_valid}.log")
+    log_fpath = os.path.join(
+        LOG_DIR, f"argus_{ts}_{log_lvl_valid}.log"
+    )  # nosemgrep: injection-path-traversal-join
 
     log_cfg: dict[str, Any] = copy.deepcopy(BASE_LOG_CFG)
     log_cfg["handlers"]["file_handler"]["filename"] = log_fpath

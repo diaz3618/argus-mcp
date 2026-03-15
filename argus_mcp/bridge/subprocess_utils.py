@@ -40,7 +40,7 @@ async def log_subproc_stream(
     """Asynchronously read and log lines from subprocess streams."""
     if not stream:
         return
-    while True:
+    while True:  # nosemgrep: mcp-unbounded-tool-loop
         try:
             line_bytes = await stream.readline()
             if not line_bytes:

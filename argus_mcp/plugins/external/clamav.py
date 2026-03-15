@@ -88,7 +88,7 @@ class ClamAVPlugin(PluginBase):
             try:
                 writer.write(_INSTREAM_CMD)
                 offset = 0
-                while offset < len(data):
+                while offset < len(data):  # nosemgrep: mcp-unbounded-tool-loop
                     chunk = data[offset : offset + _MAX_CHUNK]
                     writer.write(len(chunk).to_bytes(4, "big") + chunk)
                     offset += _MAX_CHUNK

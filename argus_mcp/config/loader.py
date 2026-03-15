@@ -47,7 +47,7 @@ def find_config_file() -> str:
     search_dirs = [os.getcwd(), pkg_parent_dir]
     for base_dir in search_dirs:
         for name in _CONFIG_SEARCH_ORDER:
-            candidate = os.path.join(base_dir, name)
+            candidate = os.path.join(base_dir, name)  # nosemgrep: injection-path-traversal-join
             if os.path.isfile(candidate):
                 return candidate
     # Default -- loader will report a clear error

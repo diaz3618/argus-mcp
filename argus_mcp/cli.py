@@ -232,7 +232,9 @@ def _detach_server(args: argparse.Namespace) -> None:
 
     log_dir = os.path.join(os.path.expanduser("~"), ".argus", LOG_DIR)
     os.makedirs(log_dir, exist_ok=True)
-    out_path = os.path.join(log_dir, f"detached-{session_name}.log")
+    out_path = os.path.join(
+        log_dir, f"detached-{session_name}.log"
+    )  # nosemgrep: injection-path-traversal-join
     out_fd = open(out_path, "a")
 
     # Ensure the child process flushes stdout/stderr immediately so

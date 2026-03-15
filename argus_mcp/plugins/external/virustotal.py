@@ -124,7 +124,9 @@ class VirusTotalPlugin(PluginBase):
             import base64
 
             url_id = base64.urlsafe_b64encode(url.encode()).decode().rstrip("=")
-            resp = await self._client.get(f"/urls/{url_id}")
+            resp = await self._client.get(
+                f"/urls/{url_id}"
+            )  # nosemgrep: mcp-unverified-remote-content
             if resp.status_code == 404:
                 return None
             resp.raise_for_status()

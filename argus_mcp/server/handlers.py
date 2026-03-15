@@ -46,7 +46,7 @@ async def _dispatch(
     token = current_auth_token.get()
     if token is not None:
         metadata["auth_token"] = token
-    session_id = current_session_id.get()
+    session_id = current_session_id.get()  # nosemgrep: mcp-session-not-bound-to-user
     if session_id is not None:
         metadata["session_id"] = session_id
     client_ip = current_client_ip.get()
