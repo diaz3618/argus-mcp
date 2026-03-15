@@ -669,5 +669,5 @@ not controlled by a feature flag.
 
 ## Full Example
 
-See [example_config.yaml](../example_config.yaml) for a comprehensive,
+See [example_config.yaml](../example_config.yaml) for a complete,
 annotated configuration file covering all sections and options.

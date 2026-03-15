@@ -17,10 +17,6 @@ logger = logging.getLogger(__name__)
 
 RegistryType = Literal["auto", "glama", "smithery", "generic"]
 
-# ---------------------------------------------------------------------------
-# Per-registry profiles
-# ---------------------------------------------------------------------------
-
 _GLAMA_PATH = "/v1/servers"
 _SMITHERY_PATH = "/servers"
 _GENERIC_PATH = "/v0.1/servers"

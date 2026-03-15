@@ -1,0 +1,35 @@
+schema_version: "1.0"
+
+# Target Argus MCP server (Docker container on default port)
+target: http://127.0.0.1:9000
+
+redact:
+  server_url: true
+
+scenarios:
+  # Core protocol — catches -32602, initialization regressions
+  protocol_handshake:
+    description: "Initialize and verify server capabilities"
+    actions:
+      - list_tools
+      - list_resources
+
+  # Tool discovery — catches schema drift, missing tools
+  tool_schemas:
+    description: "Verify tool list and schemas haven't regressed"
+    actions:
+      - list_tools
+
+  # Resource discovery — catches resource URI changes
+  resource_list:
+    description: "Verify resource list is stable"
+    actions:
+      - list_resources
+
+  # Error handling — catches silent error changes
+  error_handling:
+    description: "Invalid tool call returns proper MCP error"
+    actions:
+      - call_tool:
+          name: "nonexistent_tool_xyz"
+          arguments: {}

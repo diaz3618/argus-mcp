@@ -1,4 +1,4 @@
-"""Settings mode — comprehensive configuration, server management, and preferences.
+"""Settings mode — configuration, server management, and preferences.
 
 Provides:
 - General: Log level, polling interval, feature flags

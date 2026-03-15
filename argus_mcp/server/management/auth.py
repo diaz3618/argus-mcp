@@ -2,7 +2,7 @@
 
 Token is resolved from (highest priority first):
 1. ``ARGUS_MGMT_TOKEN`` environment variable
-2. ``management.token`` in the config file (future — Phase 0 config restructure)
+2. ``management.token`` in the config file
 
 If no token is configured, authentication is **disabled** and all requests pass.
 ``/manage/v1/health`` and ``/manage/v1/ready`` are always public regardless of auth configuration.

@@ -5,7 +5,7 @@ delegates lifecycle management to :class:`~argus_mcp.runtime.ArgusService`.
 
 The display/console status callbacks are kept here so that the runtime service
 layer (``runtime/service.py``) remains presentation-agnostic and can be reused
-by the management API (Phase 0.2).
+by the management API.
 
 **Signal Handling Note (Ctrl+C)**
 
@@ -644,7 +644,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         # This must happen *after* handlers are attached so that
         # mcp_server.run() (called internally per session) can serve
         # tools/resources/prompts.
-        # Uses AsyncExitStack for robust cleanup
+        # Uses AsyncExitStack for reliable cleanup
         from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
         import argus_mcp.server.app as app_module

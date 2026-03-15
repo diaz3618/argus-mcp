@@ -19,6 +19,7 @@ repos:
         args: ['--maxkb=500']
         exclude: '^uv\.lock$'
       - id: detect-private-key
+        exclude: '^tests/test_builtin_plugins\.py$'
       - id: check-merge-conflict
 
   # Ruff — lint + format (replaces flake8 + isort + black for linting)
@@ -34,7 +35,6 @@ repos:
     rev: v1.33.1
     hooks:
       - id: typos
-        args: ['--config', '.typos.toml']
 
   # Local hooks (pytest on pre-push — tests/ is local-only)
   # To run pytest on push: ARGUS_TEST=1 git push

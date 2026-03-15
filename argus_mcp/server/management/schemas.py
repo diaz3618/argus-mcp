@@ -1,6 +1,5 @@
 """Pydantic response schemas for the Management API.
 
-These schemas match the contract defined in ``docs/development_path/api-contract.json``.
 Where possible they reuse models from ``argus_mcp.runtime.models``.
 """
 

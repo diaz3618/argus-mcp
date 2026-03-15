@@ -128,8 +128,6 @@ class RegistryBrowserWidget(Widget):
     def on_mount(self) -> None:
         self._rebuild_columns()
 
-    # --- Event handlers ------------------------------------------------
-
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "registry-search":
             self.search_query = event.value
@@ -177,14 +175,10 @@ class RegistryBrowserWidget(Widget):
         self._update_transport_options()
         self._refresh_table()
 
-    # --- Public API ----------------------------------------------------
-
     def set_status(self, text: str) -> None:
         """Update the status bar text."""
         if w := safe_query(self, "#registry-status", Static):
             w.update(text)
-
-    # --- Internal helpers ----------------------------------------------
 
     def _update_transport_options(self) -> None:
         """Rebuild the transport filter dropdown from current entries."""

@@ -78,7 +78,6 @@ def sse_example_prompt(user_name: str) -> list[mcp_types.PromptMessage]:
     ]
 
 
-# --- Starlette App Setup for SSE Transport ---
 if not isinstance(mcp._mcp_server, McpLowLevelServer):
     logger.error("FastMCP instance did not initialize its internal McpServer correctly.")
     raise TypeError("mcp._mcp_server is not of type McpLowLevelServer")

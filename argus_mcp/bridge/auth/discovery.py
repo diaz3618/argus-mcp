@@ -346,7 +346,7 @@ async def _discover_oidc(
         return None
 
     # Merge: RFC 8414 takes precedence, OIDC fills gaps.
-    # OAuth-specific metadata while still leveraging OIDC for fields
+    # OAuth-specific metadata while still using OIDC for fields
     # like userinfo_endpoint that only OIDC publishes.
     merged: Dict[str, Any] = {}
     if oidc_data:

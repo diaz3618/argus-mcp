@@ -1,6 +1,6 @@
 """Catalog Browser TUI — parse, stage, and commit catalog entries.
 
-Wraps the Phase 4 ``parse_catalog``, ``stage_catalog``, and
+Wraps the ``parse_catalog``, ``stage_catalog``, and
 ``commit_catalog`` functions in a Textual screen with a YAML editor,
 dry-run preview table, and a commit confirmation step.
 """

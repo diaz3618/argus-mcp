@@ -1,6 +1,6 @@
 """Export / Import TUI workflow — dry-run preview then commit.
 
-Wraps the Phase 4 ``export_config`` and ``import_config`` functions in
+Wraps the ``export_config`` and ``import_config`` functions in
 a Textual screen with filter controls, dry-run preview tables, and a
 commit confirmation step.
 """

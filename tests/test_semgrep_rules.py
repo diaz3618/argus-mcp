@@ -1,4 +1,4 @@
-"""Tests for custom semgrep rules in internal/rules/.
+"""Tests for custom semgrep rules.
 
 Validates that:
 1. All rule files are valid YAML
@@ -178,11 +178,6 @@ class TestRuleLanguages:
                 assert any("docker" in lang.lower() for lang in langs), (
                     f"{rule_file.name}/{rule['id']}: expected dockerfile language"
                 )
-
-
-# ---------------------------------------------------------------------------
-# Live semgrep scans — each rule file is run against the source tree
-# ---------------------------------------------------------------------------
 
 
 def _scannable_rule_files() -> list[Path]:

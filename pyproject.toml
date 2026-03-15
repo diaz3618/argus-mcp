@@ -81,7 +81,26 @@ extend-exclude = [
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/test_phase5_advanced.py" = ["E402"]
+"tests/*.py" = ["E402"]
+
+[tool.typos.default.extend-words]
+mcp = "mcp"
+sse = "sse"
+oidc = "oidc"
+pkce = "pkce"
+sarif = "sarif"
+numer = "numer"
+asend = "asend"
+
+[tool.typos.files]
+extend-exclude = [
+    "*.jsonl",
+    "logs/",
+    "internal/",
+    "memory-bank/",
+    ".venv*",
+    "*.egg-info",
+]
 
 [tool.mypy]
 python_version = "3.10"

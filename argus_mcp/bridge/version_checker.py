@@ -89,7 +89,7 @@ class VersionChecker:
     Parameters
     ----------
     registry_client:
-        An instance of :class:`RegistryClient` (from Phase 3.5).
+        An instance of :class:`RegistryClient`.
         If ``None``, version checking is disabled.
     """
 

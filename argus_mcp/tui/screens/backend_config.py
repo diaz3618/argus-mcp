@@ -111,7 +111,7 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
             yield Label(f"[b]{title}[/b]", id="bcm-title")
 
             with VerticalScroll(id="bcm-scroll"):
-                # --- Common fields ---
+                # Common fields
                 yield Label("General", classes="bcm-section")
 
                 yield Label("Backend Name", classes="bcm-field-label")
@@ -141,7 +141,7 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                 yield Label("Enabled", classes="bcm-field-label")
                 yield Switch(value=True, id="bcm-enabled")
 
-                # --- Type-specific fields ---
+                # Type-specific fields
                 yield Label("Transport Options", classes="bcm-section")
                 with Vertical(id="bcm-type-fields"):
                     # stdio fields
@@ -199,7 +199,7 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                         id="bcm-headers",
                     )
 
-                # --- Advanced ---
+                # Advanced
                 yield Label("Advanced", classes="bcm-section")
 
                 yield Label("Timeout (seconds)", classes="bcm-field-label")

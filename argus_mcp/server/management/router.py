@@ -1,7 +1,6 @@
-"""Management API router — read-only endpoints for Phase 0.2.
+"""Management API router.
 
 All routes are mounted under ``/manage/v1/`` by ``server/app.py``.
-Authentication is added in Phase 0.3.
 """
 
 import asyncio

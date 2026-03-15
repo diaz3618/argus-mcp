@@ -306,7 +306,6 @@ class ArgusService:
         self._config_path = config_path
 
         try:
-            # --- Phase 1: Config ------------------------------------------
             logger.info("Loading configuration: %s", config_path)
             self.emit_event("config", f"Loading configuration: {config_path}")
             config = await asyncio.to_thread(load_and_validate_config, config_path)
@@ -324,7 +323,6 @@ class ArgusService:
             # Build server group manager from per-backend group fields.
             self._group_manager = self._build_group_manager(config)
 
-            # --- Phase 2: Connect backends --------------------------------
             logger.info("Connecting %d backend service(s)...", self._backends_total)
             self.emit_event(
                 "backend_init",
@@ -366,7 +364,6 @@ class ArgusService:
                 f"Backend connections: {self._backends_connected}/{self._backends_total} active.",
             )
 
-            # --- Start background token refresh service -------------------
             try:
                 full_cfg = load_argus_config(self._config_path)
                 server_settings = full_cfg.server
@@ -400,7 +397,6 @@ class ArgusService:
             except Exception:  # noqa: BLE001
                 logger.debug("Could not start background token refresh.", exc_info=True)
 
-            # --- Phase 3: Discover capabilities ---------------------------
             if self._backends_connected > 0:
                 logger.info("Discovering capabilities...")
                 await self._registry.discover_and_register(active_sessions)
@@ -421,12 +417,10 @@ class ArgusService:
             else:
                 logger.info("No active backends — skipping capability discovery.")
 
-            # --- Transition to RUNNING ------------------------------------
             self._started_at = datetime.now(timezone.utc)
             self._transition(ServiceState.RUNNING)
             self._ready_event.set()
 
-            # --- Start health checker ------------------------------------
             self._health_checker = HealthChecker(
                 manager=self._manager,
                 registry=self._registry,
@@ -434,7 +428,6 @@ class ArgusService:
             )
             self._health_checker.start()
 
-            # --- Start config file watcher --------------------------------
             if self._config_path:
                 from argus_mcp.config.watcher import ConfigWatcher
 

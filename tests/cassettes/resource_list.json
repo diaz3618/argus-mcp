@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "recorded_at": "2026-03-10T18:43:32.939670+00:00",
+    "server_url": "http://127.0.0.1:9000",
+    "protocol_version": "2025-11-25",
+    "server_info": {
+      "name": "Argus MCP",
+      "version": "1.26.0"
+    }
+  },
+  "interactions": [
+    {
+      "type": "jsonrpc_request",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-11-25",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "mcp-recorder",
+            "version": "0.1.0"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "protocolVersion": "2025-11-25",
+          "capabilities": {
+            "experimental": {},
+            "prompts": {
+              "listChanged": false
+            },
+            "resources": {
+              "subscribe": false,
+              "listChanged": false
+            },
+            "tools": {
+              "listChanged": false
+            }
+          },
+          "serverInfo": {
+            "name": "Argus MCP",
+            "version": "1.26.0"
+          }
+        }
+      },
+      "response_is_sse": true,
+      "response_status": 200,
+      "latency_ms": 6,
+      "http_method": null,
+      "http_path": null
+    },
+    {
+      "type": "notification",
+      "request": {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+      },
+      "response": null,
+      "response_is_sse": false,
+      "response_status": 202,
+      "latency_ms": 0,
+      "http_method": null,
+      "http_path": null
+    },
+    {
+      "type": "jsonrpc_request",
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "resources/list",
+        "params": {}
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "resources": [
+            {
+              "name": "Product Context",
+              "uri": "memory-bank://product-context",
+              "description": "Project overview and context",
+              "mimeType": "text/markdown"
+            },
+            {
+              "name": "Active Context",
+              "uri": "memory-bank://active-context",
+              "description": "Current project context and tasks",
+              "mimeType": "text/markdown"
+            },
+            {
+              "name": "Progress",
+              "uri": "memory-bank://progress",
+              "description": "Project progress and milestones",
+              "mimeType": "text/markdown"
+            },
+            {
+              "name": "Decision Log",
+              "uri": "memory-bank://decision-log",
+              "description": "Project decisions and rationale",
+              "mimeType": "text/markdown"
+            },
+            {
+              "name": "System Patterns",
+              "uri": "memory-bank://system-patterns",
+              "description": "System patterns and architecture",
+              "mimeType": "text/markdown"
+            }
+          ]
+        }
+      },
+      "response_is_sse": true,
+      "response_status": 200,
+      "latency_ms": 5,
+      "http_method": null,
+      "http_path": null
+    }
+  ]
+}

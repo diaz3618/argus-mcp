@@ -2,7 +2,7 @@
 
 These models serve dual purpose:
 1. Internal state representation for ArgusService
-2. API response schemas for the management API (Phase 0.2)
+2. API response schemas for the management API
 """
 
 from datetime import datetime, timezone

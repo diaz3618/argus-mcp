@@ -2,7 +2,7 @@
 
 Logs structured NIST SP 800-53 aligned records for every request that
 flows through the middleware chain.  When an :class:`AuditLogger` is
-provided (Phase 2.3), events are written as JSON lines to a dedicated
+provided, events are written as JSON lines to a dedicated
 audit file.  Otherwise, the middleware falls back to standard Python
 logging.
 """

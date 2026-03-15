@@ -353,7 +353,6 @@ async def start_all(
     remote_items, stdio_items = _sort_backends(config_data)
     sem = asyncio.Semaphore(concurrency)
 
-    # Phase 1: Launch remotes concurrently + sequential stdio builds
     remote_tasks = launch_remote_tasks(
         remote_items, sem, stagger, concurrency, start_one, pending_tasks
     )
@@ -364,14 +363,12 @@ async def start_all(
         stdio_items, pre_build, start_one, pending_tasks, shutdown_requested_fn()
     )
 
-    # Phase 2: Gather remote results
     remote_results = await gather_remote_results(remote_tasks)
 
     # Merge all first-pass results
     first_pass = {**remote_results, **stdio_results}
     pending_tasks.clear()
 
-    # Phase 3: Retry failures
     failed_names = [n for n, ok in first_pass.items() if not ok]
     if failed_names and not shutdown_requested_fn():
         await retry_failed_backends(

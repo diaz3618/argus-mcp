@@ -239,6 +239,78 @@ ArgusApp (Textual)
   → Handles connection loss/restore gracefully
 ```
 
+## Deployment Modes
+
+Argus MCP supports three deployment modes. Each mode determines how the gateway
+process runs and how backends connect.
+
+### stdio subprocess (default for local development)
+
+```mermaid
+graph LR
+    Client["MCP Client<br/>(Claude, Cursor)"]
+    subgraph Host["Host Machine"]
+        Argus["argus-mcp server<br/>:9000"]
+        subgraph Containers["Docker / Podman"]
+            B1["stdio backend<br/>(container)"]
+            B2["stdio backend<br/>(container)"]
+        end
+    end
+    Remote["Remote SSE/HTTP<br/>backend"]
+
+    Client -- "SSE / Streamable HTTP" --> Argus
+    Argus -- "docker start -ai" --> B1
+    Argus -- "docker start -ai" --> B2
+    Argus -- "HTTPS" --> Remote
+```
+
+Run with `argus-mcp server`. stdio backends are wrapped in hardened containers
+(non-root, read-only filesystem, no network by default). Remote SSE and
+Streamable HTTP backends connect over HTTPS.
+
+### Docker
+
+```mermaid
+graph LR
+    Client["MCP Client"]
+    subgraph Docker["Docker Network"]
+        Argus["argus-mcp<br/>container :9000"]
+        B1["stdio backend<br/>(sibling container)"]
+    end
+    Remote["Remote SSE/HTTP<br/>backend"]
+
+    Client -- "SSE / Streamable HTTP" --> Argus
+    Argus -- "docker start -ai<br/>(socket mount)" --> B1
+    Argus -- "HTTPS" --> Remote
+```
+
+Run with `docker run`. Mount the Docker socket to allow Argus to manage
+sibling containers for stdio backends. See [Docker usage](../docker.md).
+
+### Kubernetes
+
+```mermaid
+graph LR
+    Ingress["Ingress / NodePort"]
+    subgraph K8s["Kubernetes Cluster"]
+        subgraph Pod["argus-mcp Pod"]
+            Argus["argus-mcp<br/>container :9000"]
+        end
+        Probe["kubelet<br/>readiness/liveness"]
+    end
+    Remote["Remote SSE/HTTP<br/>backend"]
+    Client["MCP Client"]
+
+    Client --> Ingress
+    Ingress --> Argus
+    Probe -- "GET /ready<br/>GET /manage/v1/health" --> Argus
+    Argus -- "HTTPS" --> Remote
+```
+
+Deploy with the Helm chart in `charts/argus-mcp/`. The gateway connects to
+remote backends only (no stdio in-cluster). Probes use `/ready` (readiness)
+and `/manage/v1/health` (liveness). See [Kubernetes deployment](../kubernetes.md).
+
 ## Design Principles
 
 | Principle | Implementation |

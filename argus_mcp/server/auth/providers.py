@@ -3,7 +3,7 @@
 Supports multiple modes:
 * ``jwt`` — validate JWT tokens via JWKS (optionally via OIDC discovery)
 * ``oidc`` — OIDC auto-discovery + JWT validation
-* ``local`` — static bearer token (like Phase 0.3 management auth)
+* ``local`` — static bearer token (management auth)
 * ``anonymous`` — no authentication (development mode)
 
 The active provider is selected from config.  The auth middleware
