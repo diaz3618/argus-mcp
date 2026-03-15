@@ -100,7 +100,7 @@ async def _authenticate_request(scope: dict) -> None:
         current_auth_token.set(token)
 
 
-async def handle_sse(request: Request) -> None:
+async def handle_sse(request: Request) -> Response | None:
     """Handle incoming SSE connection requests with resilience guards."""
     from argus_mcp.server.app import mcp_server
 
@@ -114,20 +114,18 @@ async def handle_sse(request: Request) -> None:
         token = _extract_bearer_token(request.scope)
         error_type = "invalid_token" if token else None
         www_auth = _build_www_authenticate(error=error_type)
-        response = Response(
+        return Response(
             status_code=401,
             content="Unauthorized",
             headers={"WWW-Authenticate": www_auth},
         )
-        await response(request.scope, request.receive, request._send)
-        return
 
     if not mcp_server.manager or not mcp_server.registry:
         logger.error(
             "manager or registry is unset in handle_sse. "
             "Missing critical components; cannot handle SSE connection."
         )
-        return
+        return Response(status_code=503, content="Service not ready")
 
     session_mgr = getattr(mcp_server, "session_manager", None)
     session = None
