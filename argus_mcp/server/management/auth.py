@@ -5,7 +5,7 @@ Token is resolved from (highest priority first):
 2. ``management.token`` in the config file (future — Phase 0 config restructure)
 
 If no token is configured, authentication is **disabled** and all requests pass.
-``/manage/v1/health`` is always public regardless of auth configuration.
+``/manage/v1/health`` and ``/manage/v1/ready`` are always public regardless of auth configuration.
 """
 
 import hmac
@@ -24,7 +24,7 @@ MGMT_TOKEN_ENV_VAR = "ARGUS_MGMT_TOKEN"
 # Path suffixes that never require authentication.  The middleware
 # receives the full mounted path (e.g. ``/manage/v1/health``), so
 # we match on the trailing segment(s) rather than the exact path.
-PUBLIC_PATH_SUFFIXES = frozenset({"/health"})
+PUBLIC_PATH_SUFFIXES = frozenset({"/health", "/ready"})
 
 
 def resolve_token() -> Optional[str]:
