@@ -132,6 +132,10 @@ disable_error_code = ["attr-defined"]
 module = ["argus_mcp.tui.*"]
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = ["mods.debug_focus"]
+disable_error_code = ["method-assign", "assignment"]
+
 # ── import-linter ────────────────────────────────────────────────────────
 # Layered architecture enforcement.  Higher layers may depend on lower,
 # but not the reverse.  Run: uv run lint-imports

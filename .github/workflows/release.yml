@@ -15,6 +15,7 @@ concurrency:
 permissions:
   contents: write
   actions: write
+  statuses: read
 
 jobs:
   create-release:

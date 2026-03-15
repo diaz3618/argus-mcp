@@ -33,8 +33,8 @@ COPY argus_mcp/ ./argus_mcp/
 # Install the package and all runtime dependencies into a virtual env
 # nosemgrep: docker-pip-no-cache, dependency-docker-no-unpinned-pip-install
 RUN uv venv /opt/venv && \
-    UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python . && \
-    find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+    UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python .
+RUN find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 
 
 # ── Stage 2: Runtime ───────────────────────────────────────
@@ -48,6 +48,7 @@ LABEL org.opencontainers.image.title="Argus MCP" \
 
 # Install Node.js 22 LTS via NodeSource APT repo (GPG-verified, no pipe-to-bash)
 # Supply-chain hardening: pinned versions, GPG-verified packages
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
