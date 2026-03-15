@@ -141,7 +141,7 @@ helm install argus-mcp ./charts/argus-mcp \
 helm install argus-mcp ./charts/argus-mcp \
   --namespace argus --create-namespace \
   --set replicaCount=3 \
-  --set image.tag=0.7.1
+  --set image.tag=0.7.2
 ```
 
 ## Upgrade
