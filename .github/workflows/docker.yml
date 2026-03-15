@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write           # Attach SBOM to GitHub release
   packages: write
   id-token: write          # Cosign keyless (Sigstore/Fulcio OIDC)
 
