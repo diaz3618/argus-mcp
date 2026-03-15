@@ -33,16 +33,17 @@ import argus_mcp.tui.app  # noqa: E402
 importlib.reload(argus_mcp.tui.app)
 
 
-def _resolve_server_url() -> str:
-    """Resolve the Argus server URL from (highest priority first):
+def _resolve_client_settings() -> tuple[str, str | None]:
+    """Resolve the Argus server URL and token from (highest priority first):
 
-    1. ``ARGUS_TUI_SERVER`` environment variable
-    2. ``client.server_url`` in ``config.yaml`` (searched in CWD)
-    3. Hard-coded default ``http://127.0.0.1:9000``
+    1. ``ARGUS_TUI_SERVER`` / ``ARGUS_MGMT_TOKEN`` environment variables
+    2. ``client.server_url`` / ``client.token`` in ``config.yaml`` (searched in CWD)
+    3. Hard-coded default ``http://127.0.0.1:9000`` / ``None``
     """
     env_url = os.environ.get("ARGUS_TUI_SERVER")
+    env_token = os.environ.get("ARGUS_MGMT_TOKEN")
     if env_url:
-        return env_url
+        return env_url, env_token
 
     # Try loading the client section from config.yaml
     from argus_mcp.config.loader import find_config_file, load_argus_config
@@ -51,18 +52,21 @@ def _resolve_server_url() -> str:
     if os.path.isfile(candidate):
         try:
             cfg = load_argus_config(candidate)
-            return cfg.client.server_url
+            url = cfg.client.server_url
+            token = getattr(cfg.client, "token", None) or env_token
+            return url, token
         except (OSError, ValueError):
             pass  # Fall through to default
 
-    return "http://127.0.0.1:9000"
+    return "http://127.0.0.1:9000", env_token
 
 
 class DevArgusApp(argus_mcp.tui.app.ArgusApp):
     """Thin subclass so that the Textual MCP ``textual_launch`` tool can
     discover an ``App`` subclass in this module while passing our dev-time
-    ``--server`` URL automatically.
+    ``--server`` URL and token automatically.
     """
 
     def __init__(self) -> None:
-        super().__init__(server_url=_resolve_server_url())
+        url, token = _resolve_client_settings()
+        super().__init__(server_url=url, token=token)

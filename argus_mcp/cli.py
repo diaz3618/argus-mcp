@@ -85,12 +85,22 @@ async def _run_server(
     app_state.verbosity = verbosity
     app_state.auto_reauth = auto_reauth
 
-    # Read transport type from config so display/management can use it.
+    # Read server settings from config so host/port/transport are honoured.
     try:
         from argus_mcp.config.loader import load_argus_config
 
         _argus_cfg = load_argus_config(resolved_config_path)
         app_state.transport_type = _argus_cfg.server.transport
+
+        # Apply config host/port when the CLI values are still the defaults.
+        if host == DEFAULT_HOST and _argus_cfg.server.host != DEFAULT_HOST:
+            host = _argus_cfg.server.host
+            app_state.host = host
+            module_logger.info("Host overridden by config: %s", host)
+        if port == DEFAULT_PORT and _argus_cfg.server.port != DEFAULT_PORT:
+            port = _argus_cfg.server.port
+            app_state.port = port
+            module_logger.info("Port overridden by config: %s", port)
     except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
         app_state.transport_type = "streamable-http"
         module_logger.debug(
