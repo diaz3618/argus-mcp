@@ -184,11 +184,8 @@ logs/*
 
 # Session metadata
 .argus/
-docs/public/
-internal/
-memory-bank/
 
-# Snyk Security Extension - AI Rules (auto-generated)
+# Snyk Security Extension
 .github/instructions/snyk_rules.instructions.md
 .snyk
 .typos.toml
