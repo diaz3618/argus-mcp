@@ -307,6 +307,7 @@ class TestRenderTemplate:
                 "install_cmd": "uv tool install test-pkg",
                 "build_env": {},
                 "system_deps": [],
+                "build_system_deps": [],
                 "additional_packages": [],
                 "binary": "test-pkg",
             },
@@ -326,6 +327,7 @@ class TestRenderTemplate:
                 "bin_name": "my-server",
                 "build_env": {},
                 "system_deps": [],
+                "build_system_deps": [],
                 "additional_packages": [],
             },
         )
@@ -343,6 +345,7 @@ class TestRenderTemplate:
                 "install_cmd": "uv tool install pkg",
                 "build_env": {},
                 "system_deps": ["ripgrep", "git"],
+                "build_system_deps": [],
                 "additional_packages": [],
                 "binary": "pkg",
             },
@@ -360,6 +363,7 @@ class TestRenderTemplate:
                 "bin_name": "pkg",
                 "build_env": {},
                 "system_deps": ["ripgrep"],
+                "build_system_deps": [],
                 "additional_packages": [],
             },
         )
@@ -374,6 +378,7 @@ class TestRenderTemplate:
                 "install_cmd": "uv tool install pkg",
                 "build_env": {},
                 "system_deps": ["curl"],
+                "build_system_deps": [],
                 "additional_packages": [],
                 "binary": "pkg",
             },
@@ -389,6 +394,7 @@ class TestRenderTemplate:
                 "install_cmd": "uv tool install pkg",
                 "build_env": {"MY_TOKEN": "abc123"},
                 "system_deps": [],
+                "build_system_deps": [],
                 "additional_packages": [],
                 "binary": "pkg",
             },
@@ -405,6 +411,7 @@ class TestRenderTemplate:
                 "install_cmd": "uv tool install pkg",
                 "build_env": {},
                 "system_deps": [],
+                "build_system_deps": [],
                 "additional_packages": ["wget", "jq"],
                 "binary": "pkg",
             },
@@ -427,6 +434,8 @@ from argus_mcp.bridge.container.templates._generators import (
     _npm_bin_name,
     _sanitize_image_name,
     _strip_version,
+    _vcs_repo_name,
+    is_vcs_specifier,
 )
 
 
@@ -444,6 +453,26 @@ class TestStripVersion:
 
     def test_scoped_no_version(self):
         assert _strip_version("@scope/pkg") == "@scope/pkg"
+
+    def test_github_vcs_unchanged(self):
+        assert _strip_version("github:owner/repo") == "github:owner/repo"
+
+    def test_git_https_vcs_unchanged(self):
+        assert _strip_version("git+https://github.com/o/r.git") == "git+https://github.com/o/r.git"
+
+    def test_git_ssh_vcs_unchanged(self):
+        assert _strip_version("git+ssh://git@github.com:o/r") == "git+ssh://git@github.com:o/r"
+
+    def test_bitbucket_vcs_unchanged(self):
+        assert _strip_version("bitbucket:owner/repo") == "bitbucket:owner/repo"
+
+    def test_gitlab_vcs_unchanged(self):
+        assert _strip_version("gitlab:owner/repo") == "gitlab:owner/repo"
+
+    def test_git_proto_vcs_unchanged(self):
+        assert (
+            _strip_version("git://github.com/owner/repo.git") == "git://github.com/owner/repo.git"
+        )
 
 
 class TestSanitizeImageName:
@@ -473,6 +502,21 @@ class TestNpmBinName:
 
     def test_scoped_with_version(self):
         assert _npm_bin_name("@scope/my-server@1.0.0") == "my-server@1.0.0"
+
+    def test_github_vcs(self):
+        assert _npm_bin_name("github:owner/my-mcp-server") == "my-mcp-server"
+
+    def test_git_https_vcs(self):
+        assert _npm_bin_name("git+https://github.com/owner/repo.git") == "repo"
+
+    def test_git_https_vcs_with_fragment(self):
+        assert _npm_bin_name("git+https://github.com/owner/repo.git#v1.0") == "repo"
+
+    def test_bitbucket_vcs(self):
+        assert _npm_bin_name("bitbucket:owner/my-tool") == "my-tool"
+
+    def test_gitlab_vcs(self):
+        assert _npm_bin_name("gitlab:owner/my-tool") == "my-tool"
 
 
 class TestComputeUvxInstallCmd:
@@ -520,14 +564,151 @@ class TestParseNpxArgs:
     """NPX argument parsing."""
 
     def test_basic(self):
-        pkg, extra = parse_npx_args(["@scope/my-server"])
+        pkg, extra, is_vcs = parse_npx_args(["@scope/my-server"])
         assert pkg == "@scope/my-server"
         assert extra == []
+        assert is_vcs is False
 
     def test_with_yes_flag(self):
-        pkg, extra = parse_npx_args(["-y", "@scope/my-server", "--verbose"])
+        pkg, extra, is_vcs = parse_npx_args(["-y", "@scope/my-server", "--verbose"])
         assert pkg == "@scope/my-server"
         assert extra == ["--verbose"]
+        assert is_vcs is False
+
+    def test_github_vcs_specifier(self):
+        pkg, extra, is_vcs = parse_npx_args(["-y", "github:owner/repo"])
+        assert pkg == "github:owner/repo"
+        assert is_vcs is True
+
+    def test_git_https_vcs_specifier(self):
+        pkg, extra, is_vcs = parse_npx_args(["git+https://github.com/owner/repo.git"])
+        assert pkg == "git+https://github.com/owner/repo.git"
+        assert is_vcs is True
+
+    def test_git_ssh_vcs_specifier(self):
+        pkg, extra, is_vcs = parse_npx_args(["-y", "git+ssh://git@github.com:owner/repo"])
+        assert is_vcs is True
+
+    def test_bitbucket_vcs_specifier(self):
+        pkg, extra, is_vcs = parse_npx_args(["bitbucket:owner/repo"])
+        assert is_vcs is True
+
+    def test_gitlab_vcs_specifier(self):
+        pkg, extra, is_vcs = parse_npx_args(["gitlab:owner/repo"])
+        assert is_vcs is True
+
+    def test_registry_package_not_vcs(self):
+        _, _, is_vcs = parse_npx_args(["-y", "@modelcontextprotocol/server-filesystem"])
+        assert is_vcs is False
+
+
+class TestIsVcsSpecifier:
+    """VCS specifier detection."""
+
+    def test_github_shorthand(self):
+        assert is_vcs_specifier("github:owner/repo") is True
+
+    def test_github_with_fragment(self):
+        assert is_vcs_specifier("github:owner/repo#main") is True
+
+    def test_bitbucket_shorthand(self):
+        assert is_vcs_specifier("bitbucket:owner/repo") is True
+
+    def test_gitlab_shorthand(self):
+        assert is_vcs_specifier("gitlab:owner/repo") is True
+
+    def test_git_https(self):
+        assert is_vcs_specifier("git+https://github.com/owner/repo.git") is True
+
+    def test_git_ssh(self):
+        assert is_vcs_specifier("git+ssh://git@github.com/owner/repo") is True
+
+    def test_git_protocol(self):
+        assert is_vcs_specifier("git://github.com/owner/repo.git") is True
+
+    def test_case_insensitive(self):
+        assert is_vcs_specifier("GitHub:Owner/Repo") is True
+
+    def test_registry_package(self):
+        assert is_vcs_specifier("@scope/my-server") is False
+
+    def test_plain_package(self):
+        assert is_vcs_specifier("my-server") is False
+
+    def test_versioned_package(self):
+        assert is_vcs_specifier("my-server@1.2.3") is False
+
+    def test_empty_string(self):
+        assert is_vcs_specifier("") is False
+
+
+class TestVcsRepoName:
+    """Repository name extraction from VCS specifiers."""
+
+    def test_github_shorthand(self):
+        assert _vcs_repo_name("github:owner/repo") == "repo"
+
+    def test_github_with_fragment(self):
+        assert _vcs_repo_name("github:owner/repo#main") == "repo"
+
+    def test_bitbucket_shorthand(self):
+        assert _vcs_repo_name("bitbucket:owner/repo") == "repo"
+
+    def test_gitlab_shorthand(self):
+        assert _vcs_repo_name("gitlab:owner/repo") == "repo"
+
+    def test_git_https_with_dot_git(self):
+        assert _vcs_repo_name("git+https://github.com/owner/repo.git") == "repo"
+
+    def test_git_https_without_dot_git(self):
+        assert _vcs_repo_name("git+https://github.com/owner/repo") == "repo"
+
+    def test_git_ssh(self):
+        assert _vcs_repo_name("git+ssh://git@github.com/owner/repo.git") == "repo"
+
+    def test_git_protocol(self):
+        assert _vcs_repo_name("git://github.com/owner/repo.git") == "repo"
+
+    def test_nested_path(self):
+        assert _vcs_repo_name("github:org/deep/repo") == "repo"
+
+
+class TestBuildSystemDeps:
+    """build_system_deps appears in generated Dockerfiles."""
+
+    def test_npx_build_system_deps_alpine(self):
+        df = generate_npx_dockerfile("my-pkg", build_system_deps=["git"])
+        assert "apk add --no-cache git" in df
+
+    def test_npx_build_system_deps_debian(self):
+        rc = RuntimeConfig(builder_image="node:22-slim")
+        df = generate_npx_dockerfile("my-pkg", build_system_deps=["git"], runtime_config=rc)
+        assert "apt-get install -y --no-install-recommends git" in df
+
+    def test_uvx_build_system_deps_debian(self):
+        df = generate_uvx_dockerfile("my-pkg", "my-pkg", build_system_deps=["git"])
+        assert "apt-get install -y --no-install-recommends git" in df
+
+    def test_uvx_build_system_deps_alpine(self):
+        rc = RuntimeConfig(builder_image="python:3.13-alpine")
+        df = generate_uvx_dockerfile(
+            "my-pkg", "my-pkg", build_system_deps=["git"], runtime_config=rc
+        )
+        assert "apk add --no-cache git" in df
+
+    def test_go_build_system_deps(self):
+        df = generate_go_dockerfile("github.com/example/tool@latest", build_system_deps=["gcc"])
+        assert "gcc" in df
+
+    def test_npx_no_build_system_deps(self):
+        df = generate_npx_dockerfile("my-pkg")
+        # Should not contain a build_system_deps block
+        assert "apk add --no-cache git" not in df
+
+    def test_npx_vcs_package_dockerfile(self):
+        df = generate_npx_dockerfile("github:owner/repo", build_system_deps=["git"])
+        assert "apk add --no-cache git" in df
+        assert "npm install" in df
 
 
 class TestGenerateUvxDockerfileWithRuntimeConfig:

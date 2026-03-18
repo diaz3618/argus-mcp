@@ -16,7 +16,13 @@ ENV {{ key }}="{{ value }}"
 {% endfor %}
 
 # Install build dependencies
+{% if build_system_deps %}
 {% if additional_packages %}
+RUN apk add --no-cache {{ additional_packages | join(' ') }} {{ build_system_deps | join(' ') }}
+{% else %}
+RUN apk add --no-cache ca-certificates git {{ build_system_deps | join(' ') }}
+{% endif %}
+{% elif additional_packages %}
 RUN apk add --no-cache {{ additional_packages | join(' ') }}
 {% else %}
 RUN apk add --no-cache ca-certificates git

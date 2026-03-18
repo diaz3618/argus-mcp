@@ -490,32 +490,35 @@ class TestParseNpxArgs:
     """Tests for parse_npx_args()."""
 
     def test_simple_package(self):
-        pkg, extra = parse_npx_args(["@modelcontextprotocol/server-fetch"])
+        pkg, extra, is_vcs = parse_npx_args(["@modelcontextprotocol/server-fetch"])
         assert pkg == "@modelcontextprotocol/server-fetch"
         assert extra == []
+        assert is_vcs is False
 
     def test_strips_y_flag(self):
-        pkg, extra = parse_npx_args(["-y", "some-pkg"])
+        pkg, extra, is_vcs = parse_npx_args(["-y", "some-pkg"])
         assert pkg == "some-pkg"
         assert extra == []
+        assert is_vcs is False
 
     def test_strips_yes_flag(self):
-        pkg, extra = parse_npx_args(["--yes", "some-pkg"])
+        pkg, extra, is_vcs = parse_npx_args(["--yes", "some-pkg"])
         assert pkg == "some-pkg"
         assert extra == []
+        assert is_vcs is False
 
     def test_with_extra_args(self):
-        pkg, extra = parse_npx_args(["-y", "some-pkg", "--stdio"])
+        pkg, extra, is_vcs = parse_npx_args(["-y", "some-pkg", "--stdio"])
         assert pkg == "some-pkg"
         assert extra == ["--stdio"]
 
     def test_empty_args(self):
-        pkg, extra = parse_npx_args([])
+        pkg, extra, is_vcs = parse_npx_args([])
         assert pkg == "unknown"
         assert extra == []
 
     def test_scoped_package(self):
-        pkg, extra = parse_npx_args(["-y", "@scope/package@1.0.0", "--verbose"])
+        pkg, extra, is_vcs = parse_npx_args(["-y", "@scope/package@1.0.0", "--verbose"])
         assert pkg == "@scope/package@1.0.0"
         assert extra == ["--verbose"]
 
@@ -655,12 +658,13 @@ class TestIsAlreadyContainerised:
         assert is_already_containerised("docker", []) is False
 
 
+@patch("argus_mcp.bridge.container.image_builder._go_adapter_available", return_value=False)
 class TestEnsureImage:
     """Tests for ensure_image() — the orchestrator."""
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=True)
-    async def test_reuses_cached_image(self, mock_exists):
+    async def test_reuses_cached_image(self, mock_exists, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "uvx", ["my-tool"], None, "docker"
         )
@@ -671,7 +675,7 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=True)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_builds_when_not_cached(self, mock_exists, mock_build):
+    async def test_builds_when_not_cached(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "uvx", ["my-tool"], None, "docker"
         )
@@ -681,14 +685,14 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=False)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_returns_none_on_build_failure(self, mock_exists, mock_build):
+    async def test_returns_none_on_build_failure(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "uvx", ["my-tool"], None, "docker"
         )
         assert tag is None
 
     @pytest.mark.asyncio
-    async def test_returns_passthrough_for_docker(self):
+    async def test_returns_passthrough_for_docker(self, _mock_go):
         """When command is 'docker', ensure_image returns None passthrough."""
         tag, binary, runtime_args = await ensure_image(
             "test-server", "docker", ["run", "myimage"], None, "docker"
@@ -697,7 +701,7 @@ class TestEnsureImage:
         assert binary == "docker"
 
     @pytest.mark.asyncio
-    async def test_returns_passthrough_for_unknown(self):
+    async def test_returns_passthrough_for_unknown(self, _mock_go):
         """When command is unrecognised, returns None passthrough."""
         tag, binary, runtime_args = await ensure_image(
             "test-server", "unknown-binary", ["--flag"], None, "docker"
@@ -707,7 +711,7 @@ class TestEnsureImage:
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_uvx_build_if_missing_false(self, mock_exists):
+    async def test_uvx_build_if_missing_false(self, mock_exists, _mock_go):
         """When build_if_missing=False and image not cached, falls back."""
         tag, binary, runtime_args = await ensure_image(
             "test-server",
@@ -722,7 +726,7 @@ class TestEnsureImage:
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=True)
-    async def test_npx_reuses_cached(self, mock_exists):
+    async def test_npx_reuses_cached(self, mock_exists, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "npx", ["-y", "my-package"], None, "docker"
         )
@@ -732,7 +736,7 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=True)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_npx_builds_when_not_cached(self, mock_exists, mock_build):
+    async def test_npx_builds_when_not_cached(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "npx", ["-y", "my-package"], None, "docker"
         )
@@ -742,7 +746,7 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=False)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_npx_returns_none_on_build_failure(self, mock_exists, mock_build):
+    async def test_npx_returns_none_on_build_failure(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server", "npx", ["-y", "my-package"], None, "docker"
         )
@@ -750,7 +754,7 @@ class TestEnsureImage:
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_npx_build_if_missing_false(self, mock_exists):
+    async def test_npx_build_if_missing_false(self, mock_exists, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server",
             "npx",
@@ -764,7 +768,7 @@ class TestEnsureImage:
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=True)
-    async def test_go_reuses_cached(self, mock_exists):
+    async def test_go_reuses_cached(self, mock_exists, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server",
             "go",
@@ -780,7 +784,7 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=True)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_go_builds_when_not_cached(self, mock_exists, mock_build):
+    async def test_go_builds_when_not_cached(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server",
             "go",
@@ -796,7 +800,7 @@ class TestEnsureImage:
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.build_image", return_value=False)
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_go_returns_none_on_build_failure(self, mock_exists, mock_build):
+    async def test_go_returns_none_on_build_failure(self, mock_exists, mock_build, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server",
             "go",
@@ -808,7 +812,7 @@ class TestEnsureImage:
         assert tag is None
 
     @pytest.mark.asyncio
-    async def test_go_without_package_returns_none(self):
+    async def test_go_without_package_returns_none(self, _mock_go):
         """Go transport without go_package should return None."""
         tag, binary, runtime_args = await ensure_image(
             "test-server",
@@ -822,7 +826,7 @@ class TestEnsureImage:
 
     @pytest.mark.asyncio
     @patch("argus_mcp.bridge.container.runtime.image_exists", return_value=False)
-    async def test_go_build_if_missing_false(self, mock_exists):
+    async def test_go_build_if_missing_false(self, mock_exists, _mock_go):
         tag, binary, runtime_args = await ensure_image(
             "test-server",
             "go",
@@ -917,6 +921,21 @@ class TestWrapBackend:
         yield
         RuntimeFactory.get().reset()
         _active_containers.clear()
+
+    @pytest.fixture(autouse=True)
+    def _disable_go_adapter(self):
+        """Disable Go adapter so tests always use the subprocess path."""
+        with (
+            patch(
+                "argus_mcp.bridge.container.wrapper._go_adapter_available",
+                return_value=False,
+            ),
+            patch(
+                "argus_mcp.bridge.container.image_builder._go_adapter_available",
+                return_value=False,
+            ),
+        ):
+            yield
 
     def _make_runtime(self, healthy: bool = True, name: str = "docker"):
         """Create a mock runtime suitable for factory.detect patching."""

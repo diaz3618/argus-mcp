@@ -125,6 +125,11 @@ class TemplateData:
     system_deps : list[str]
         System packages from per-backend ``container.system_deps``
         config (e.g. ``["ripgrep"]``).
+    build_system_deps : list[str]
+        System packages needed only in the **builder** stage (e.g.
+        ``["git"]`` for VCS npm specifiers).  These are installed
+        before the package install command runs and are NOT carried
+        over to the runtime stage.
     build_env : dict[str, str]
         Build-time environment variables.
     additional_packages : list[str]
@@ -140,12 +145,20 @@ class TemplateData:
     is_alpine: bool = False
     install_cmd: str = ""
     system_deps: List[str] = field(default_factory=list)
+    build_system_deps: List[str] = field(default_factory=list)
     build_env: Dict[str, str] = field(default_factory=dict)
     additional_packages: List[str] = field(default_factory=list)
     bin_name: str = ""
     go_package: str = ""
     go_package_clean: str = ""
     runtime_args: List[str] = field(default_factory=list)
+
+    # Source-build fields
+    source_url: str = ""
+    source_ref: str = ""
+    build_steps: List[str] = field(default_factory=list)
+    entrypoint: List[str] = field(default_factory=list)
+    source_url_host: str = ""
 
     # Container user — defaults match the module-level constants.
     # These are injected into Jinja2 templates so that UID/user/home

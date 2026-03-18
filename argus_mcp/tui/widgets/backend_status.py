@@ -15,7 +15,6 @@ from argus_mcp._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 
-# Phase → (icon, color)
 _PHASE_STYLE: Dict[str, tuple] = {
     "pending": ("◌", "$text-muted"),
     "initializing": ("⟳", "yellow"),
@@ -33,7 +32,6 @@ _TRANSPORT_BADGE: Dict[str, str] = {
     "streamable_http": "[green]StreamableHTTP[/green]",
 }
 
-# Phase summary icons for the footer line
 _PHASE_SUMMARY: Dict[str, str] = {
     "ready": "●",
     "degraded": "◑",

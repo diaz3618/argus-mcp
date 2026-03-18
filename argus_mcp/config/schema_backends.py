@@ -6,9 +6,12 @@ MCP servers, along with shared sub-models (timeouts, filters, auth).
 
 from __future__ import annotations
 
+import ipaddress
+import re
 from typing import Annotated, Dict, List, Literal, Optional, Union
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MetadataProvenance(BaseModel):
@@ -260,6 +263,15 @@ class ContainerConfig(BaseModel):
             "images (uvx), packages are installed via 'apt-get install'."
         ),
     )
+    build_system_deps: List[str] = Field(
+        default_factory=list,
+        description=(
+            "System packages needed only in the builder stage "
+            "(e.g. ['git'] for VCS npm specifiers). These are "
+            "installed before the package install command and are "
+            "NOT carried over to the runtime stage."
+        ),
+    )
     builder_image: Optional[str] = Field(
         default=None,
         description=(
@@ -294,6 +306,58 @@ class ContainerConfig(BaseModel):
         ),
     )
 
+    # --- source_url + build_steps + entrypoint + build_env ---
+
+    source_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Git repository URL to clone and build from source. "
+            "Must use 'https' or 'git+ssh' scheme. "
+            "Example: 'https://github.com/owner/repo.git'."
+        ),
+    )
+    build_steps: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Shell commands to execute during the build stage "
+            "after cloning source_url. Required when source_url is set. "
+            "Example: ['pip install -e .', 'python setup.py build']."
+        ),
+    )
+    entrypoint: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Custom container entrypoint as a list of strings. "
+            "Required when source_url is set. Also usable standalone "
+            "to override auto-detected entrypoints. "
+            "Example: ['python', '-m', 'my_server']."
+        ),
+    )
+    build_env: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Build-time environment variables. Keys must be uppercase "
+            "with underscores. Values may reference secrets using "
+            "'${SECRET_NAME}' syntax — resolved at build time only, "
+            "never in the runtime layer."
+        ),
+    )
+    source_ref: Optional[str] = Field(
+        default=None,
+        description=("Git ref to checkout after cloning source_url (branch, tag, or commit SHA)."),
+    )
+
+    # --- dockerfile escape hatch ---
+
+    dockerfile: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path to a custom Dockerfile, relative to the config file. "
+            "When set, bypasses all auto-generated templates. "
+            "Absolute paths and '..' path components are rejected."
+        ),
+    )
+
     @field_validator("transport")
     @classmethod
     def _validate_transport(cls, v: Optional[str]) -> Optional[str]:
@@ -310,6 +374,107 @@ class ContainerConfig(BaseModel):
         if v is not None:
             v = v.strip()
         return v
+
+    @field_validator("source_url")
+    @classmethod
+    def _validate_source_url(cls, v: Optional[str]) -> Optional[str]:
+        """Validate source_url: HTTPS or git+ssh only, no private IPs."""
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return None
+
+        parsed = urlparse(v)
+        scheme = parsed.scheme.lower()
+        allowed_schemes = {"https", "git+ssh"}
+        if scheme not in allowed_schemes:
+            raise ValueError(
+                f"source_url scheme must be one of {sorted(allowed_schemes)}, "
+                f"got '{scheme}' in '{v}'"
+            )
+
+        hostname = parsed.hostname or ""
+        if hostname:
+            # Reject private/loopback IP addresses (SSRF prevention)
+            try:
+                addr = ipaddress.ip_address(hostname)
+                if addr.is_private or addr.is_loopback or addr.is_reserved:
+                    raise ValueError(
+                        f"source_url must not point to private/loopback addresses: '{hostname}'"
+                    )
+            except ValueError as exc:
+                if "private" in str(exc) or "loopback" in str(exc):
+                    raise
+                # Not an IP literal — hostname is fine
+
+            lower_host = hostname.lower()
+            if lower_host in ("localhost", "localhost.localdomain"):
+                raise ValueError(f"source_url must not point to localhost: '{hostname}'")
+        return v
+
+    @field_validator("build_steps")
+    @classmethod
+    def _validate_build_steps(cls, v: List[str]) -> List[str]:
+        """Validate build_steps: reject shell-unsafe characters."""
+        _shell_unsafe = re.compile(r"[`$()]")
+        for step in v:
+            if _shell_unsafe.search(step):
+                raise ValueError(f"build_steps entry contains unsafe characters: {step!r}")
+        return v
+
+    @field_validator("entrypoint")
+    @classmethod
+    def _validate_entrypoint(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate entrypoint: reject shell-unsafe characters."""
+        if v is None:
+            return v
+        _shell_unsafe = re.compile(r"[;&|`$(){}\[\]<>!#~\\\n\r]")
+        for elem in v:
+            if _shell_unsafe.search(elem):
+                raise ValueError(f"entrypoint element contains unsafe characters: {elem!r}")
+        return v
+
+    @field_validator("build_env")
+    @classmethod
+    def _validate_build_env(cls, v: Dict[str, str]) -> Dict[str, str]:
+        """Validate build_env keys and values."""
+        _key_pattern = re.compile(r"^[A-Z][A-Z0-9_]*$")
+        for key in v:
+            if not _key_pattern.match(key):
+                raise ValueError(
+                    f"build_env key must be uppercase letters/digits/underscore "
+                    f"starting with a letter: {key!r}"
+                )
+        return v
+
+    @field_validator("dockerfile")
+    @classmethod
+    def _validate_dockerfile(cls, v: Optional[str]) -> Optional[str]:
+        """Validate dockerfile path: no absolute paths, no '..' traversal."""
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            return None
+        import pathlib
+
+        p = pathlib.PurePosixPath(v)
+        if p.is_absolute():
+            raise ValueError(f"dockerfile must be a relative path, got absolute: '{v}'")
+        if ".." in p.parts:
+            raise ValueError(f"dockerfile must not contain '..' path components: '{v}'")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_source_url_deps(self) -> "ContainerConfig":
+        """Ensure build_steps and entrypoint are set when source_url is."""
+        if self.source_url:
+            if not self.build_steps:
+                raise ValueError("build_steps is required when source_url is set")
+            if not self.entrypoint:
+                raise ValueError("entrypoint is required when source_url is set")
+        return self
 
 
 class StdioBackendConfig(MetadataProvenance):

@@ -702,10 +702,17 @@ def _cmd_build(args: argparse.Namespace) -> None:
                     extra_args=container_cfg.get("extra_args"),
                     build_if_missing=True,
                     system_deps=container_cfg.get("system_deps"),
+                    build_system_deps=container_cfg.get("build_system_deps"),
                     builder_image=container_cfg.get("builder_image"),
                     additional_packages=container_cfg.get("additional_packages"),
                     transport_override=container_cfg.get("transport"),
                     go_package=container_cfg.get("go_package"),
+                    source_url=container_cfg.get("source_url"),
+                    build_steps=container_cfg.get("build_steps"),
+                    entrypoint=container_cfg.get("entrypoint"),
+                    build_env=container_cfg.get("build_env"),
+                    source_ref=container_cfg.get("source_ref"),
+                    dockerfile=container_cfg.get("dockerfile"),
                 )
                 if was_isolated:
                     print("OK (containerised)")

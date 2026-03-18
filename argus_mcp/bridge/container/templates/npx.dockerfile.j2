@@ -11,6 +11,15 @@ WORKDIR /app
 ARG {{ key }}="{{ value }}"
 ENV {{ key }}="${{ '{' }}{{ key }}{{ '}' }}"
 {% endfor %}
+{% if build_system_deps %}
+{% if is_alpine %}
+RUN apk add --no-cache {{ build_system_deps | join(' ') }}
+{% else %}
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends {{ build_system_deps | join(' ') }} && \
+    rm -rf /var/lib/apt/lists/*
+{% endif %}
+{% endif %}
 RUN npm install --save {{ package }}
 # Discover the canonical binary name from the installed package.
 # NPM packages define binaries in package.json "bin" field, which

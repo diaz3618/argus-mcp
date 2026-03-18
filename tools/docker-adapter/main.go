@@ -13,13 +13,17 @@
 //   - create-network: Create a Docker network
 //   - remove-network: Remove a Docker network
 //   - list-images: List images matching a prefix
+//   - build: Build an image from a Dockerfile string
+//   - create: Create a container and return its ID
 //
 // This achieves 5-10× faster operations through native API connection
 // pooling vs. CLI subprocess overhead per call.
 package main
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,9 +31,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 
+	"github.com/docker/docker/api/types/build"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -115,6 +123,10 @@ func handleRequest(ctx context.Context, cli *client.Client, req *Request) Respon
 		return doRemoveNetwork(ctx, cli, req.Args["name"])
 	case "list-images":
 		return doListImages(ctx, cli, req.Args["prefix"])
+	case "build":
+		return doBuild(ctx, cli, req.Args)
+	case "create":
+		return doCreate(ctx, cli, req.Args)
 	default:
 		return Response{Error: fmt.Sprintf("unknown operation: %q", req.Op)}
 	}
@@ -231,4 +243,244 @@ func doListImages(ctx context.Context, cli *client.Client, prefix string) Respon
 		}
 	}
 	return Response{OK: true, Data: result}
+}
+
+// --- Validation regexes for build and create ops ---
+
+var (
+	imageTagRe    = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-z0-9._-]+$`)
+	buildArgKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+	volumeRe      = regexp.MustCompile(`^[a-zA-Z0-9/._:-]+$`)
+	networkNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+)
+
+func doBuild(ctx context.Context, cli *client.Client, args map[string]string) Response {
+	dockerfileContent := args["dockerfile_content"]
+	if dockerfileContent == "" {
+		return Response{Error: "missing 'dockerfile_content' arg"}
+	}
+	imageTag := args["image_tag"]
+	if imageTag == "" {
+		return Response{Error: "missing 'image_tag' arg"}
+	}
+	if !imageTagRe.MatchString(imageTag) {
+		return Response{Error: fmt.Sprintf("invalid image_tag format: %q", imageTag)}
+	}
+
+	// Parse build_args from JSON string (optional).
+	buildArgs := make(map[string]*string)
+	if buildArgsJSON := args["build_args"]; buildArgsJSON != "" {
+		var raw map[string]string
+		if err := json.Unmarshal([]byte(buildArgsJSON), &raw); err != nil {
+			return Response{Error: fmt.Sprintf("invalid build_args JSON: %v", err)}
+		}
+		for k, v := range raw {
+			if !buildArgKeyRe.MatchString(k) {
+				return Response{Error: fmt.Sprintf("invalid build_arg key: %q", k)}
+			}
+			val := v
+			buildArgs[k] = &val
+		}
+	}
+
+	// Create an in-memory tar archive with just the Dockerfile.
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	content := []byte(dockerfileContent)
+	if err := tw.WriteHeader(&tar.Header{
+		Name: "Dockerfile",
+		Size: int64(len(content)),
+		Mode: 0600,
+	}); err != nil {
+		return Response{Error: fmt.Sprintf("tar header error: %v", err)}
+	}
+	if _, err := tw.Write(content); err != nil {
+		return Response{Error: fmt.Sprintf("tar write error: %v", err)}
+	}
+	if err := tw.Close(); err != nil {
+		return Response{Error: fmt.Sprintf("tar close error: %v", err)}
+	}
+
+	resp, err := cli.ImageBuild(ctx, &buf, build.ImageBuildOptions{
+		Tags:        []string{imageTag},
+		Dockerfile:  "Dockerfile",
+		BuildArgs:   buildArgs,
+		Remove:      true,
+		ForceRemove: true,
+	})
+	if err != nil {
+		return Response{Error: fmt.Sprintf("build failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	// Stream build output — collect last status for response.
+	var lastLine string
+	decoder := json.NewDecoder(resp.Body)
+	for {
+		var msg map[string]interface{}
+		if err := decoder.Decode(&msg); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return Response{Error: fmt.Sprintf("build stream error: %v", err)}
+		}
+		if errMsg, ok := msg["error"]; ok {
+			return Response{Error: fmt.Sprintf("build error: %v", errMsg)}
+		}
+		if stream, ok := msg["stream"].(string); ok {
+			line := strings.TrimSpace(stream)
+			if line != "" {
+				lastLine = line
+			}
+		}
+	}
+
+	return Response{OK: true, Data: map[string]string{
+		"image_tag": imageTag,
+		"status":    lastLine,
+	}}
+}
+
+func doCreate(ctx context.Context, cli *client.Client, args map[string]string) Response {
+	img := args["image"]
+	if img == "" {
+		return Response{Error: "missing 'image' arg"}
+	}
+	name := args["name"]
+	if name == "" {
+		return Response{Error: "missing 'name' arg"}
+	}
+
+	// Parse cmd from JSON array string (optional).
+	var cmd []string
+	if c := args["cmd"]; c != "" {
+		if err := json.Unmarshal([]byte(c), &cmd); err != nil {
+			return Response{Error: fmt.Sprintf("invalid cmd JSON: %v", err)}
+		}
+	}
+
+	// Parse entrypoint from JSON array string (optional).
+	var entrypoint []string
+	if ep := args["entrypoint"]; ep != "" {
+		if err := json.Unmarshal([]byte(ep), &entrypoint); err != nil {
+			return Response{Error: fmt.Sprintf("invalid entrypoint JSON: %v", err)}
+		}
+	}
+
+	// Parse env from JSON object string (optional).
+	var envList []string
+	if e := args["env"]; e != "" {
+		var envMap map[string]string
+		if err := json.Unmarshal([]byte(e), &envMap); err != nil {
+			return Response{Error: fmt.Sprintf("invalid env JSON: %v", err)}
+		}
+		for k, v := range envMap {
+			envList = append(envList, k+"="+v)
+		}
+	}
+
+	// Parse volumes from JSON array string (optional).
+	var binds []string
+	if v := args["volumes"]; v != "" {
+		if err := json.Unmarshal([]byte(v), &binds); err != nil {
+			return Response{Error: fmt.Sprintf("invalid volumes JSON: %v", err)}
+		}
+		for _, b := range binds {
+			if !volumeRe.MatchString(b) {
+				return Response{Error: fmt.Sprintf("invalid volume spec: %q", b)}
+			}
+		}
+	}
+
+	// Parse cap_drop from JSON array string (optional).
+	var capDrop []string
+	if cd := args["cap_drop"]; cd != "" {
+		if err := json.Unmarshal([]byte(cd), &capDrop); err != nil {
+			return Response{Error: fmt.Sprintf("invalid cap_drop JSON: %v", err)}
+		}
+	}
+
+	// Network name validation.
+	netName := args["network"]
+	if netName != "" && !networkNameRe.MatchString(netName) {
+		return Response{Error: fmt.Sprintf("invalid network name: %q", netName)}
+	}
+
+	// Resource limits.
+	var memoryBytes int64
+	if m := args["memory"]; m != "" {
+		parsed, err := strconv.ParseInt(m, 10, 64)
+		if err != nil {
+			return Response{Error: fmt.Sprintf("invalid memory value: %v", err)}
+		}
+		memoryBytes = parsed
+	}
+
+	var nanoCPUs int64
+	if c := args["cpus"]; c != "" {
+		cpuFloat, err := strconv.ParseFloat(c, 64)
+		if err != nil {
+			return Response{Error: fmt.Sprintf("invalid cpus value: %v", err)}
+		}
+		nanoCPUs = int64(cpuFloat * 1e9)
+	}
+
+	readOnly := args["read_only"] == "true"
+
+	config := &container.Config{
+		Image:        img,
+		Cmd:          cmd,
+		Env:          envList,
+		OpenStdin:    true,
+		StdinOnce:    true,
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+	if len(entrypoint) > 0 {
+		config.Entrypoint = entrypoint
+	}
+
+	hostConfig := &container.HostConfig{
+		Init:           boolPtr(true),
+		ReadonlyRootfs: readOnly,
+		CapDrop:        capDrop,
+		Binds:          binds,
+		Resources: container.Resources{
+			Memory:   memoryBytes,
+			NanoCPUs: nanoCPUs,
+		},
+	}
+
+	netConfig := (*network.NetworkingConfig)(nil)
+	if netName != "" {
+		netConfig = &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				netName: {},
+			},
+		}
+	}
+
+	// Pre-emptively remove any leftover container with the same name to
+	// avoid "name already in use" errors on retry.  Ignore errors — the
+	// container may not exist.
+	_ = cli.ContainerRemove(ctx, name, container.RemoveOptions{Force: true})
+
+	created, err := cli.ContainerCreate(ctx, config, hostConfig, netConfig, nil, name)
+	if err != nil && strings.Contains(err.Error(), "already in use") {
+		// Race with slow removal — force-remove and retry once.
+		_ = cli.ContainerRemove(ctx, name, container.RemoveOptions{Force: true})
+		created, err = cli.ContainerCreate(ctx, config, hostConfig, netConfig, nil, name)
+	}
+	if err != nil {
+		return Response{Error: fmt.Sprintf("create failed: %v", err)}
+	}
+
+	return Response{OK: true, Data: map[string]string{
+		"container_id": created.ID,
+	}}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
