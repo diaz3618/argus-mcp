@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
+from argus_mcp.constants import SESSION_DEFAULT_TTL
+
 
 class HealthBackends(BaseModel):
     total: int = 0
@@ -174,7 +176,7 @@ class SessionDetail(BaseModel):
     capability_snapshot: Dict[str, Any] = Field(default_factory=dict)
     age_seconds: float = 0.0
     idle_seconds: float = 0.0
-    ttl: float = 1800.0
+    ttl: float = SESSION_DEFAULT_TTL
     expired: bool = False
 
 

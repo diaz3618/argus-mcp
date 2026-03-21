@@ -20,6 +20,7 @@ from mcp import ClientSession, StdioServerParameters
 from argus_mcp.bridge import auth_discovery as ad
 from argus_mcp.bridge import backend_connection as bc
 from argus_mcp.bridge import startup_coordinator as sc
+from argus_mcp.constants import EXIT_STACK_CLOSE_TIMEOUT, STACK_CLOSE_TIMEOUT
 
 if TYPE_CHECKING:
     from argus_mcp.bridge.auth.refresh_service import ReAuthCallback
@@ -89,6 +90,7 @@ class ClientManager:
         self,
         config_data: Dict[str, Dict[str, Any]],
         progress_callback: Optional[Callable[..., None]] = None,
+        parallel: bool = False,
     ) -> None:
         """Start all backend server connections, retrying failures."""
         await sc.start_all(
@@ -102,6 +104,7 @@ class ClientManager:
             progress_cb_holder=self,
             progress_callback=progress_callback,
             shutdown_requested_fn=lambda: self._shutdown_requested,
+            parallel=parallel,
         )
 
     def start_refresh_service(
@@ -160,12 +163,12 @@ class ClientManager:
         """Close per-backend exit stacks (transport + session + subprocess)."""
         for name, stack in list(self._backend_stacks.items()):
             try:
-                await asyncio.wait_for(stack.aclose(), timeout=5.0)
+                await asyncio.wait_for(stack.aclose(), timeout=STACK_CLOSE_TIMEOUT)
                 logger.debug("Backend '%s' stack closed.", name)
             except asyncio.TimeoutError:
                 logger.warning("Backend '%s' stack close timed out.", name)
-            except RuntimeError as e_rt:
-                logger.debug("Cancel scope error closing '%s': %s", name, e_rt)
+            except RuntimeError as exc:
+                logger.debug("Cancel scope error closing '%s': %s", name, exc)
             except Exception:  # noqa: BLE001
                 logger.debug("Error closing backend '%s' stack.", name, exc_info=True)
         self._backend_stacks.clear()
@@ -174,14 +177,16 @@ class ClientManager:
         """Close the global AsyncExitStack as a safety net."""
         logger.debug("Closing global AsyncExitStack as safety net...")
         try:
-            await asyncio.wait_for(self._exit_stack.aclose(), timeout=10.0)
+            await asyncio.wait_for(self._exit_stack.aclose(), timeout=EXIT_STACK_CLOSE_TIMEOUT)
             logger.info("Global AsyncExitStack closed.")
         except asyncio.TimeoutError:
-            logger.warning("Global AsyncExitStack.aclose() timed out after 10s.")
-        except RuntimeError as e_rt:
-            logger.warning("Cancel scope error during shutdown (safe to ignore): %s", e_rt)
-        except Exception as e_aclose:  # noqa: BLE001
-            logger.warning("Error while closing global AsyncExitStack: %s.", e_aclose)
+            logger.warning(
+                "Global AsyncExitStack.aclose() timed out after %ss.", EXIT_STACK_CLOSE_TIMEOUT
+            )
+        except RuntimeError as exc:
+            logger.warning("Cancel scope error during shutdown (safe to ignore): %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Error while closing global AsyncExitStack: %s.", exc, exc_info=True)
 
     async def stop_all(self) -> None:
         """Close all active sessions and subprocesses started by the manager."""
@@ -215,7 +220,6 @@ class ClientManager:
         except Exception:  # noqa: BLE001
             logger.debug("Container cleanup during shutdown failed.", exc_info=True)
 
-        # Close the shared devnull file
         if self._devnull is not None:
             try:
                 self._devnull.close()
@@ -239,17 +243,19 @@ class ClientManager:
         backend_stack = self._backend_stacks.pop(name, None)
         if backend_stack is not None:
             try:
-                await asyncio.wait_for(backend_stack.aclose(), timeout=10.0)
+                await asyncio.wait_for(backend_stack.aclose(), timeout=EXIT_STACK_CLOSE_TIMEOUT)
                 logger.info(
                     "Backend '%s' disconnected (stack closed, subprocess terminated).", name
                 )
             except asyncio.TimeoutError:
-                logger.warning("Backend '%s' disconnect timed out after 10s.", name)
-            except RuntimeError as e_rt:
+                logger.warning(
+                    "Backend '%s' disconnect timed out after %ss.", name, EXIT_STACK_CLOSE_TIMEOUT
+                )
+            except RuntimeError as exc:
                 logger.debug(
                     "Cancel scope error disconnecting '%s' (benign): %s",
                     name,
-                    e_rt,
+                    exc,
                 )
             except Exception:  # noqa: BLE001
                 logger.warning("Error disconnecting backend '%s'.", name, exc_info=True)

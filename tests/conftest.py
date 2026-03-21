@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Semgrep authentication ──────────────────────────────────────────────
+# Semgrep authentication
 # Set the token so semgrep CLI never prompts for login during test runs.
 # Safe to keep here — the tests/ folder is excluded from the remote repo
 # via .git/info/exclude.
@@ -25,7 +25,7 @@ os.environ.setdefault(
 )
 
 
-# pytest-asyncio configuration ────────────────────────────────────────
+# pytest-asyncio configuration
 
 
 def pytest_configure(config: Any) -> None:
@@ -36,7 +36,7 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "semgrep: marks semgrep rule validation tests")
 
 
-# Mock Backend Session ────────────────────────────────────────────────
+# Mock Backend Session
 
 
 class MockMCPSession:
@@ -147,7 +147,7 @@ def mock_session_factory():
     return _create
 
 
-# Mock Capability Registry ────────────────────────────────────────────
+# Mock Capability Registry
 
 
 @pytest.fixture
@@ -184,7 +184,7 @@ def mock_manager():
     return manager
 
 
-# Config Fixtures ─────────────────────────────────────────────────────
+# Config Fixtures
 
 
 @pytest.fixture

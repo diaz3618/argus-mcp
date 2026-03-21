@@ -15,7 +15,8 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
-from argus_mcp.bridge.auth.token_cache import TokenCache
+from argus_mcp.bridge.auth._token_cache_rs import TokenCache
+from argus_mcp.constants import DEFAULT_TOKEN_EXPIRES_IN
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class OAuth2Provider(AuthProvider):
 
         payload: Dict[str, Any] = resp.json()
         access_token: str = payload["access_token"]
-        expires_in = float(payload.get("expires_in", 3600))
+        expires_in = float(payload.get("expires_in", DEFAULT_TOKEN_EXPIRES_IN))
         self._cache.set(access_token, expires_in)
         logger.info(
             "OAuth2 token acquired (expires_in=%.0fs).",

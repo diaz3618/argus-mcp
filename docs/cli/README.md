@@ -1,6 +1,6 @@
 # CLI Reference
 
-Argus MCP provides five subcommands:
+Argus MCP provides seven subcommands:
 
 | Command | Description |
 |---------|-------------|
@@ -9,11 +9,13 @@ Argus MCP provides five subcommands:
 | [`argus-mcp status`](server.md#status) | List all running detached sessions |
 | [`argus-mcp tui`](tui.md) | Launch the interactive terminal UI |
 | [`argus-mcp secret`](secret.md) | Manage encrypted secrets |
+| [`argus-mcp build`](server.md#build) | Pre-build container images for stdio backends |
+| [`argus-mcp clean`](server.md#clean) | Remove containers and images created by Argus |
 
 ## Usage
 
 ```
-argus-mcp [-h] {server,stop,status,tui,secret} ...
+argus-mcp [-h] {server,stop,status,tui,secret,build,clean} ...
 ```
 
 ## Global Help

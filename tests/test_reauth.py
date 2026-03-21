@@ -12,7 +12,7 @@ from argus_mcp.bridge.auth.refresh_service import AuthRefreshService
 from argus_mcp.server.management.schemas import ReAuthResponse
 from argus_mcp.tui.events import ReAuthRequired
 
-# ReAuthRequired event ─────────────────────────────────────────────
+# ReAuthRequired event
 
 
 class TestReAuthRequiredEvent:
@@ -26,7 +26,7 @@ class TestReAuthRequiredEvent:
         assert ev.reason == ""
 
 
-# ReAuthCallback type in refresh service ───────────────────────────
+# ReAuthCallback type in refresh service
 
 
 class TestReAuthCallbackInRefreshService:
@@ -80,7 +80,7 @@ class TestReAuthCallbackInRefreshService:
         await svc._sweep()
 
 
-# ReAuthResponse schema ───────────────────────────────────────────
+# ReAuthResponse schema
 
 
 class TestReAuthResponse:
@@ -106,7 +106,7 @@ class TestReAuthResponse:
         assert r2 == r
 
 
-# Management API /reauth/{name} endpoint ──────────────────────────
+# Management API /reauth/{name} endpoint
 
 from argus_mcp.server.management.router import handle_reauth
 
@@ -199,7 +199,7 @@ class TestHandleReauth:
         assert resp.status_code == 500
 
 
-# ArgusService.reauth_backend ─────────────────────────────────────
+# ArgusService.reauth_backend
 
 from argus_mcp.runtime.models import ServiceState
 
@@ -274,7 +274,7 @@ class TestReauthBackend:
         assert "browser failed" in result["error"]
 
 
-# CLI --auto-reauth flag ──────────────────────────────────────────
+# CLI --auto-reauth flag
 
 from argus_mcp.cli import _build_parser
 
@@ -291,7 +291,7 @@ class TestAutoReauthFlag:
         assert args.auto_reauth is True
 
 
-# Management auth mutating suffixes ───────────────────────────────
+# Management auth mutating suffixes
 
 from argus_mcp.server.management.auth import BearerAuthMiddleware
 
@@ -301,7 +301,7 @@ class TestMutatingSuffixes:
         assert "/reauth" in BearerAuthMiddleware._MUTATING_SUFFIXES
 
 
-# TUI ApiClient.post_reauth ───────────────────────────────────────
+# TUI ApiClient.post_reauth
 
 
 class TestApiClientPostReauth:
@@ -330,7 +330,7 @@ class TestApiClientPostReauth:
         assert "reauth/be1" in call_args[0][0]
 
 
-# Auth __init__ exports ───────────────────────────────────────────
+# Auth __init__ exports
 
 
 class TestAuthExports:

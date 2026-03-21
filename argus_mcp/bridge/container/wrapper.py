@@ -41,6 +41,7 @@ from argus_mcp.bridge.container.image_builder import (
 from argus_mcp.bridge.container.network import effective_network
 from argus_mcp.bridge.container.runtime import RuntimeFactory
 from argus_mcp.bridge.container.templates.models import CONTAINER_HOME
+from argus_mcp.constants import EXIT_STACK_CLOSE_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -324,14 +325,14 @@ async def _go_adapter_create(
     # Merge writable-dir env vars with user env
     full_env: Dict[str, str] = {
         "HOME": CONTAINER_HOME,
-        "TMPDIR": "/tmp",
+        "TMPDIR": "/tmp",  # noqa: S108 — container-internal tmpfs, not host /tmp
     }
     if env:
         full_env.update(env)
 
     # Prepend tmpfs-style writable volume mounts
     all_volumes = [
-        "/tmp:/tmp:rw",
+        "/tmp:/tmp:rw",  # noqa: S108 — container-internal tmpfs mount
         f"{CONTAINER_HOME}:{CONTAINER_HOME}:rw",
     ]
     if volumes:
@@ -571,7 +572,7 @@ async def cleanup_container(svr_name: str) -> None:
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        await asyncio.wait_for(proc.wait(), timeout=10.0)
+        await asyncio.wait_for(proc.wait(), timeout=EXIT_STACK_CLOSE_TIMEOUT)
     except Exception:  # noqa: BLE001
         logger.debug(
             "[%s] Failed to cleanup container %s (may already be removed)",

@@ -45,7 +45,7 @@ def _mock_response(json_data: Any, status_code: int = 200) -> httpx.Response:
     )
 
 
-# LLMGuard ───────────────────────────────────────────────────
+# LLMGuard
 
 
 class TestLLMGuardPlugin:
@@ -177,7 +177,7 @@ class TestLLMGuardPlugin:
         await plugin.on_unload()
 
 
-# VirusTotal ──────────────────────────────────────────────────
+# VirusTotal
 
 
 class TestVirusTotalPlugin:
@@ -326,7 +326,7 @@ class TestVirusTotalPlugin:
         await plugin.on_unload()
 
 
-# Cedar Policy ────────────────────────────────────────────────
+# Cedar Policy
 
 
 class TestCedarPolicyPlugin:
@@ -439,7 +439,7 @@ class TestCedarPolicyPlugin:
         await p.on_unload()
 
 
-# ClamAV ─────────────────────────────────────────────────────
+# ClamAV
 
 
 class TestClamAVPlugin:
@@ -597,7 +597,7 @@ class TestClamAVPlugin:
         assert result is ctx
 
 
-# OPA Policy ──────────────────────────────────────────────────
+# OPA Policy
 
 
 class TestOPAPolicyPlugin:
@@ -704,7 +704,7 @@ class TestOPAPolicyPlugin:
         await p.on_unload()
 
 
-# Content Moderation ─────────────────────────────────────────
+# Content Moderation
 
 
 class TestContentModerationPlugin:
@@ -1001,7 +1001,7 @@ class TestContentModerationPlugin:
         assert plugin._extract_text({"nope": 1}) is None
 
 
-# Unified PDP ─────────────────────────────────────────────────
+# Unified PDP
 
 
 class TestUnifiedPDPPlugin:
@@ -1264,7 +1264,7 @@ class TestUnifiedPDPPlugin:
         await plugin.on_unload()
 
 
-# Plugin Registration ────────────────────────────────────────
+# Plugin Registration
 
 
 class TestPluginRegistration:
@@ -1288,7 +1288,7 @@ class TestPluginRegistration:
         assert VirusTotalPlugin is not None
 
 
-# PluginContext ───────────────────────────────────────────────
+# PluginContext
 
 
 class TestPluginContextExternal:

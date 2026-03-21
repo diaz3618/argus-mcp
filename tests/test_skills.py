@@ -11,7 +11,7 @@ import pytest
 from argus_mcp.skills.manager import InstalledSkill, SkillManager, SkillStatus
 from argus_mcp.skills.manifest import SkillManifest, SkillManifestError
 
-# SkillManifest ───────────────────────────────────────────────────────
+# SkillManifest
 
 
 class TestSkillManifest:
@@ -96,7 +96,7 @@ class TestSkillManifest:
             SkillManifest.from_file(str(p))
 
 
-# SkillManager ────────────────────────────────────────────────────────
+# SkillManager
 
 
 def _write_manifest(skill_dir: Any, name: str, **extra: Any) -> None:
@@ -247,7 +247,7 @@ class TestSkillManager:
         assert found[0].status == SkillStatus.DISABLED
 
 
-# InstalledSkill ──────────────────────────────────────────────────────
+# InstalledSkill
 
 
 class TestInstalledSkill:

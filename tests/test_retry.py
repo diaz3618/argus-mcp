@@ -22,7 +22,7 @@ from argus_mcp.bridge.retry import (
 )
 from argus_mcp.config.schema import RetryConfig
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _mock_response(status: int, headers: dict[str, str] | None = None) -> httpx.Response:
@@ -38,7 +38,7 @@ def _mock_client(*responses: httpx.Response) -> httpx.AsyncClient:
     return client
 
 
-# Constants tests ─────────────────────────────────────────────────────
+# Constants tests
 
 
 class TestStatusCodeClassification:
@@ -54,7 +54,7 @@ class TestStatusCodeClassification:
         assert RETRYABLE_STATUS_CODES.isdisjoint(NON_RETRYABLE_STATUS_CODES)
 
 
-# Defaults tests ──────────────────────────────────────────────────────
+# Defaults tests
 
 
 class TestDefaults:
@@ -83,7 +83,7 @@ class TestDefaults:
         assert rm._jitter == 0.2
 
 
-# Success path ────────────────────────────────────────────────────────
+# Success path
 
 
 class TestSuccessPath:
@@ -103,7 +103,7 @@ class TestSuccessPath:
         assert resp.status_code == 201
 
 
-# Non-retryable errors ───────────────────────────────────────────────
+# Non-retryable errors
 
 
 class TestNonRetryable:
@@ -126,7 +126,7 @@ class TestNonRetryable:
         assert exc_info.value.status_code == 418
 
 
-# Retryable errors ───────────────────────────────────────────────────
+# Retryable errors
 
 
 class TestRetryable:
@@ -156,7 +156,7 @@ class TestRetryable:
         assert client.request.call_count == 3
 
 
-# 429 Retry-After ────────────────────────────────────────────────────
+# 429 Retry-After
 
 
 class TestRetryAfter:
@@ -183,7 +183,7 @@ class TestRetryAfter:
         assert resp.status_code == 200
 
 
-# Transport errors ───────────────────────────────────────────────────
+# Transport errors
 
 
 class TestTransportErrors:
@@ -211,7 +211,7 @@ class TestTransportErrors:
         assert client.request.call_count == 3  # initial + 2 retries
 
 
-# Backoff and jitter ─────────────────────────────────────────────────
+# Backoff and jitter
 
 
 class TestBackoff:
@@ -260,7 +260,7 @@ class TestBackoff:
             assert d <= 20.0
 
 
-# Exception types ────────────────────────────────────────────────────
+# Exception types
 
 
 class TestExceptions:
@@ -283,7 +283,7 @@ class TestExceptions:
         assert "503" in str(exc)
 
 
-# Config model tests ─────────────────────────────────────────────────
+# Config model tests
 
 
 class TestRetryConfig:
@@ -322,7 +322,7 @@ class TestRetryConfig:
         assert cfg.retry.enabled is True
 
 
-# Request parameters forwarding ───────────────────────────────────────
+# Request parameters forwarding
 
 
 class TestRequestForwarding:

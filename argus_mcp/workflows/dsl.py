@@ -126,7 +126,6 @@ def parse_workflow(data: Dict[str, Any]) -> WorkflowDefinition:
         seen_ids.add(step.id)
         steps.append(step)
 
-    # Validate dependency references
     for step in steps:
         for dep in step.depends_on:
             if dep not in seen_ids:

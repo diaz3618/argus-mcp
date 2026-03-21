@@ -11,7 +11,7 @@ import pytest
 from argus_mcp.registry.cache import RegistryCache
 from argus_mcp.registry.models import ServerEntry, ServerPage, ToolDefinition
 
-# Models ──────────────────────────────────────────────────────────────
+# Models
 
 
 class TestToolDefinition:
@@ -106,7 +106,7 @@ class TestServerPage:
         assert page.next_cursor is None
 
 
-# Cache ───────────────────────────────────────────────────────────────
+# Cache
 
 
 class TestRegistryCache:
@@ -171,7 +171,7 @@ class TestRegistryCache:
             assert cache.get("https://example.com") is None
 
 
-# Client (with mocked HTTP) ──────────────────────────────────────────
+# Client (with mocked HTTP)
 
 
 class TestRegistryClient:
@@ -273,7 +273,7 @@ class TestRegistryClient:
         assert client._client is None
 
 
-# Client Config Generator ─────────────────────────────────
+# Client Config Generator
 
 
 class TestClientConfigGenerator:

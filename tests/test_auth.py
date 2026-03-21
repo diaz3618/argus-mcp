@@ -18,7 +18,7 @@ from argus_mcp.bridge.auth.provider import (
 )
 from argus_mcp.bridge.auth.token_cache import TokenCache
 
-# TokenCache tests ───────────────────────────────────────────────────
+# TokenCache tests
 
 
 class TestTokenCache:
@@ -55,7 +55,7 @@ class TestTokenCache:
         assert not cache.valid
 
 
-# StaticTokenProvider tests ───────────────────────────────────────
+# StaticTokenProvider tests
 
 
 class TestStaticTokenProvider:
@@ -85,7 +85,7 @@ class TestStaticTokenProvider:
         assert "StaticTokenProvider" in r
 
 
-# OAuth2Provider tests ────────────────────────────────────────────
+# OAuth2Provider tests
 
 
 class TestOAuth2Provider:
@@ -126,7 +126,7 @@ class TestOAuth2Provider:
         provider._fetch_token.assert_not_called()
 
 
-# Factory tests ───────────────────────────────────────────────────
+# Factory tests
 
 
 class TestCreateAuthProvider:
@@ -158,7 +158,7 @@ class TestCreateAuthProvider:
             create_auth_provider({"type": "oauth2", "client_id": "x", "client_secret": "y"})
 
 
-# Redact helper tests ────────────────────────────────────────────
+# Redact helper tests
 
 
 class TestRedact:
@@ -172,7 +172,7 @@ class TestRedact:
         assert len(result) == 10
 
 
-# Config schema tests ────────────────────────────────────────────
+# Config schema tests
 
 
 class TestAuthConfigSchema:
@@ -220,7 +220,7 @@ class TestAuthConfigSchema:
         assert cfg.headers == {"X-Api-Key": "test"}
 
 
-# Merge headers test ─────────────────────────────────────────────
+# Merge headers test
 
 
 class TestMergeHeaders:
@@ -249,7 +249,7 @@ class TestMergeHeaders:
         assert result == {"Authorization": "new", "X-Other": "keep"}
 
 
-# OAuth discovery (discovery.py) ─────────────────────────────────────
+# OAuth discovery (discovery.py)
 
 from unittest.mock import MagicMock, patch
 
@@ -651,7 +651,7 @@ class TestTokenExpiryBufferConfig:
         assert cache2.get() is None
 
 
-# AuthRefreshService tests ───────────────────────────────────────────
+# AuthRefreshService tests
 
 
 class TestAuthRefreshService:
@@ -773,7 +773,7 @@ class TestAuthRefreshService:
         await svc._sweep()  # no error
 
 
-# ServerSettings config field tests ──────────────────────────────────
+# ServerSettings config field tests
 
 
 class TestServerSettingsAuthConfig:
@@ -813,7 +813,7 @@ class TestServerSettingsAuthConfig:
             ServerSettings(auth_background_refresh_interval_seconds=5000.0)
 
 
-# ClientManager refresh service integration tests ────────────────────
+# ClientManager refresh service integration tests
 
 
 class TestClientManagerRefreshIntegration:

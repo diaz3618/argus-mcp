@@ -29,7 +29,7 @@ from argus_mcp.plugins.models import (
 )
 from argus_mcp.plugins.registry import _PLUGIN_CLASSES, PluginRegistry, register_plugin
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_config(
@@ -110,7 +110,7 @@ class _LifecyclePlugin(PluginBase):
         self.unloaded = True
 
 
-# Fixtures ────────────────────────────────────────────────────────────
+# Fixtures
 
 
 @pytest.fixture(autouse=True)

@@ -16,7 +16,7 @@ from argus_mcp._error_utils import safe_query
 logger = logging.getLogger(__name__)
 
 _PHASE_STYLE: Dict[str, tuple] = {
-    "pending": ("◌", "$text-muted"),
+    "pending": ("◌", "dim"),
     "initializing": ("⟳", "yellow"),
     "ready": ("●", "green"),
     "degraded": ("◑", "dark_orange"),
@@ -95,7 +95,7 @@ class BackendStatusWidget(Widget):
         table.clear()
         for b in details:
             phase = b.get("phase", "pending")
-            icon, color = _PHASE_STYLE.get(phase, ("?", "$text-muted"))
+            icon, color = _PHASE_STYLE.get(phase, ("?", "dim"))
             name = b.get("name", "?")
             transport = b.get("type", "?")
             transport_plain = {
@@ -137,7 +137,7 @@ class BackendStatusWidget(Widget):
     def _compute_connection_detail(self) -> tuple[str, str]:
         """Return ``(detail_text, color)`` describing connection status."""
         if self.total == 0:
-            return "No backends configured", "$text-muted"
+            return "No backends configured", "dim"
         if self.connected == self.total:
             return f"All {self.total} connected", "green"
         if self.connected == 0:

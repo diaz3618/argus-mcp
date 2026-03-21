@@ -21,6 +21,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from argus_mcp.constants import STACK_CLOSE_TIMEOUT
+
 logger = logging.getLogger(__name__)
 
 # Cached binary path (resolved once).
@@ -106,7 +108,7 @@ class GoDockerAdapter:
         if self._proc and self._proc.returncode is None:
             self._proc.stdin.close()  # type: ignore[union-attr]
             try:
-                await asyncio.wait_for(self._proc.wait(), timeout=5.0)
+                await asyncio.wait_for(self._proc.wait(), timeout=STACK_CLOSE_TIMEOUT)
             except asyncio.TimeoutError:
                 self._proc.kill()
                 await self._proc.wait()

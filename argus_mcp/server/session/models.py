@@ -7,6 +7,8 @@ from time import monotonic
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
+from argus_mcp.constants import SESSION_DEFAULT_TTL
+
 
 @dataclass
 class MCPSession:
@@ -31,7 +33,7 @@ class MCPSession:
     last_active: float = field(default_factory=monotonic)
     """Monotonic timestamp of last client activity."""
 
-    ttl: float = 1800.0
+    ttl: float = SESSION_DEFAULT_TTL
     """Session time-to-live in seconds (default: 30 minutes)."""
 
     transport_type: str = ""

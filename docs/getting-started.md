@@ -95,6 +95,23 @@ Or point to a specific config file:
 argus-mcp server --config /path/to/my-config.yaml
 ```
 
+Use `-v` to see backend connection progress during startup, or `-vv` for
+full subprocess output:
+
+```bash
+argus-mcp server -v
+```
+
+#### Pre-building Container Images
+
+When container isolation is enabled (the default), each stdio backend's
+container image is built on first startup. To avoid this latency, pre-build
+all images:
+
+```bash
+argus-mcp build
+```
+
 ### 3. Connect an MCP Client
 
 Point any MCP-compatible client at one of the Argus transport endpoints:
@@ -179,6 +196,18 @@ servers config file at `~/.config/argus-mcp/servers.json`:
 
 ```bash
 argus-mcp tui --servers-config ~/.config/argus-mcp/servers.json
+```
+
+## Cleanup
+
+Remove containers and images created by Argus:
+
+```bash
+# Remove containers only
+argus-mcp clean
+
+# Remove everything (containers + images + network)
+argus-mcp clean --all
 ```
 
 ## What's Next?

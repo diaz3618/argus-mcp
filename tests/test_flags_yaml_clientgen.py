@@ -10,7 +10,7 @@ import pytest
 
 from argus_mcp.config.flags import _DEFAULTS, FeatureFlags
 
-# FeatureFlags ────────────────────────────────────────────────────────
+# FeatureFlags
 
 
 class TestFeatureFlagsDefaults:
@@ -75,7 +75,7 @@ class TestFeatureFlagsRepr:
         assert "hot_reload" not in r  # hot_reload is disabled
 
 
-# YAML config loading ────────────────────────────────────────────────
+# YAML config loading
 
 
 class TestReadConfigFile:
@@ -147,7 +147,7 @@ class TestReadConfigFile:
             os.unlink(path)
 
 
-# Client config generator ─────────────────────────────────
+# Client config generator
 
 
 class TestClientConfigGenerator:

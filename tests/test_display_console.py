@@ -19,7 +19,7 @@ from argus_mcp.display.console import (
     log_file_status,
 )
 
-# gen_status_info ─────────────────────────────────────────────────────
+# gen_status_info
 
 
 class TestGenStatusInfo:
@@ -99,7 +99,7 @@ class TestGenStatusInfo:
         assert "route_map" not in info
 
 
-# disp_console_status ────────────────────────────────────────────────
+# disp_console_status
 
 
 class TestDispConsoleStatus:
@@ -167,7 +167,7 @@ class TestDispConsoleStatus:
         assert "fatal crash" in captured.out
 
 
-# log_file_status ─────────────────────────────────────────────────────
+# log_file_status
 
 
 class TestLogFileStatus:

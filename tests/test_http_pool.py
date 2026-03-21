@@ -11,7 +11,7 @@ from argus_mcp.bridge.http_pool import (
     HttpPool,
 )
 
-# Defaults ────────────────────────────────────────────────────────────
+# Defaults
 
 
 class TestDefaults:
@@ -25,7 +25,7 @@ class TestDefaults:
         assert DEFAULT_TIMEOUT == 30.0
 
 
-# Lifecycle ───────────────────────────────────────────────────────────
+# Lifecycle
 
 
 class TestLifecycle:
@@ -61,7 +61,7 @@ class TestLifecycle:
         assert not pool.is_running
 
 
-# Client access ───────────────────────────────────────────────────────
+# Client access
 
 
 class TestClientAccess:
@@ -88,7 +88,7 @@ class TestClientAccess:
             await pool.stop()
 
 
-# Custom configuration ────────────────────────────────────────────────
+# Custom configuration
 
 
 class TestCustomConfig:
@@ -105,7 +105,7 @@ class TestCustomConfig:
             await pool.stop()
 
 
-# Stats ───────────────────────────────────────────────────────────────
+# Stats
 
 
 class TestStats:
@@ -127,7 +127,7 @@ class TestStats:
             await pool.stop()
 
 
-# HttpPoolConfig schema ───────────────────────────────────────────────
+# HttpPoolConfig schema
 
 
 class TestHttpPoolConfig:

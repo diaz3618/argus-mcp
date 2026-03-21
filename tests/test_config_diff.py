@@ -14,7 +14,7 @@ import pytest
 
 from argus_mcp.config.diff import ConfigDiff, compute_diff, configs_differ
 
-# ConfigDiff ──────────────────────────────────────────────────────────
+# ConfigDiff
 
 
 class TestConfigDiff:
@@ -52,7 +52,7 @@ class TestConfigDiff:
             d.added = {"new"}
 
 
-# configs_differ ──────────────────────────────────────────────────────
+# configs_differ
 
 
 class TestConfigsDiffer:
@@ -140,7 +140,7 @@ class TestConfigsDiffer:
         assert configs_differ(old, new) is True
 
 
-# compute_diff ────────────────────────────────────────────────────────
+# compute_diff
 
 
 class TestComputeDiff:

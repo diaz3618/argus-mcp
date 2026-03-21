@@ -29,6 +29,7 @@ from argus_mcp.bridge.container.templates.validation import (
     validate_package_name,
     validate_system_deps,
 )
+from argus_mcp.constants import SHORT_ID_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +225,6 @@ def _vcs_repo_name(specifier: str) -> str:
         # Remove user@host prefix for ssh
         if "@" in path.split("/")[0]:
             path = path.split("@", 1)[1]
-        # Get the last path component
         repo = path.rstrip("/").rsplit("/", 1)[-1]
         return repo.removesuffix(".git")
 
@@ -377,7 +377,6 @@ def generate_uvx_dockerfile(
     rc = runtime_config or RuntimeConfig.for_transport("uvx")
     image = builder_image or rc.builder_image
 
-    # Validate inputs
     package, validated_env, validated_deps = _validate_build_inputs(package, build_env, system_deps)
     validated_build_deps = validate_system_deps(build_system_deps or [])
 
@@ -432,7 +431,6 @@ def generate_npx_dockerfile(
     rc = runtime_config or RuntimeConfig.for_transport("npx")
     image = builder_image or rc.builder_image
 
-    # Validate inputs
     package, validated_env, validated_deps = _validate_build_inputs(package, build_env, system_deps)
     validated_build_deps = validate_system_deps(build_system_deps or [])
 
@@ -495,7 +493,6 @@ def generate_go_dockerfile(
     rc = runtime_config or RuntimeConfig.for_transport("go")
     image = builder_image or rc.builder_image
 
-    # Validate inputs
     go_package, validated_env, validated_deps = _validate_build_inputs(
         go_package, build_env, system_deps
     )
@@ -585,8 +582,8 @@ def generate_source_dockerfile(
             from urllib.parse import urlparse
 
             host = urlparse(source_url).hostname or ""
-        except Exception:  # noqa: BLE001
-            pass
+        except ValueError:  # noqa: BLE001
+            logger.debug("Failed to parse source URL hostname: %s", source_url)
 
     # Derive a package name for tagging from the URL.
     repo_name = source_url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
@@ -621,6 +618,6 @@ def compute_image_tag(
     The tag includes a content hash so that image rebuilds only occur
     when the Dockerfile actually changes (e.g. package version bump).
     """
-    content_hash = hashlib.sha256(dockerfile_content.encode()).hexdigest()[:12]
+    content_hash = hashlib.sha256(dockerfile_content.encode()).hexdigest()[:SHORT_ID_LENGTH]
     sanitized = _sanitize_image_name(_strip_version(package))
     return f"{IMAGE_PREFIX}/{transport}-{sanitized}:{content_hash}"

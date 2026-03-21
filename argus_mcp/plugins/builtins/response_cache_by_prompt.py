@@ -21,6 +21,16 @@ from argus_mcp.plugins.models import PluginConfig
 
 logger = logging.getLogger(__name__)
 
+# Rust-accelerated JSON+SHA256 hashing (optional)
+try:
+    from hash_rs import json_sha256 as _rust_json_sha256
+
+    _USE_RUST_HASH = True
+    logger.debug("Rust cache key hasher loaded")
+except ImportError:
+    _USE_RUST_HASH = False
+    _rust_json_sha256 = None  # type: ignore[assignment]
+
 
 class ResponseCachePlugin(PluginBase):
     """TTL-based response cache keyed by capability + arguments hash."""
@@ -37,6 +47,8 @@ class ResponseCachePlugin(PluginBase):
     @staticmethod
     def _make_key(server: str, capability: str, arguments: dict) -> str:
         """Deterministic cache key from server + capability + sorted args."""
+        if _USE_RUST_HASH:
+            return _rust_json_sha256(server, capability, arguments)
         raw = json.dumps(
             {"s": server, "c": capability, "a": arguments},
             sort_keys=True,

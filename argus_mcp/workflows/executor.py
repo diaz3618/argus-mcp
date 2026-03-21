@@ -112,7 +112,6 @@ class WorkflowExecutor:
                 logger.debug("Step '%s' skipped (condition false)", step.id)
                 return StepResult(step_id=step.id, status=StepStatus.SKIPPED)
 
-        # Check if dependencies all succeeded
         for dep_id in step.depends_on:
             dep_result = results.get(dep_id)
             if dep_result and dep_result.status == StepStatus.FAILED:
@@ -128,7 +127,6 @@ class WorkflowExecutor:
         # Interpolate arguments
         resolved_args = self._interpolate(step.args, context)
 
-        # Execute with retry
         last_error: Optional[str] = None
         attempts = 1 + step.retry
 
@@ -160,6 +158,7 @@ class WorkflowExecutor:
                     attempts,
                     duration,
                     exc,
+                    exc_info=True,
                 )
 
         return StepResult(

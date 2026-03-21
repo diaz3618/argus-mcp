@@ -39,13 +39,17 @@ import asyncio
 import base64
 import hashlib
 import logging
+import os
 import secrets
+import sys
 import webbrowser
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlencode, urlparse
+
+from argus_mcp.constants import DEFAULT_TOKEN_EXPIRES_IN, STACK_CLOSE_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +60,54 @@ _DEFAULT_PORT = 0  # OS picks ephemeral port
 _AUTH_TIMEOUT = 120.0  # seconds to wait for browser callback
 
 
+def _is_headless() -> bool:
+    """Return ``True`` when no graphical browser is likely available.
+
+    Checks for SSH sessions, missing DISPLAY on Linux, and non-TTY stdin.
+    """
+    if os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"):
+        return True
+    if (
+        sys.platform.startswith("linux")
+        and not os.environ.get("DISPLAY")
+        and not os.environ.get("WAYLAND_DISPLAY")
+    ):
+        return True
+    return False
+
+
+def _present_auth_url(auth_url: str, redirect_uri: str) -> None:
+    """Present the OAuth authorization URL with headless-environment support.
+
+    In graphical environments, opens the browser automatically.
+    In headless environments (SSH, Docker, CI), prints the URL to
+    stderr so the user can copy-paste it into a browser.
+    """
+    headless = _is_headless()
+
+    if headless:
+        print(
+            "\n" + "=" * 60,
+            "\n  OAUTH AUTHORIZATION REQUIRED",
+            "\n" + "=" * 60,
+            f"\n  Open this URL in a browser:\n\n    {auth_url}\n",
+            f"\n  Callback listening on: {redirect_uri}",
+            "\n" + "=" * 60 + "\n",
+            file=sys.stderr,
+        )
+        logger.info(
+            "Headless environment detected — browser not opened.\n"
+            "  Authorization URL printed to stderr.",
+        )
+    else:
+        logger.info(
+            "Opening browser for OAuth authorization…\n  URL: %s\n  Listening on %s for callback.",
+            auth_url,
+            redirect_uri,
+        )
+        webbrowser.open(auth_url)
+
+
 @dataclass
 class TokenSet:
     """Result of a successful OAuth token exchange."""
@@ -63,7 +115,7 @@ class TokenSet:
     access_token: str
     token_type: str = "Bearer"
     refresh_token: str = ""
-    expires_in: float = 3600.0
+    expires_in: float = float(DEFAULT_TOKEN_EXPIRES_IN)
     scope: str = ""
     raw: Dict[str, Any] = field(default_factory=dict)
 
@@ -293,15 +345,8 @@ class PKCEFlow:
 
             auth_url = f"{self._auth_endpoint}?{urlencode(auth_params)}"
 
-            # Launch browser
-            logger.info(
-                "Opening browser for OAuth authorization…\n"
-                "  URL: %s\n"
-                "  Listening on %s for callback.",
-                auth_url,
-                redirect_uri,
-            )
-            webbrowser.open(auth_url)
+            # Present auth URL (opens browser or prints to stderr in headless)
+            _present_auth_url(auth_url, redirect_uri)
 
             # Wait for callback
             try:
@@ -323,7 +368,6 @@ class PKCEFlow:
             if not result or "code" not in result:
                 raise RuntimeError("No authorization code received.")
 
-            # Verify state
             if result.get("state") != state:
                 raise RuntimeError("OAuth state mismatch — possible CSRF attack.")
 
@@ -336,7 +380,7 @@ class PKCEFlow:
 
         finally:
             server.shutdown()
-            server_thread.join(timeout=5.0)
+            server_thread.join(timeout=STACK_CLOSE_TIMEOUT)
             # Clear pre-bound state so a fresh server is used on retry
             self._server = None
             self._redirect_uri = None
@@ -385,7 +429,7 @@ class PKCEFlow:
             access_token=payload["access_token"],
             token_type=payload.get("token_type", "Bearer"),
             refresh_token=payload.get("refresh_token", ""),
-            expires_in=float(payload.get("expires_in", 3600)),
+            expires_in=float(payload.get("expires_in", DEFAULT_TOKEN_EXPIRES_IN)),
             scope=payload.get("scope", ""),
             raw=payload,
         )
@@ -433,7 +477,7 @@ async def refresh_access_token(
         access_token=payload["access_token"],
         token_type=payload.get("token_type", "Bearer"),
         refresh_token=payload.get("refresh_token", refresh_token),
-        expires_in=float(payload.get("expires_in", 3600)),
+        expires_in=float(payload.get("expires_in", DEFAULT_TOKEN_EXPIRES_IN)),
         scope=payload.get("scope", ""),
         raw=payload,
     )

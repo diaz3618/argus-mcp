@@ -36,7 +36,7 @@ from argus_mcp.server.management.router import (
     management_routes,
 )
 
-# _sse_format helper ─────────────────────────────────────────────────
+# _sse_format helper
 
 
 class TestSseFormat:
@@ -64,7 +64,7 @@ class TestSseFormat:
                 assert parsed["count"] == 42
 
 
-# management_routes ───────────────────────────────────────────────────
+# management_routes
 
 
 class TestManagementRoutes:
@@ -99,7 +99,7 @@ class TestManagementRoutes:
                 break
 
 
-# handle_health ───────────────────────────────────────────────────────
+# handle_health
 
 
 class TestHandleHealth:
@@ -143,7 +143,7 @@ class TestHandleHealth:
         assert data["status"] == "unhealthy"
 
 
-# handle_status ───────────────────────────────────────────────────────
+# handle_status
 
 
 class TestHandleStatus:
@@ -182,7 +182,7 @@ class TestHandleStatus:
         assert "transport" in data
 
 
-# _get_service / _error_json helpers ──────────────────────────────────
+# _get_service / _error_json helpers
 
 
 class TestGetService:
@@ -212,7 +212,7 @@ class TestErrorJson:
         assert resp.status_code == 400
 
 
-# handle_health — additional scenarios ────────────────────────────────
+# handle_health — additional scenarios
 
 
 class TestHandleHealthExtra:
@@ -247,7 +247,7 @@ class TestHandleHealthExtra:
         assert data["status"] == "healthy"
 
 
-# handle_backends ─────────────────────────────────────────────────────
+# handle_backends
 
 
 class TestHandleBackends:
@@ -354,7 +354,7 @@ class TestHandleBackends:
         assert data["backends"][0]["phase"] == "ready"
 
 
-# handle_groups ───────────────────────────────────────────────────────
+# handle_groups
 
 
 class TestHandleGroups:
@@ -401,7 +401,7 @@ class TestHandleGroups:
         assert data["total_groups"] == 1
 
 
-# handle_capabilities ────────────────────────────────────────────────
+# handle_capabilities
 
 
 class TestHandleCapabilities:
@@ -511,7 +511,7 @@ class TestHandleCapabilities:
         assert len(data2["tools"]) == 0
 
 
-# handle_events ───────────────────────────────────────────────────────
+# handle_events
 
 
 class TestHandleEvents:
@@ -555,7 +555,7 @@ class TestHandleEvents:
         assert resp.status_code == 400
 
 
-# handle_reload ───────────────────────────────────────────────────────
+# handle_reload
 
 
 class TestHandleReload:
@@ -586,7 +586,7 @@ class TestHandleReload:
         assert resp.status_code == 503
 
 
-# handle_reconnect ────────────────────────────────────────────────────
+# handle_reconnect
 
 
 class TestHandleReconnect:
@@ -637,7 +637,7 @@ class TestHandleReconnect:
         assert resp.status_code == 404
 
 
-# handle_shutdown ─────────────────────────────────────────────────────
+# handle_shutdown
 
 
 class TestHandleShutdown:
@@ -682,7 +682,7 @@ class TestHandleShutdown:
         assert resp.status_code == 400
 
 
-# handle_sessions ─────────────────────────────────────────────────────
+# handle_sessions
 
 
 class TestHandleSessions:

@@ -108,7 +108,7 @@ class TelemetryConfig:
 
         if not success.is_set():
             if error:
-                logger.warning("OTel initialization failed: %s", error[0])
+                logger.warning("OTel initialization failed: %s", error[0], exc_info=error[0])
             else:
                 logger.warning(
                     "OTel initialization timed out after %ds — "

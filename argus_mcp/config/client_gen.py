@@ -42,7 +42,7 @@ def generate_client_config(
     host / port:
         Argus's listening address.
     transport:
-        ``sse`` or ``streamable-http``.
+        sse or streamable-http.
     server_name:
         Display name used in the client config.
     """

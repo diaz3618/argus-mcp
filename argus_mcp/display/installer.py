@@ -11,6 +11,7 @@ Color scheme (non-monotone):
 
 from __future__ import annotations
 
+import re
 import sys
 import time
 from enum import Enum
@@ -19,7 +20,15 @@ from typing import Any, Callable, Dict, List, Optional, TextIO
 from rich.console import Console, Group, RenderableType
 from rich.live import Live
 from rich.spinner import Spinner
+from rich.table import Table
 from rich.text import Text
+
+from argus_mcp.display.braille import (
+    render_empty_bar,
+    render_progress_bar,
+    render_scattered_bar,
+    render_solid_bar,
+)
 
 
 class DisplayPhase(str, Enum):
@@ -31,6 +40,25 @@ class DisplayPhase(str, Enum):
     READY = "ready"
     FAILED = "failed"
     SKIPPED = "skipped"
+
+
+# progress for non-remote backends.
+# each phase transition represents a discrete progress step.
+_PARALLEL_PHASE_PROGRESS: Dict[DisplayPhase, float] = {
+    DisplayPhase.INITIALIZING: 0.4,
+    DisplayPhase.DOWNLOADING: 0.7,
+    DisplayPhase.RETRYING: 0.3,
+}
+
+# BuildKit --progress=plain output: "#6 [2/8] RUN apt-get update"
+_BUILDKIT_STEP_RE = re.compile(r"\[(\d+)/(\d+)\]")
+
+# Shared column widths for consistent alignment between parallel and completed tables
+_COL_ICON = 2
+_COL_NAME = 42
+_COL_BAR = 19
+_COL_STATUS = 36
+_COL_TIMER = 7
 
 
 class RuntimeKind(str, Enum):
@@ -160,7 +188,16 @@ _STYLES: Dict[RuntimeKind, _RuntimeStyle] = {
 class _BackendEntry:
     """Tracks state for one backend in the display."""
 
-    __slots__ = ("name", "runtime", "style", "phase", "message", "start_time", "end_time")
+    __slots__ = (
+        "name",
+        "runtime",
+        "style",
+        "phase",
+        "message",
+        "start_time",
+        "end_time",
+        "build_progress",
+    )
 
     def __init__(self, name: str, runtime: RuntimeKind) -> None:
         self.name = name
@@ -170,6 +207,7 @@ class _BackendEntry:
         self.message = "Pending..."
         self.start_time: float = 0.0  # set on first non-PENDING phase
         self.end_time: float = 0.0  # frozen on terminal phase
+        self.build_progress: float = 0.0  # 0.0→1.0 for local builds
 
 
 class InstallerDisplay:
@@ -195,6 +233,8 @@ class InstallerDisplay:
         backends: Dict[str, Dict[str, Any]],
         stream: TextIO = sys.stderr,
         verbose: bool = False,
+        parallel: bool = False,
+        verbosity: int | None = None,
     ) -> None:
         self._console = Console(stderr=True, file=stream)
         self._entries: Dict[str, _BackendEntry] = {}
@@ -202,8 +242,24 @@ class InstallerDisplay:
         self._live: Optional[Live] = None
         self._finalized = False
         self._build_lines: Dict[str, List[str]] = {}
-        self._max_build_lines = 15
-        self._verbose = verbose
+        self._parallel = parallel
+        self._all_terminal_at: Optional[float] = None
+
+        # Resolve verbosity: explicit int wins, else derive from bool flag
+        if verbosity is not None:
+            self._verbosity = verbosity
+        else:
+            self._verbosity = 1 if verbose else 0
+
+        # Build-line visibility per design doc Section 7
+        if self._parallel:
+            # Parallel: 0=no lines, 1=5 lines (focused), 2=10 lines (all)
+            self._max_build_lines = {0: 0, 1: 5}.get(self._verbosity, 10)
+        else:
+            # Sequential: 0=no lines, 1=15 lines, 2=30 lines
+            self._max_build_lines = {0: 0, 1: 15}.get(self._verbosity, 30)
+
+        self._last_focused_builder: Optional[str] = None
 
         # Sequential expand/collapse state
         self._active_name: Optional[str] = None
@@ -219,30 +275,202 @@ class InstallerDisplay:
         _type_prio = {"streamable-http": 0, "sse": 1}
         self._ordered.sort(key=lambda e: _type_prio.get(backends[e.name].get("type", "stdio"), 2))
 
-    def _format_completed_line(self, entry: _BackendEntry) -> Text:
-        """Return a Rich Text for a terminal-state backend line."""
+    def _format_completed_line(self, entry: _BackendEntry) -> Table:
+        """Return a Rich Table row for a terminal-state backend line."""
         elapsed = (
             (entry.end_time or time.monotonic()) - entry.start_time if entry.start_time else 0.0
         )
         mins, secs = divmod(int(elapsed), 60)
         style = entry.style
-        label = f"Connecting {entry.name} ({style.label}):"
 
         if entry.phase == DisplayPhase.READY:
-            icon = "[bold bright_green]\u2713[/]"
-            status = "Ready"
+            icon = Text("\u2713", style="bold bright_green")
+            verb = "Connected"
+            status = Text("Ready", style="bold bright_green")
         elif entry.phase == DisplayPhase.FAILED:
-            icon = "[bold red]\u2717[/]"
-            status = entry.message or "Failed"
+            icon = Text("\u2717", style="bold red")
+            verb = "Connecting"
+            status = Text(entry.message or "Failed", style="bold red")
         else:
-            icon = "[dim]-[/]"
-            status = "Skipped"
+            icon = Text("-", style="dim")
+            verb = "Connecting"
+            status = Text("Skipped", style="dim")
 
-        line = f"  {icon} [{style.name_style}]{label:<42}[/] {status} 0:{mins:02d}:{secs:02d}"
-        return Text.from_markup(line)
+        label = Text.from_markup(f"{verb} [{style.name_style}]{entry.name}[/] ({style.label}):")
+        timer = f"{mins}:{secs:02d}"
+
+        tbl = Table(show_header=False, box=None, pad_edge=False, expand=False)
+        tbl.add_column(width=_COL_ICON, justify="center")  # Icon
+        tbl.add_column(width=_COL_NAME, justify="left", no_wrap=True)  # Label
+        tbl.add_column(width=_COL_STATUS, justify="left")  # Status
+        tbl.add_column(width=_COL_TIMER, justify="right")  # Timer
+        tbl.add_row(icon, label, status, timer)
+        return tbl
+
+    # Parallel rendering
+
+    _TERMINAL_PHASES = frozenset({DisplayPhase.READY, DisplayPhase.FAILED, DisplayPhase.SKIPPED})
+    _IN_PROGRESS_PHASES = frozenset(
+        {
+            DisplayPhase.INITIALIZING,
+            DisplayPhase.DOWNLOADING,
+            DisplayPhase.RETRYING,
+        }
+    )
+
+    @staticmethod
+    def _parallel_entry_cells(
+        entry: "_BackendEntry",
+        elapsed: float,
+    ) -> tuple[Text, Text, RenderableType, Text, str]:
+        """Return (icon, verb_name, bar, status, timer) for one entry row."""
+        style = entry.style
+        mins, secs = divmod(int(elapsed), 60)
+        timer = f"{mins}:{secs:02d}"
+        name_tag = f"[{style.name_style}]{entry.name}[/] ({style.label}):"
+
+        phase = entry.phase
+        if phase == DisplayPhase.READY:
+            return (
+                Text("\u2713", style="bold bright_green"),
+                Text.from_markup(f"Connected {name_tag}"),
+                render_solid_bar(style=style.spinner_style),
+                Text("Ready", style="bold bright_green"),
+                timer,
+            )
+        if phase == DisplayPhase.FAILED:
+            return (
+                Text("\u2717", style="bold red"),
+                Text.from_markup(f"Connecting {name_tag}"),
+                render_solid_bar(style="bold red"),
+                Text(entry.message or "Failed", style="bold red"),
+                timer,
+            )
+        if phase == DisplayPhase.SKIPPED:
+            return (
+                Text("-", style="dim"),
+                Text.from_markup(f"Connecting {name_tag}"),
+                render_empty_bar(),
+                Text("Skipped", style="dim"),
+                timer,
+            )
+        if phase == DisplayPhase.PENDING:
+            return (
+                Text("\u2026", style="dim"),
+                Text.from_markup(f"Pending {name_tag}"),
+                render_empty_bar(),
+                Text("Pending...", style="dim"),
+                "",
+            )
+        if phase == DisplayPhase.BUILDING:
+            return (
+                Text("\u2026", style=style.spinner_style),
+                Text.from_markup(f"Deploying {name_tag}"),
+                render_progress_bar(
+                    entry.build_progress,
+                    monotone_style=style.spinner_style,
+                ),
+                Text(entry.message or "Building...", style=style.status_style),
+                timer,
+            )
+        # INITIALIZING, DOWNLOADING, RETRYING
+        if entry.runtime == RuntimeKind.REMOTE:
+            # Remote backends: scattered (no real progress to track)
+            bar = render_scattered_bar(elapsed, monotone_style=style.spinner_style)
+        else:
+            # Non-remote backends: phase-based progress
+            bar = render_progress_bar(
+                _PARALLEL_PHASE_PROGRESS.get(phase, 0.3),
+                monotone_style=style.spinner_style,
+            )
+        return (
+            Text("\u2026", style=style.spinner_style),
+            Text.from_markup(f"Connecting {name_tag}"),
+            bar,
+            Text(
+                entry.message or f"{phase.value.title()}...",
+                style=style.status_style,
+            ),
+            timer,
+        )
+
+    def _render_build_output(self) -> List[RenderableType]:
+        """Return build-log lines for the current verbosity level."""
+        parts: List[RenderableType] = []
+        limit = self._max_build_lines
+
+        if self._verbosity >= 2:
+            for entry in self._ordered:
+                if entry.phase == DisplayPhase.BUILDING:
+                    lines = self._build_lines.get(entry.name, [])
+                    if lines:
+                        parts.append(Text(""))
+                        parts.append(
+                            Text.from_markup(f"  [{entry.style.name_style}]{entry.name}[/]:")
+                        )
+                        for ln in lines[-limit:]:
+                            parts.append(Text(f"    {ln}", style="dim"))
+        elif self._verbosity >= 1 and self._last_focused_builder:
+            lines = self._build_lines.get(self._last_focused_builder, [])
+            if lines:
+                entry = self._entries[self._last_focused_builder]
+                parts.append(Text(""))
+                parts.append(
+                    Text.from_markup(
+                        f"  [{entry.style.name_style}]{self._last_focused_builder}[/]:"
+                    )
+                )
+                for ln in lines[-limit:]:
+                    parts.append(Text(f"    {ln}", style="dim"))
+        return parts
+
+    def _build_parallel_renderable(self) -> RenderableType:
+        """Render all backends simultaneously with braille progress bars."""
+        now = time.monotonic()
+
+        # Detect all-terminal transition
+        if self._all_terminal_at is None and all(
+            e.phase in self._TERMINAL_PHASES for e in self._ordered
+        ):
+            self._all_terminal_at = now
+
+        # After 0.5s hold in all-terminal, suppress bar column (State 3)
+        show_bars = self._all_terminal_at is None or (now - self._all_terminal_at) <= 0.5
+
+        table = Table(
+            show_header=False,
+            box=None,
+            pad_edge=False,
+            expand=False,
+        )
+        table.add_column(width=_COL_ICON, justify="center")
+        table.add_column(width=_COL_NAME, justify="left", no_wrap=True)
+        if show_bars:
+            table.add_column(width=_COL_BAR, justify="left")
+        table.add_column(width=_COL_STATUS, justify="left")
+        table.add_column(width=_COL_TIMER, justify="right")
+
+        for entry in self._ordered:
+            elapsed = (entry.end_time or now) - entry.start_time if entry.start_time else 0.0
+            icon, verb_name, bar, status, timer = self._parallel_entry_cells(entry, elapsed)
+            if show_bars:
+                table.add_row(icon, verb_name, bar, status, timer)
+            else:
+                table.add_row(icon, verb_name, status, timer)
+
+        if self._max_build_lines == 0:
+            return table
+
+        build_parts = self._render_build_output()
+        if build_parts:
+            return Group(table, *build_parts)
+        return table
 
     def _build_renderable(self) -> RenderableType:
         """Render all visible backends in config order inside the Live area."""
+        if self._parallel:
+            return self._build_parallel_renderable()
+
         parts: List[RenderableType] = []
 
         for entry in self._ordered:
@@ -259,11 +487,12 @@ class InstallerDisplay:
             if self._active_name == entry.name and self._active_spinner is not None:
                 parts.append(self._active_spinner)
                 # Build output lines (for docker builds)
-                lines = self._build_lines.get(entry.name, [])
-                if lines:
-                    visible = lines[-self._max_build_lines :]
-                    for ln in visible:
-                        parts.append(Text(f"    {ln}", style="dim"))
+                if self._max_build_lines > 0:
+                    lines = self._build_lines.get(entry.name, [])
+                    if lines:
+                        visible = lines[-self._max_build_lines :]
+                        for ln in visible:
+                            parts.append(Text(f"    {ln}", style="dim"))
                 continue
 
             # In-progress but not active: dim status line
@@ -320,7 +549,7 @@ class InstallerDisplay:
         summary = self._build_runtime_summary()
         self._console.print(f"\n[bold]Backend operations:[/bold] {total} connections ({summary})\n")
 
-        fps = 12 if self._verbose else 4
+        fps = 12 if self._verbosity >= 1 else (8 if self._parallel else 4)
         self._live = Live(
             Text(""),
             console=self._console,
@@ -372,6 +601,46 @@ class InstallerDisplay:
                 style=style.spinner_style,
             )
 
+    def _apply_phase_update(
+        self,
+        entry: _BackendEntry,
+        phase: str,
+        name: str,
+    ) -> None:
+        """Parse *phase* string and update *entry* state, clearing stale build output."""
+        try:
+            new_phase = DisplayPhase(phase)
+        except ValueError:
+            return
+        # Clear build output when leaving BUILDING phase
+        if new_phase != DisplayPhase.BUILDING and name in self._build_lines:
+            del self._build_lines[name]
+        # Record the start time on first non-PENDING phase
+        if entry.phase == DisplayPhase.PENDING and new_phase != DisplayPhase.PENDING:
+            entry.start_time = time.monotonic()
+        entry.phase = new_phase
+
+    def _handle_build_output(self, entry: _BackendEntry, name: str) -> None:
+        """Accumulate build log lines, parse progress, and manage focused-builder."""
+        if entry.message:
+            lines = self._build_lines.setdefault(name, [])
+            if not lines:
+                lines.append(f"$ docker build -t argus-mcp-{name} .")
+                lines.append("")
+            lines.append(entry.message)
+            if len(lines) > 200:
+                del lines[:100]
+
+            # RC-1: Parse BuildKit step pattern to compute build_progress
+            m = _BUILDKIT_STEP_RE.search(entry.message)
+            if m:
+                current, total = int(m.group(1)), int(m.group(2))
+                if total > 0:
+                    entry.build_progress = min(current / total, 1.0)
+
+        if self._parallel:
+            self._last_focused_builder = name
+
     def update(
         self,
         name: str,
@@ -384,42 +653,28 @@ class InstallerDisplay:
         if entry is None or self._finalized or self._live is None:
             return
 
-        # Parse the new phase
         if phase is not None:
-            try:
-                new_phase = DisplayPhase(phase)
-                # Clear build output when leaving BUILDING phase
-                if new_phase != DisplayPhase.BUILDING and name in self._build_lines:
-                    del self._build_lines[name]
-                # Record the start time on first non-PENDING phase
-                if entry.phase == DisplayPhase.PENDING and new_phase != DisplayPhase.PENDING:
-                    entry.start_time = time.monotonic()
-                entry.phase = new_phase
-            except ValueError:
-                pass
+            self._apply_phase_update(entry, phase, name)
 
         if message is not None:
             entry.message = message
 
         if entry.phase in (DisplayPhase.READY, DisplayPhase.FAILED):
-            self._collapse_to_completed(name, entry)
+            if self._parallel:
+                entry.end_time = time.monotonic()
+            else:
+                self._collapse_to_completed(name, entry)
             self._refresh()
             return
 
         if entry.phase == DisplayPhase.BUILDING:
-            if entry.message:
-                lines = self._build_lines.setdefault(name, [])
-                if not lines:
-                    lines.append(f"$ docker build -t argus-mcp-{name} .")
-                    lines.append("")
-                lines.append(entry.message)
-                if len(lines) > 200:
-                    del lines[:100]
+            self._handle_build_output(entry, name)
 
-        if entry.phase == DisplayPhase.BUILDING:
-            self._set_active(name, entry)
-        elif self._active_name is None or self._active_name == name:
-            self._set_active(name, entry)
+        if not self._parallel:
+            if entry.phase == DisplayPhase.BUILDING:
+                self._set_active(name, entry)
+            elif self._active_name is None or self._active_name == name:
+                self._set_active(name, entry)
         self._refresh()
 
     def finalize(self) -> None:

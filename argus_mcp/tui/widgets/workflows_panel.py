@@ -405,7 +405,6 @@ class WorkflowsPanel(Widget):
                     prefix="⚡",
                     style="bright_yellow",
                 )
-                # Show arguments (truncated)
                 for k, v in arguments.items():
                     val_str = str(v)
                     if len(val_str) > 80:

@@ -73,3 +73,17 @@ MGMT_EVENTS_LIMIT_MAX = 10_000
 MGMT_SHUTDOWN_TIMEOUT_MIN = 1
 MGMT_SHUTDOWN_TIMEOUT_MAX = 300
 MGMT_BACKEND_NAME_MAX_LEN = 255
+MGMT_QUERY_PARAM_MAX_LEN = 255
+
+# Short ID length for UUID/hash truncation (used in request IDs, catalog IDs, etc.)
+SHORT_ID_LENGTH = 12
+
+# Default OAuth token expiry (seconds)
+DEFAULT_TOKEN_EXPIRES_IN = 3600
+
+# Async context-manager close timeouts
+STACK_CLOSE_TIMEOUT = 5.0  # seconds for individual AsyncExitStack cleanup
+EXIT_STACK_CLOSE_TIMEOUT = 10.0  # seconds for heavier top-level exit stack cleanup
+
+# Session default time-to-live
+SESSION_DEFAULT_TTL = 1800.0  # 30 minutes

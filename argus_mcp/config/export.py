@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set
 from pydantic import BaseModel, Field
 
 from argus_mcp.config.schema import ArgusConfig
+from argus_mcp.constants import SHORT_ID_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class ExportFilter(BaseModel):
 class ExportResult(BaseModel):
     """Result of an export operation."""
 
-    export_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    export_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:SHORT_ID_LENGTH])
     exported_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
     )

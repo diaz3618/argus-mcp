@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from argus_mcp.bridge.auth.pkce import TokenSet
+from argus_mcp.constants import DEFAULT_TOKEN_EXPIRES_IN
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ class TokenStore:
             access_token=data["access_token"],
             token_type=data.get("token_type", "Bearer"),
             refresh_token=data.get("refresh_token", ""),
-            expires_in=data.get("expires_in", 3600),
+            expires_in=data.get("expires_in", DEFAULT_TOKEN_EXPIRES_IN),
             scope=data.get("scope", ""),
         )
 

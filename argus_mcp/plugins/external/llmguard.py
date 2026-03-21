@@ -79,8 +79,8 @@ class LLMGuardPlugin(PluginBase):
             resp = await self._client.post("/analyze/prompt", json=payload)
             resp.raise_for_status()
             data = resp.json()
-        except Exception:
-            logger.warning("LLMGuard service unavailable during %s scan.", phase)
+        except Exception:  # noqa: BLE001
+            logger.warning("LLMGuard service unavailable during %s scan.", phase, exc_info=True)
             return
 
         results = data.get("results", [])

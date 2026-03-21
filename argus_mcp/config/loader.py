@@ -27,6 +27,16 @@ from argus_mcp.errors import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
+# Rust-accelerated YAML parsing (optional)
+try:
+    from yaml_rs import parse_yaml as _rust_parse_yaml
+
+    _USE_RUST_YAML = True
+    logger.debug("Rust YAML parser loaded")
+except ImportError:
+    _USE_RUST_YAML = False
+    _rust_parse_yaml = None  # type: ignore[assignment]
+
 # Recognised config file extensions.
 _YAML_EXTS = frozenset({".yaml", ".yml"})
 
@@ -68,7 +78,11 @@ def _read_config_file(cfg_fpath: str) -> Dict[str, Any]:
 
     try:
         with open(cfg_fpath, "r", encoding="utf-8") as f:
-            raw_data = yaml.safe_load(f)
+            content = f.read()
+        if _USE_RUST_YAML:
+            raw_data = _rust_parse_yaml(content)
+        else:
+            raw_data = yaml.safe_load(content)
     except (OSError, yaml.YAMLError) as exc:
         raise ConfigurationError(f"Error reading configuration file: {cfg_fpath}\n  {exc}") from exc
 

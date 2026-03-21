@@ -249,6 +249,7 @@ class RegistryClient:
                 self._rtype,
                 path,
                 exc,
+                exc_info=True,
             )
             return self._fallback_page()
 
@@ -278,7 +279,7 @@ class RegistryClient:
             resp.raise_for_status()
             return _entry_from_raw(self._rtype, resp.json(), resp.json())
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Registry get_server(%s) failed: %s", name, exc)
+            logger.warning("Registry get_server(%s) failed: %s", name, exc, exc_info=True)
             return self._fallback_server(name)
 
     async def search(
@@ -300,6 +301,7 @@ class RegistryClient:
             page = _parse_page(self._rtype, resp.json())
             return page.servers
         except Exception:  # noqa: BLE001
+            logger.debug("Registry search failed, falling back to cache", exc_info=True)
             cached = self._fallback_page().servers
             q = query.lower()
             return [s for s in cached if q in s.name.lower() or q in s.description.lower()]

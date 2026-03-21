@@ -30,7 +30,7 @@ from argus_mcp.runtime.models import (
     is_valid_transition,
 )
 
-# ServiceState ────────────────────────────────────────────────────────
+# ServiceState
 
 
 class TestServiceState:
@@ -77,7 +77,7 @@ class TestServiceState:
             assert state in _VALID_TRANSITIONS
 
 
-# BackendPhase ────────────────────────────────────────────────────────
+# BackendPhase
 
 
 class TestBackendPhase:
@@ -132,7 +132,7 @@ class TestBackendPhase:
             assert phase in _BACKEND_TRANSITIONS
 
 
-# BackendInfo ─────────────────────────────────────────────────────────
+# BackendInfo
 
 
 class TestBackendInfo:
@@ -160,7 +160,7 @@ class TestBackendInfo:
         assert round_trip == info
 
 
-# BackendCondition ────────────────────────────────────────────────────
+# BackendCondition
 
 
 class TestBackendCondition:
@@ -181,7 +181,7 @@ class TestBackendCondition:
         assert d["type"] == "check"
 
 
-# BackendStatusRecord ────────────────────────────────────────────────
+# BackendStatusRecord
 
 
 class TestBackendStatusRecord:
@@ -281,7 +281,7 @@ class TestBackendStatusRecord:
         assert len(d["conditions"]) == 1
 
 
-# CapabilityInfo ──────────────────────────────────────────────────────
+# CapabilityInfo
 
 
 class TestCapabilityInfo:
@@ -304,7 +304,7 @@ class TestCapabilityInfo:
         assert cap.route_map["t1"] == ("backend-a", "orig_t1")
 
 
-# ServiceStatus ───────────────────────────────────────────────────────
+# ServiceStatus
 
 
 class TestServiceStatus:

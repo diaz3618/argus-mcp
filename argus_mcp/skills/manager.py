@@ -107,7 +107,6 @@ class SkillManager:
 
         manifest = SkillManifest.from_file(manifest_path)
 
-        # Validate
         errors = manifest.validate()
         if errors:
             raise SkillManifestError(f"Invalid manifest for '{manifest.name}': {'; '.join(errors)}")

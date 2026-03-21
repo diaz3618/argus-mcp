@@ -61,7 +61,8 @@ argus_mcp/
 ├── sessions.py          # Named detached-session registry (stop/status)
 │
 ├── config/              # Configuration system
-│   ├── loader.py        # JSON/YAML loading, validation
+│   ├── loader.py        # JSON/YAML loading, validation (Rust-accelerated YAML)
+│   ├── _yaml_rs/        # Rust crate: serde_yaml-based YAML parser (PyO3)
 │   ├── schema.py        # Top-level ArgusConfig Pydantic model
 │   ├── schema_backends.py  # Backend config models (stdio, SSE, streamable-http)
 │   ├── schema_client.py    # Client/TUI config models
@@ -129,7 +130,8 @@ argus_mcp/
 │
 ├── audit/               # Audit logging
 │   ├── models.py        # AuditEvent (NIST SP 800-53)
-│   └── logger.py        # JSONL writer with rotation
+│   ├── logger.py        # JSONL writer with rotation (Rust-accelerated serialization)
+│   └── _audit_rs/       # Rust crate: serde_json audit event serializer (PyO3)
 │
 ├── secrets/             # Secret management
 │   ├── store.py         # SecretStore facade
@@ -311,6 +313,76 @@ Deploy with the Helm chart in `charts/argus-mcp/`. The gateway connects to
 remote backends only (no stdio in-cluster). Probes use `/ready` (readiness)
 and `/manage/v1/health` (liveness). See [Kubernetes deployment](../kubernetes.md).
 
+## Rust Acceleration Layer
+
+Performance-critical paths use optional Rust extensions built with
+[PyO3](https://pyo3.rs/) and [maturin](https://maturin.rs/). Every Rust
+crate ships with an `abi3-py311` stable ABI wheel and falls back to a
+pure-Python implementation when the native extension is unavailable.
+
+```
+argus_mcp/
+├── config/
+│   └── _yaml_rs/           # YAML → Python dict (serde_yaml → json.loads)
+├── audit/
+│   └── _audit_rs/           # Audit event JSON serialization (serde_json)
+├── plugins/
+│   ├── _filter_rs/          # PII / secrets regex scanning
+│   ├── _hash_rs/            # JSON + SHA-256 cache key generation
+│   └── builtins/
+│       └── _circuit_breaker_rs/  # Circuit breaker state machine
+├── bridge/
+│   └── auth/
+│       └── _token_cache_rs/     # Token cache with TTL
+```
+
+### Fallback Pattern
+
+Each module uses a try/except import guard so the gateway works with or
+without compiled extensions:
+
+```python
+try:
+    from yaml_rs import parse_yaml as _rust_parse_yaml
+    _USE_RUST_YAML = True
+except ImportError:
+    _USE_RUST_YAML = False
+```
+
+Call sites branch on the flag:
+
+```python
+if _USE_RUST_YAML:
+    data = _rust_parse_yaml(text)
+else:
+    data = yaml.safe_load(text)
+```
+
+### Benchmark Summary
+
+| Module              | Python p50 (µs) | Rust p50 (µs) | Speedup    |
+|---------------------|------------------|---------------|------------|
+| YAML config parsing | 1037             | 25            | **41.9×**  |
+| Audit serialization | 8.2              | 7.7           | 1.1×       |
+| Cache key hashing   | 8.2              | 10.2          | 0.8×       |
+
+YAML parsing shows the largest gain because it replaces Python's pure-Python
+YAML parser with Rust's `serde_yaml` + `serde_json` pipeline.  Sub-10 µs
+operations like hashing and audit serialization are dominated by FFI
+crossing overhead.
+
+### Building the Extensions
+
+```bash
+# Build all Rust crates in release mode
+cd argus_mcp/config/_yaml_rs && maturin develop --release
+cd argus_mcp/audit/_audit_rs && maturin develop --release
+cd argus_mcp/plugins/_hash_rs && maturin develop --release
+```
+
+Each crate's `Cargo.toml` enables LTO (`lto = "fat"`) and
+`codegen-units = 1` for maximum optimization.
+
 ## Design Principles
 
 | Principle | Implementation |
@@ -324,3 +396,4 @@ and `/manage/v1/health` (liveness). See [Kubernetes deployment](../kubernetes.md
 | **Defense in depth** | Auth → AuthZ → Audit → Recovery → Container isolation |
 | **Graceful degradation** | Backend failures don't crash the gateway |
 | **Operational visibility** | Management API + TUI + audit logs + health checks |
+| **Optional native acceleration** | Rust extensions for hot paths, pure-Python fallback always available |

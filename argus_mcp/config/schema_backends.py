@@ -306,7 +306,7 @@ class ContainerConfig(BaseModel):
         ),
     )
 
-    # --- source_url + build_steps + entrypoint + build_env ---
+    # source_url + build_steps + entrypoint + build_env
 
     source_url: Optional[str] = Field(
         default=None,
@@ -347,7 +347,7 @@ class ContainerConfig(BaseModel):
         description=("Git ref to checkout after cloning source_url (branch, tag, or commit SHA)."),
     )
 
-    # --- dockerfile escape hatch ---
+    # dockerfile escape hatch
 
     dockerfile: Optional[str] = Field(
         default=None,

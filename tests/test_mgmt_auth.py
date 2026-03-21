@@ -20,7 +20,7 @@ from argus_mcp.server.management.auth import (
     resolve_token,
 )
 
-# resolve_token ───────────────────────────────────────────────────────
+# resolve_token
 
 
 class TestResolveToken:
@@ -39,7 +39,7 @@ class TestResolveToken:
         assert result == "" or result is None
 
 
-# PUBLIC_PATH_SUFFIXES ────────────────────────────────────────────────
+# PUBLIC_PATH_SUFFIXES
 
 
 class TestPublicPaths:
@@ -53,7 +53,7 @@ class TestPublicPaths:
         assert isinstance(PUBLIC_PATH_SUFFIXES, frozenset)
 
 
-# BearerAuthMiddleware ────────────────────────────────────────────────
+# BearerAuthMiddleware
 
 
 class TestBearerAuthMiddleware:

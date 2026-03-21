@@ -15,6 +15,7 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.constants import (
     SERVER_NAME,
     SERVER_VERSION,
@@ -322,7 +323,6 @@ class ArgusApp(App):
         if saved_theme in self.available_themes:
             self.theme = saved_theme
 
-        # Ensure we have a ServerManager
         self._ensure_server_manager()
 
         # DEFAULT_MODE already switches to dashboard; initialize
@@ -392,7 +392,6 @@ class ArgusApp(App):
         else:
             info.status_text = "No servers configured"
 
-        # Update the server selector widget
         self._refresh_server_selector()
 
         # Kick off the initial connection + polling
@@ -412,10 +411,9 @@ class ArgusApp(App):
                 self.run_worker(self._server_manager.close_all(), exclusive=True)
 
         # Stop capturing print()
-        try:
-            self.screen.query_one(EventLogWidget).stop_capture()
-        except Exception:  # NoMatches, ScreenStackError, etc.
-            pass
+        ew = safe_query(self.screen, "EventLogWidget", EventLogWidget)
+        if ew is not None:
+            ew.stop_capture()
 
     def _start_polling(self) -> None:
         """Begin the initial connection and periodic polling."""
@@ -714,7 +712,6 @@ class ArgusApp(App):
         self._caps_loaded = False
         self._seen_event_ids.clear()
 
-        # Update the info panel
         entry = mgr.active_entry
         if entry:
             try:
@@ -736,7 +733,6 @@ class ArgusApp(App):
         # Force an immediate poll
         self.run_worker(self._poll_once(), exclusive=True, name="poll-switch")
 
-        # Refresh selector display
         self._refresh_server_selector()
 
     def on_capabilities_ready(self, event: CapabilitiesReady) -> None:

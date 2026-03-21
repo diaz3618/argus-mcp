@@ -206,7 +206,6 @@ def stop_session(
         logger.error("Failed to signal PID %d: %s", info.pid, exc)
         return False
 
-    # Wait for exit
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if not info.is_alive():
@@ -232,3 +231,124 @@ def check_port_conflict(host: str, port: int) -> Optional[SessionInfo]:
         if info.port == port and (info.host == host or info.host == "0.0.0.0"):  # noqa: S104 — wildcard bind matches any host
             return info
     return None
+
+
+@dataclass
+class OrphanProcess:
+    """A running argus-mcp process not tracked by the session system."""
+
+    pid: int
+    cmdline: str
+    started: str = ""
+
+    def is_alive(self) -> bool:
+        try:
+            os.kill(self.pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+
+def discover_server_processes() -> list[OrphanProcess]:
+    """Scan ``/proc`` for running ``argus_mcp`` server processes.
+
+    Returns processes that look like an Argus MCP server but are
+    **not** tracked by a session file.  This catches orphan servers
+    started via ``python -m argus_mcp server`` directly, or whose
+    session JSON was cleaned up prematurely.
+    """
+    tracked_pids: set[int] = {s.pid for s in list_sessions()}
+    my_pid = os.getpid()
+    orphans: list[OrphanProcess] = []
+
+    proc = "/proc"
+    if not os.path.isdir(proc):
+        return orphans
+
+    for entry in os.listdir(proc):
+        if not entry.isdigit():
+            continue
+        pid = int(entry)
+        if pid == my_pid or pid in tracked_pids:
+            continue
+
+        cmdline_path = os.path.join(proc, entry, "cmdline")
+        try:
+            with open(cmdline_path, "rb") as fh:
+                raw = fh.read()
+        except (OSError, PermissionError):
+            continue
+
+        parts = raw.replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+        if not parts:
+            continue
+
+        # Match: python ... argus_mcp ... server  (the main entry point)
+        if "argus_mcp" not in parts:
+            continue
+        if "server" not in parts:
+            continue
+        # Exclude pytest, test runners, grep, etc.
+        if "pytest" in parts or "grep" in parts or "tail " in parts:
+            continue
+
+        # Read start time from /proc/<pid>/stat
+        started = ""
+        stat_path = os.path.join(proc, entry, "stat")
+        try:
+            with open(stat_path, encoding="utf-8") as sf:
+                _ = sf.read()
+            # Field 22 is starttime in clock ticks — use /proc/uptime instead
+        except OSError:
+            pass
+
+        # Best-effort: read creation time of /proc/<pid> directory
+        try:
+            ctime = os.stat(os.path.join(proc, entry)).st_mtime
+            from datetime import datetime, timezone
+
+            started = datetime.fromtimestamp(ctime, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        except OSError:
+            pass
+
+        orphans.append(OrphanProcess(pid=pid, cmdline=parts, started=started))
+
+    return orphans
+
+
+def stop_pid(pid: int, *, timeout: float = 3.0, force: bool = False) -> bool:
+    """Stop an arbitrary process by PID (SIGTERM then SIGKILL).
+
+    Returns *True* if the process exited.
+    """
+    sig = signal.SIGKILL if force else signal.SIGTERM
+    try:
+        os.kill(pid, sig)
+    except ProcessLookupError:
+        return True
+    except OSError as exc:
+        logger.error("Failed to signal PID %d: %s", pid, exc)
+        return False
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.1)
+
+    if not force:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+        time.sleep(0.3)
+
+    try:
+        os.kill(pid, 0)
+        return False
+    except ProcessLookupError:
+        return True

@@ -99,7 +99,7 @@ class TestArgusConfigNewFields:
         assert cfg.secrets.strict is True
 
 
-# Secret resolution wiring in loader ─────────────────────────────────
+# Secret resolution wiring in loader
 
 
 class TestMaybeResolveSecrets:
@@ -143,7 +143,7 @@ class TestMaybeResolveSecrets:
         assert result["backends"]["srv"]["token"] == "plain-value"
 
 
-# Network isolation env-var enforcement ───────────────────────────────
+# Network isolation env-var enforcement
 
 
 class TestApplyNetworkEnv:
@@ -195,7 +195,7 @@ class TestApplyNetworkEnv:
         assert result is params
 
 
-# ConfigSyncUpdate Textual message ────────────────────────────────────
+# ConfigSyncUpdate Textual message
 
 
 class TestConfigSyncUpdate:
@@ -219,7 +219,7 @@ class TestConfigSyncUpdate:
         assert msg.sync_type == "changed"
 
 
-# Lifespan wiring: VersionChecker + SkillManager + Telemetry ─────────
+# Lifespan wiring: VersionChecker + SkillManager + Telemetry
 
 
 class TestLifespanWiring:
@@ -405,7 +405,7 @@ class TestLifespanWiring:
         mock_logger.warning.assert_not_called()
 
 
-# Config file change emits config_sync event ─────────────────────────
+# Config file change emits config_sync event
 
 
 class TestConfigSyncEventEmission:

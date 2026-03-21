@@ -12,7 +12,7 @@ import pytest
 from argus_mcp.runtime.models import ServiceState, is_valid_transition
 from argus_mcp.runtime.service import ArgusService, _InvalidStateTransition
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _dummy_config() -> Dict[str, Any]:
@@ -23,7 +23,7 @@ def _dummy_config() -> Dict[str, Any]:
     }
 
 
-# _InvalidStateTransition ────────────────────────────────────────────
+# _InvalidStateTransition
 
 
 class TestInvalidStateTransition:
@@ -38,7 +38,7 @@ class TestInvalidStateTransition:
         assert exc.target == ServiceState.PENDING
 
 
-# ArgusService.__init__ ──────────────────────────────────────────────
+# ArgusService.__init__
 
 
 class TestInit:
@@ -66,7 +66,7 @@ class TestInit:
         assert svc.registry is not None
 
 
-# _transition ────────────────────────────────────────────────────────
+# _transition
 
 
 class TestTransition:
@@ -90,7 +90,7 @@ class TestTransition:
         assert "starting" in status_events[-1]["message"]
 
 
-# _build_registry ────────────────────────────────────────────────────
+# _build_registry
 
 
 class TestBuildRegistry:
@@ -125,7 +125,7 @@ class TestBuildRegistry:
         mock_strategy.assert_called_once()
 
 
-# _build_group_manager ───────────────────────────────────────────────
+# _build_group_manager
 
 
 class TestBuildGroupManager:
@@ -154,7 +154,7 @@ class TestBuildGroupManager:
         assert gm is not None
 
 
-# start ───────────────────────────────────────────────────────────────
+# start
 
 
 class TestStart:
@@ -258,7 +258,7 @@ class TestStart:
         assert svc.state == ServiceState.RUNNING
 
 
-# stop ────────────────────────────────────────────────────────────────
+# stop
 
 
 class TestStop:
@@ -357,7 +357,7 @@ class TestStop:
         assert "kaboom" in (svc.error_message or "")
 
 
-# reload ──────────────────────────────────────────────────────────────
+# reload
 
 
 class TestReload:
@@ -432,7 +432,7 @@ class TestReload:
         assert any("Config reload failed" in e for e in result["errors"])
 
 
-# reconnect_backend ───────────────────────────────────────────────────
+# reconnect_backend
 
 
 class TestReconnectBackend:
@@ -508,7 +508,7 @@ class TestReconnectBackend:
         assert "RuntimeError" in result["error"]
 
 
-# shutdown ────────────────────────────────────────────────────────────
+# shutdown
 
 
 class TestShutdown:
@@ -537,7 +537,7 @@ class TestShutdown:
         assert "timed out" in (svc.error_message or "")
 
 
-# _disconnect_backend / _connect_backend ──────────────────────────────
+# _disconnect_backend / _connect_backend
 
 
 class TestBackendHelpers:
@@ -579,7 +579,7 @@ class TestBackendHelpers:
         assert result is False
 
 
-# get_status ──────────────────────────────────────────────────────────
+# get_status
 
 
 class TestGetStatus:
@@ -619,7 +619,7 @@ class TestGetStatus:
         assert status.backends == []
 
 
-# _on_health_change ───────────────────────────────────────────────────
+# _on_health_change
 
 
 class TestOnHealthChange:
@@ -643,7 +643,7 @@ class TestOnHealthChange:
         assert any("be1" in e["message"] for e in events)
 
 
-# Event system ────────────────────────────────────────────────────────
+# Event system
 
 
 class TestEventSystem:
@@ -729,7 +729,7 @@ class TestEventSystem:
         assert small_q.qsize() == 1
 
 
-# wait_until_ready ────────────────────────────────────────────────────
+# wait_until_ready
 
 
 class TestWaitUntilReady:
@@ -759,7 +759,7 @@ class TestWaitUntilReady:
         assert result is True
 
 
-# is_valid_transition (model-level) ───────────────────────────────────
+# is_valid_transition (model-level)
 
 
 class TestIsValidTransition:

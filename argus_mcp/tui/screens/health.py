@@ -249,6 +249,7 @@ class HealthScreen(ArgusScreen):
             with open(config_path) as fh:
                 data = yaml.safe_load(fh) or {}
         except Exception as exc:
+            logger.debug("Config read failed", exc_info=True)
             self.app.notify(f"Config read error: {exc}", severity="error")
             return
 
@@ -262,6 +263,7 @@ class HealthScreen(ArgusScreen):
             with open(config_path, "w") as fh:
                 yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
         except Exception as exc:
+            logger.debug("Config write failed", exc_info=True)
             self.app.notify(f"Config write error: {exc}", severity="error")
             return
 
@@ -310,7 +312,6 @@ class HealthScreen(ArgusScreen):
         async def _restart() -> None:
             import asyncio
 
-            # Send shutdown
             try:
                 await client.post_shutdown(timeout_seconds=5.0)
             except (OSError, ConnectionError, ApiClientError):

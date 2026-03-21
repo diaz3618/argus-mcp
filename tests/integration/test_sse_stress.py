@@ -22,7 +22,7 @@ from argus_mcp.server.sse_resilience import (
 pytestmark = [pytest.mark.stress]
 
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _mock_send_stream(delay: float = 0.0) -> AsyncMock:
@@ -46,7 +46,7 @@ def _mock_recv_stream() -> AsyncMock:
     return stream
 
 
-# GuardedWriteStream stress ───────────────────────────────────────────
+# GuardedWriteStream stress
 
 
 class TestGuardedWriteStreamStress:
@@ -99,7 +99,6 @@ class TestGuardedWriteStreamStress:
             spin_threshold=threshold,
             metrics=metrics,
         )
-        # Send more than threshold
         for i in range(threshold + 10):
             await guard.send(f"msg-{i}")
         assert metrics.spin_loop_warnings > 0
@@ -143,7 +142,7 @@ class TestGuardedWriteStreamStress:
         assert metrics.messages_sent == 50
 
 
-# SseResilience orchestrator stress ───────────────────────────────────
+# SseResilience orchestrator stress
 
 
 class TestSseResilienceStress:
@@ -190,7 +189,7 @@ class TestSseResilienceStress:
         await resilience.cleanup_with_deadline(slow_cleanup())
 
 
-# SseStreamMetrics ────────────────────────────────────────────────────
+# SseStreamMetrics
 
 
 class TestSseStreamMetricsStress:

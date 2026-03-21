@@ -26,6 +26,7 @@ from argus_mcp.bridge.subprocess_utils import (
 from argus_mcp.constants import (
     MCP_INIT_TIMEOUT,
     SSE_LOCAL_START_DELAY,
+    STACK_CLOSE_TIMEOUT,
     STARTUP_TIMEOUT,
     STDIO_MCP_INIT_TIMEOUT,
 )
@@ -299,7 +300,7 @@ async def prepare_backend_stack(
     old_stack = backend_stacks.pop(svr_name, None)
     if old_stack is not None:
         try:
-            await asyncio.wait_for(old_stack.aclose(), timeout=5.0)
+            await asyncio.wait_for(old_stack.aclose(), timeout=STACK_CLOSE_TIMEOUT)
         except Exception:  # noqa: BLE001
             logger.debug(
                 "[%s] Error closing previous backend stack (benign).",
@@ -491,12 +492,12 @@ async def start_backend_svr(
         )
         return False
 
-    except BaseException as e_start:  # noqa: BLE001
+    except BaseException as exc:  # noqa: BLE001
         reason = await handle_base_exception(
             svr_name,
             svr_conf,
             svr_type,
-            e_start,
+            exc,
             shutdown_requested,
             auth_discovery_tasks,
             discovered_auth,

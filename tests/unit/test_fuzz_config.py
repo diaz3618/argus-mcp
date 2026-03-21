@@ -25,7 +25,7 @@ from argus_mcp.config.schema import (
 pytestmark = [pytest.mark.fuzz]
 
 
-# Hypothesis strategies ───────────────────────────────────────────────
+# Hypothesis strategies
 
 # Finite floats excluding NaN/Inf (Pydantic rejects them).
 _finite_float = st.floats(allow_nan=False, allow_infinity=False)
@@ -33,7 +33,7 @@ _finite_pos_float = st.floats(min_value=0.0, allow_nan=False, allow_infinity=Fal
 _any_int = st.integers()
 
 
-# RetryConfig ─────────────────────────────────────────────────────────
+# RetryConfig
 
 
 class TestRetryConfigFuzz:
@@ -97,7 +97,7 @@ class TestRetryConfigFuzz:
             RetryConfig(jitter=jitter)
 
 
-# SseResilienceConfig ─────────────────────────────────────────────────
+# SseResilienceConfig
 
 
 class TestSseResilienceConfigFuzz:
@@ -165,7 +165,7 @@ class TestSseResilienceConfigFuzz:
             SseResilienceConfig(spin_loop_threshold=spin_loop_threshold)
 
 
-# SessionPoolConfig ───────────────────────────────────────────────────
+# SessionPoolConfig
 
 
 class TestSessionPoolConfigFuzz:
@@ -196,7 +196,7 @@ class TestSessionPoolConfigFuzz:
             SessionPoolConfig(per_key_max=per_key_max)
 
 
-# HttpPoolConfig ──────────────────────────────────────────────────────
+# HttpPoolConfig
 
 
 class TestHttpPoolConfigFuzz:
@@ -221,7 +221,7 @@ class TestHttpPoolConfigFuzz:
         assert 1.0 <= cfg.timeout <= 300.0
 
 
-# AuditConfig ─────────────────────────────────────────────────────────
+# AuditConfig
 
 
 class TestAuditConfigFuzz:
@@ -244,7 +244,7 @@ class TestAuditConfigFuzz:
             AuditConfig(max_size_mb=max_size_mb)
 
 
-# ArgusConfig.backends name validation ────────────────────────────────
+# ArgusConfig.backends name validation
 
 
 class TestArgusConfigBackendNameFuzz:
@@ -253,7 +253,6 @@ class TestArgusConfigBackendNameFuzz:
     @given(name=st.text(min_size=1).filter(lambda s: s.strip() == s and s.strip()))
     @settings(max_examples=100)
     def test_non_empty_trimmed_names_accepted(self, name: str) -> None:
-        # Build a minimal stdio backend for the name
         backends = {
             name: {
                 "type": "stdio",

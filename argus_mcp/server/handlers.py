@@ -75,7 +75,6 @@ def register_handlers(mcp_server: McpServer) -> None:
             raise BackendServerError("Registry is not initialized")
         tools = mcp_server.registry.get_aggregated_tools()
 
-        # Append composite workflow tools (if any are loaded)
         state = get_state(mcp_server)
         composite_tools = state.composite_tools
         for ct in composite_tools:

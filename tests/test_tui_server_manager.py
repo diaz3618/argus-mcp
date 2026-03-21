@@ -17,7 +17,7 @@ import pytest
 
 from argus_mcp.tui.server_manager import ServerEntry, ServerManager
 
-# ServerEntry ─────────────────────────────────────────────────────────
+# ServerEntry
 
 
 class TestServerEntry:
@@ -34,7 +34,7 @@ class TestServerEntry:
         assert entry.token == "abc"
 
 
-# ServerManager basics ────────────────────────────────────────────────
+# ServerManager basics
 
 
 class TestServerManagerBasics:
@@ -126,7 +126,7 @@ class TestServerManagerBasics:
         assert "hacked" not in mgr.entries
 
 
-# active_client property ──────────────────────────────────────────────
+# active_client property
 
 
 class TestActiveClient:
@@ -143,7 +143,7 @@ class TestActiveClient:
         assert mgr.active_client is entry.client
 
 
-# mark_connected / mark_disconnected ──────────────────────────────────
+# mark_connected / mark_disconnected
 
 
 class TestMarkMethods:
@@ -166,7 +166,7 @@ class TestMarkMethods:
         mgr.mark_connected("ghost")  # should not raise
 
 
-# Persistence ─────────────────────────────────────────────────────────
+# Persistence
 
 
 class TestPersistence:
@@ -222,7 +222,7 @@ class TestPersistence:
         assert "ok" in mgr.entries
 
 
-# Connection lifecycle ────────────────────────────────────────────────
+# Connection lifecycle
 
 
 class TestConnectionLifecycle:
@@ -300,7 +300,7 @@ class TestConnectionLifecycle:
         assert results["b"] is None  # success
 
 
-# Factory methods ─────────────────────────────────────────────────────
+# Factory methods
 
 
 class TestFactoryMethods:

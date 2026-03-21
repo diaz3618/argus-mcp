@@ -21,6 +21,7 @@ from argus_mcp.config.schema_backends import (
     StdioBackendConfig,
     StreamableHttpBackendConfig,
 )
+from argus_mcp.constants import SHORT_ID_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class ImportItemResult(BaseModel):
 class ImportResult(BaseModel):
     """Aggregate result of an import operation."""
 
-    import_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    import_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:SHORT_ID_LENGTH])
     imported_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(),
     )
@@ -183,6 +184,260 @@ def parse_import_payload(
     return data
 
 
+def _import_backends(
+    target: ArgusConfig,
+    raw_backends: Any,
+    strategy: ConflictStrategy,
+    dry_run: bool,
+) -> List[ImportItemResult]:
+    """Import backend entries, handling conflict resolution."""
+    if not isinstance(raw_backends, dict):
+        return []
+    items: List[ImportItemResult] = []
+    existing_names = set(target.backends.keys())
+    for name, raw_cfg in raw_backends.items():
+        if not isinstance(raw_cfg, dict):
+            items.append(
+                ImportItemResult(
+                    name=name,
+                    entity_type="backend",
+                    status=ImportItemStatus.FAILED,
+                    error="Backend config must be a mapping",
+                )
+            )
+            continue
+
+        try:
+            validated = _parse_backend(name, raw_cfg)
+        except (ValidationError, ImportValidationError) as exc:
+            items.append(
+                ImportItemResult(
+                    name=name,
+                    entity_type="backend",
+                    status=ImportItemStatus.FAILED,
+                    error=str(exc),
+                )
+            )
+            continue
+
+        if name in existing_names:
+            if strategy == ConflictStrategy.FAIL:
+                items.append(
+                    ImportItemResult(
+                        name=name,
+                        entity_type="backend",
+                        status=ImportItemStatus.FAILED,
+                        error=f"Backend '{name}' already exists",
+                    )
+                )
+                continue
+            if strategy == ConflictStrategy.SKIP:
+                items.append(
+                    ImportItemResult(
+                        name=name,
+                        entity_type="backend",
+                        status=ImportItemStatus.SKIPPED,
+                    )
+                )
+                continue
+            if strategy == ConflictStrategy.RENAME:
+                new_name = _generate_rename(name, existing_names)
+                if not dry_run:
+                    target.backends[new_name] = validated
+                existing_names.add(new_name)
+                items.append(
+                    ImportItemResult(
+                        name=name,
+                        entity_type="backend",
+                        status=ImportItemStatus.RENAMED,
+                        new_name=new_name,
+                    )
+                )
+                continue
+            # UPDATE
+            if not dry_run:
+                target.backends[name] = validated
+            items.append(
+                ImportItemResult(
+                    name=name,
+                    entity_type="backend",
+                    status=ImportItemStatus.UPDATED,
+                )
+            )
+            continue
+
+        if not dry_run:
+            target.backends[name] = validated
+        existing_names.add(name)
+        items.append(
+            ImportItemResult(
+                name=name,
+                entity_type="backend",
+                status=ImportItemStatus.ADDED,
+            )
+        )
+    return items
+
+
+def _import_registries(
+    target: ArgusConfig,
+    raw_registries: Any,
+    strategy: ConflictStrategy,
+    dry_run: bool,
+) -> List[ImportItemResult]:
+    """Import registry entries, handling conflict resolution."""
+    if not isinstance(raw_registries, list):
+        return []
+    items: List[ImportItemResult] = []
+    existing_names = {r.name for r in target.registries}
+    for idx, raw_reg in enumerate(raw_registries):
+        if not isinstance(raw_reg, dict):
+            items.append(
+                ImportItemResult(
+                    name=f"registry[{idx}]",
+                    entity_type="registry",
+                    status=ImportItemStatus.FAILED,
+                    error="Registry entry must be a mapping",
+                )
+            )
+            continue
+
+        reg_name = raw_reg.get("name", f"registry_{idx}")
+        try:
+            validated_reg = RegistryEntryConfig(**raw_reg)
+        except ValidationError as exc:
+            items.append(
+                ImportItemResult(
+                    name=reg_name,
+                    entity_type="registry",
+                    status=ImportItemStatus.FAILED,
+                    error=str(exc),
+                )
+            )
+            continue
+
+        if reg_name in existing_names:
+            if strategy == ConflictStrategy.FAIL:
+                items.append(
+                    ImportItemResult(
+                        name=reg_name,
+                        entity_type="registry",
+                        status=ImportItemStatus.FAILED,
+                        error=f"Registry '{reg_name}' already exists",
+                    )
+                )
+                continue
+            if strategy == ConflictStrategy.SKIP:
+                items.append(
+                    ImportItemResult(
+                        name=reg_name,
+                        entity_type="registry",
+                        status=ImportItemStatus.SKIPPED,
+                    )
+                )
+                continue
+            if strategy == ConflictStrategy.UPDATE:
+                if not dry_run:
+                    target.registries = [
+                        validated_reg if r.name == reg_name else r for r in target.registries
+                    ]
+                items.append(
+                    ImportItemResult(
+                        name=reg_name,
+                        entity_type="registry",
+                        status=ImportItemStatus.UPDATED,
+                    )
+                )
+                continue
+            # RENAME
+            new_name = _generate_rename(reg_name, existing_names)
+            validated_reg = validated_reg.model_copy(update={"name": new_name})
+            if not dry_run:
+                target.registries.append(validated_reg)
+            existing_names.add(new_name)
+            items.append(
+                ImportItemResult(
+                    name=reg_name,
+                    entity_type="registry",
+                    status=ImportItemStatus.RENAMED,
+                    new_name=new_name,
+                )
+            )
+            continue
+
+        if not dry_run:
+            target.registries.append(validated_reg)
+        existing_names.add(reg_name)
+        items.append(
+            ImportItemResult(
+                name=reg_name,
+                entity_type="registry",
+                status=ImportItemStatus.ADDED,
+            )
+        )
+    return items
+
+
+def _import_feature_flags(
+    target: ArgusConfig,
+    raw_flags: Any,
+    strategy: ConflictStrategy,
+    dry_run: bool,
+) -> List[ImportItemResult]:
+    """Import feature flag entries, handling conflict resolution."""
+    if not isinstance(raw_flags, dict):
+        return []
+    items: List[ImportItemResult] = []
+    for flag_name, flag_value in raw_flags.items():
+        if not isinstance(flag_value, bool):
+            items.append(
+                ImportItemResult(
+                    name=flag_name,
+                    entity_type="feature_flag",
+                    status=ImportItemStatus.FAILED,
+                    error="Feature flag value must be boolean",
+                )
+            )
+            continue
+
+        if flag_name in target.feature_flags:
+            if strategy == ConflictStrategy.SKIP:
+                items.append(
+                    ImportItemResult(
+                        name=flag_name,
+                        entity_type="feature_flag",
+                        status=ImportItemStatus.SKIPPED,
+                    )
+                )
+                continue
+            if strategy == ConflictStrategy.FAIL:
+                items.append(
+                    ImportItemResult(
+                        name=flag_name,
+                        entity_type="feature_flag",
+                        status=ImportItemStatus.FAILED,
+                        error=f"Feature flag '{flag_name}' already exists",
+                    )
+                )
+                continue
+
+        status = (
+            ImportItemStatus.UPDATED
+            if flag_name in target.feature_flags
+            else ImportItemStatus.ADDED
+        )
+        if not dry_run:
+            target.feature_flags[flag_name] = flag_value
+        items.append(
+            ImportItemResult(
+                name=flag_name,
+                entity_type="feature_flag",
+                status=status,
+            )
+        )
+    return items
+
+
 def import_config(
     target: ArgusConfig,
     payload: Dict[str, Any],
@@ -236,237 +491,17 @@ def import_config(
         return result
 
     if "backends" in entity_types and "backends" in payload:
-        raw_backends = payload["backends"]
-        if isinstance(raw_backends, dict):
-            existing_names = set(target.backends.keys())
-            for name, raw_cfg in raw_backends.items():
-                if not isinstance(raw_cfg, dict):
-                    result.items.append(
-                        ImportItemResult(
-                            name=name,
-                            entity_type="backend",
-                            status=ImportItemStatus.FAILED,
-                            error="Backend config must be a mapping",
-                        )
-                    )
-                    continue
-
-                # Validate the backend config
-                try:
-                    validated = _parse_backend(name, raw_cfg)
-                except (ValidationError, ImportValidationError) as exc:
-                    result.items.append(
-                        ImportItemResult(
-                            name=name,
-                            entity_type="backend",
-                            status=ImportItemStatus.FAILED,
-                            error=str(exc),
-                        )
-                    )
-                    continue
-
-                # Handle conflicts
-                if name in existing_names:
-                    if conflict_strategy == ConflictStrategy.FAIL:
-                        result.items.append(
-                            ImportItemResult(
-                                name=name,
-                                entity_type="backend",
-                                status=ImportItemStatus.FAILED,
-                                error=f"Backend '{name}' already exists",
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.SKIP:
-                        result.items.append(
-                            ImportItemResult(
-                                name=name,
-                                entity_type="backend",
-                                status=ImportItemStatus.SKIPPED,
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.RENAME:
-                        new_name = _generate_rename(name, existing_names)
-                        if not dry_run:
-                            target.backends[new_name] = validated
-                        existing_names.add(new_name)
-                        result.items.append(
-                            ImportItemResult(
-                                name=name,
-                                entity_type="backend",
-                                status=ImportItemStatus.RENAMED,
-                                new_name=new_name,
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.UPDATE:
-                        if not dry_run:
-                            target.backends[name] = validated
-                        result.items.append(
-                            ImportItemResult(
-                                name=name,
-                                entity_type="backend",
-                                status=ImportItemStatus.UPDATED,
-                            )
-                        )
-                        continue
-
-                # No conflict — add
-                if not dry_run:
-                    target.backends[name] = validated
-                existing_names.add(name)
-                result.items.append(
-                    ImportItemResult(
-                        name=name,
-                        entity_type="backend",
-                        status=ImportItemStatus.ADDED,
-                    )
-                )
-
+        result.items.extend(
+            _import_backends(target, payload["backends"], conflict_strategy, dry_run)
+        )
     if "registries" in entity_types and "registries" in payload:
-        raw_registries = payload["registries"]
-        if isinstance(raw_registries, list):
-            existing_reg_names = {r.name for r in target.registries}
-            for idx, raw_reg in enumerate(raw_registries):
-                if not isinstance(raw_reg, dict):
-                    result.items.append(
-                        ImportItemResult(
-                            name=f"registry[{idx}]",
-                            entity_type="registry",
-                            status=ImportItemStatus.FAILED,
-                            error="Registry entry must be a mapping",
-                        )
-                    )
-                    continue
-
-                reg_name = raw_reg.get("name", f"registry_{idx}")
-                try:
-                    validated_reg = RegistryEntryConfig(**raw_reg)
-                except ValidationError as exc:
-                    result.items.append(
-                        ImportItemResult(
-                            name=reg_name,
-                            entity_type="registry",
-                            status=ImportItemStatus.FAILED,
-                            error=str(exc),
-                        )
-                    )
-                    continue
-
-                if reg_name in existing_reg_names:
-                    if conflict_strategy == ConflictStrategy.FAIL:
-                        result.items.append(
-                            ImportItemResult(
-                                name=reg_name,
-                                entity_type="registry",
-                                status=ImportItemStatus.FAILED,
-                                error=f"Registry '{reg_name}' already exists",
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.SKIP:
-                        result.items.append(
-                            ImportItemResult(
-                                name=reg_name,
-                                entity_type="registry",
-                                status=ImportItemStatus.SKIPPED,
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.UPDATE:
-                        if not dry_run:
-                            # Replace existing
-                            target.registries = [
-                                validated_reg if r.name == reg_name else r
-                                for r in target.registries
-                            ]
-                        result.items.append(
-                            ImportItemResult(
-                                name=reg_name,
-                                entity_type="registry",
-                                status=ImportItemStatus.UPDATED,
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.RENAME:
-                        new_name = _generate_rename(reg_name, existing_reg_names)
-                        validated_reg = validated_reg.model_copy(update={"name": new_name})
-                        if not dry_run:
-                            target.registries.append(validated_reg)
-                        existing_reg_names.add(new_name)
-                        result.items.append(
-                            ImportItemResult(
-                                name=reg_name,
-                                entity_type="registry",
-                                status=ImportItemStatus.RENAMED,
-                                new_name=new_name,
-                            )
-                        )
-                        continue
-
-                # No conflict — add
-                if not dry_run:
-                    target.registries.append(validated_reg)
-                existing_reg_names.add(reg_name)
-                result.items.append(
-                    ImportItemResult(
-                        name=reg_name,
-                        entity_type="registry",
-                        status=ImportItemStatus.ADDED,
-                    )
-                )
-
+        result.items.extend(
+            _import_registries(target, payload["registries"], conflict_strategy, dry_run)
+        )
     if "feature_flags" in entity_types and "feature_flags" in payload:
-        raw_flags = payload["feature_flags"]
-        if isinstance(raw_flags, dict):
-            for flag_name, flag_value in raw_flags.items():
-                if not isinstance(flag_value, bool):
-                    result.items.append(
-                        ImportItemResult(
-                            name=flag_name,
-                            entity_type="feature_flag",
-                            status=ImportItemStatus.FAILED,
-                            error="Feature flag value must be boolean",
-                        )
-                    )
-                    continue
-
-                if flag_name in target.feature_flags:
-                    if conflict_strategy == ConflictStrategy.SKIP:
-                        result.items.append(
-                            ImportItemResult(
-                                name=flag_name,
-                                entity_type="feature_flag",
-                                status=ImportItemStatus.SKIPPED,
-                            )
-                        )
-                        continue
-                    elif conflict_strategy == ConflictStrategy.FAIL:
-                        result.items.append(
-                            ImportItemResult(
-                                name=flag_name,
-                                entity_type="feature_flag",
-                                status=ImportItemStatus.FAILED,
-                                error=f"Feature flag '{flag_name}' already exists",
-                            )
-                        )
-                        continue
-
-                status = (
-                    ImportItemStatus.UPDATED
-                    if flag_name in target.feature_flags
-                    else ImportItemStatus.ADDED
-                )
-                if not dry_run:
-                    target.feature_flags[flag_name] = flag_value
-                result.items.append(
-                    ImportItemResult(
-                        name=flag_name,
-                        entity_type="feature_flag",
-                        status=status,
-                    )
-                )
+        result.items.extend(
+            _import_feature_flags(target, payload["feature_flags"], conflict_strategy, dry_run)
+        )
 
     logger.info(
         "Config import completed: id=%s, dry_run=%s, strategy=%s, summary=%s",

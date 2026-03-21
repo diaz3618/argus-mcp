@@ -42,7 +42,7 @@ from argus_mcp.config.schema_backends import (
 from argus_mcp.config.schema_security import AuthorizationConfig, IncomingAuthConfig
 from argus_mcp.config.schema_server import ManagementSettings, ServerSettings
 
-# ArgusConfig ─────────────────────────────────────────────────────────
+# ArgusConfig
 
 
 class TestArgusConfig:
@@ -77,7 +77,7 @@ class TestArgusConfig:
         assert cfg.feature_flags["beta_tools"] is True
 
 
-# ServerSettings ──────────────────────────────────────────────────────
+# ServerSettings
 
 
 class TestServerSettings:
@@ -121,7 +121,7 @@ class TestServerSettings:
         assert s.management.token is None
 
 
-# ManagementSettings ──────────────────────────────────────────────────
+# ManagementSettings
 
 
 class TestManagementSettings:
@@ -136,7 +136,7 @@ class TestManagementSettings:
         assert m.token == "secret123"
 
 
-# StdioBackendConfig ─────────────────────────────────────────────────
+# StdioBackendConfig
 
 
 class TestStdioBackendConfig:
@@ -168,7 +168,7 @@ class TestStdioBackendConfig:
         assert cfg.group == "gpu-servers"
 
 
-# SseBackendConfig ───────────────────────────────────────────────────
+# SseBackendConfig
 
 
 class TestSseBackendConfig:
@@ -210,7 +210,7 @@ class TestSseBackendConfig:
         assert cfg.headers["X-Custom"] == "val"
 
 
-# StreamableHttpBackendConfig ─────────────────────────────────────────
+# StreamableHttpBackendConfig
 
 
 class TestStreamableHttpBackendConfig:
@@ -240,7 +240,7 @@ class TestStreamableHttpBackendConfig:
         assert cfg.auth.type == "oauth2"
 
 
-# TimeoutConfig ───────────────────────────────────────────────────────
+# TimeoutConfig
 
 
 class TestTimeoutConfig:
@@ -269,7 +269,7 @@ class TestTimeoutConfig:
             TimeoutConfig(retries=11)
 
 
-# Filter / Override models ────────────────────────────────────────────
+# Filter / Override models
 
 
 class TestFiltersConfig:
@@ -295,7 +295,7 @@ class TestToolOverrideEntry:
         assert o.name == "new_name"
 
 
-# Auth configs ────────────────────────────────────────────────────────
+# Auth configs
 
 
 class TestStaticAuthConfig:
@@ -329,7 +329,7 @@ class TestOAuth2AuthConfig:
         assert "read" in c.scopes
 
 
-# Security configs ────────────────────────────────────────────────────
+# Security configs
 
 
 class TestIncomingAuthConfig:
@@ -367,7 +367,7 @@ class TestAuthorizationConfig:
         assert len(c.policies) == 1
 
 
-# Other sub-models ────────────────────────────────────────────────────
+# Other sub-models
 
 
 class TestAuditConfig:

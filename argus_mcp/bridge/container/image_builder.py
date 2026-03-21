@@ -18,7 +18,6 @@ import asyncio
 import hashlib
 import logging
 import os
-import tempfile
 from typing import Callable, Dict, List, Optional, Tuple
 
 from argus_mcp.bridge.container import runtime as crt
@@ -35,6 +34,7 @@ from argus_mcp.bridge.container.templates import (
     parse_npx_args,
     parse_uvx_args,
 )
+from argus_mcp.constants import SHORT_ID_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,6 @@ def is_already_containerised(command: str, args: List[str]) -> bool:
     """
     basename = command.rsplit("/", 1)[-1].strip().lower()
     if basename in ("docker", "podman"):
-        # Check if the first arg is a docker subcommand that runs containers
         if args and args[0] in ("run", "exec", "start", "compose"):
             return True
     return False
@@ -249,7 +248,6 @@ async def _ensure_uvx_image(
     )
     image_tag = compute_image_tag("uvx", package, dockerfile)
 
-    # Check if image already exists
     if await crt.image_exists(container_runtime, image_tag):
         logger.info(
             "[%s] Reusing cached image '%s' for uvx package '%s'.",
@@ -270,7 +268,6 @@ async def _ensure_uvx_image(
         )
         return None, "uvx", list(args)
 
-    # Build the image
     logger.info(
         "[%s] Building image for uvx package '%s' → '%s'…",
         svr_name,
@@ -320,7 +317,6 @@ async def _ensure_npx_image(
     )
     image_tag = compute_image_tag("npx", package, dockerfile)
 
-    # Check if image already exists
     if await crt.image_exists(container_runtime, image_tag):
         logger.info(
             "[%s] Reusing cached image '%s' for npx package '%s'.",
@@ -341,7 +337,6 @@ async def _ensure_npx_image(
         )
         return None, "npx", list(args)
 
-    # Build the image
     logger.info(
         "[%s] Building image for npx package '%s' → '%s'…",
         svr_name,
@@ -396,7 +391,6 @@ async def _ensure_go_image(
     )
     image_tag = compute_image_tag("go", module_path, dockerfile)
 
-    # Check if image already exists
     if await crt.image_exists(container_runtime, image_tag):
         logger.info(
             "[%s] Reusing cached image '%s' for Go module '%s'.",
@@ -417,7 +411,6 @@ async def _ensure_go_image(
         )
         return None, "go", list(args)
 
-    # Build the image
     logger.info(
         "[%s] Building image for Go module '%s' → '%s'…",
         svr_name,
@@ -550,7 +543,7 @@ async def _ensure_custom_dockerfile_image(
         return None, "", []
 
     content = await asyncio.to_thread(_read_file, dockerfile_path)
-    content_hash = hashlib.sha256(content.encode()).hexdigest()[:12]
+    content_hash = hashlib.sha256(content.encode()).hexdigest()[:SHORT_ID_LENGTH]
     basename = os.path.basename(dockerfile_path).replace(".", "-").lower()
     image_tag = f"{_IMAGE_PREFIX}/{basename}:{content_hash}"
 
@@ -626,29 +619,38 @@ async def _build_from_string(
             await adapter.start()
             ok = await adapter.build(dockerfile_content, image_tag)
             return ok
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Go adapter build failed, falling back to CLI", exc_info=True)
         finally:
             await adapter.stop()
 
-    # Fallback: subprocess docker build via temp dir.
-    def _write_dockerfile(tmpdir: str, content: str) -> str:
-        df_path = os.path.join(tmpdir, "Dockerfile")
+    # Use a persistent build context so Docker layer caching works across
+    # builds.  The directory is keyed by a hash of the Dockerfile content
+    # and lives under ~/.argus/build-cache/.
+    def _prepare_build_dir(content: str) -> str:
+        ctx_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
+        cache_root = os.path.join(
+            os.environ.get("ARGUS_CACHE_DIR", os.path.expanduser("~/.argus")),
+            "build-cache",
+            ctx_hash,
+        )
+        os.makedirs(cache_root, exist_ok=True)
+        df_path = os.path.join(cache_root, "Dockerfile")
         with open(df_path, "w", encoding="utf-8") as f:
             f.write(content)
         return df_path
 
-    with tempfile.TemporaryDirectory(prefix="argus_build_") as tmpdir:
-        df_path = await asyncio.to_thread(_write_dockerfile, tmpdir, dockerfile_content)
+    df_path = await asyncio.to_thread(_prepare_build_dir, dockerfile_content)
+    build_dir = os.path.dirname(df_path)
 
-        try:
-            return await crt.build_image(
-                container_runtime,
-                tmpdir,
-                image_tag,
-                dockerfile=df_path,
-                line_callback=line_callback,
-            )
-        except asyncio.CancelledError:
-            logger.info("Image build for '%s' was cancelled.", image_tag)
-            raise
+    try:
+        return await crt.build_image(
+            container_runtime,
+            build_dir,
+            image_tag,
+            dockerfile=df_path,
+            line_callback=line_callback,
+        )
+    except asyncio.CancelledError:
+        logger.info("Image build for '%s' was cancelled.", image_tag)
+        raise

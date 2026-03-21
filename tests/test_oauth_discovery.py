@@ -16,7 +16,7 @@ from argus_mcp.bridge.auth.discovery import (
     discover_oauth_metadata,
 )
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _mock_response(
@@ -32,7 +32,7 @@ def _mock_response(
     return resp
 
 
-# _validate_discovery_url ─────────────────────────────────────────────
+# _validate_discovery_url
 
 
 class TestValidateDiscoveryUrl:
@@ -79,7 +79,7 @@ class TestValidateDiscoveryUrl:
             _validate_discovery_url("javascript:alert(1)")
 
 
-# OAuthMetadata ───────────────────────────────────────────────────────
+# OAuthMetadata
 
 
 class TestOAuthMetadata:
@@ -111,7 +111,7 @@ class TestOAuthMetadata:
             meta.issuer = "changed"  # type: ignore[misc]
 
 
-# _parse_www_authenticate ─────────────────────────────────────────────
+# _parse_www_authenticate
 
 
 class TestParseWwwAuthenticate:
@@ -141,7 +141,7 @@ class TestParseWwwAuthenticate:
         assert _parse_www_authenticate(header) is None
 
 
-# discover_oauth_metadata ─────────────────────────────────────────────
+# discover_oauth_metadata
 
 
 class TestDiscoverOAuthMetadata:

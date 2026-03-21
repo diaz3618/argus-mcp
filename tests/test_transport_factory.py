@@ -15,7 +15,7 @@ from argus_mcp.bridge.transport_factory import (
 )
 from argus_mcp.errors import ConfigurationError
 
-# apply_network_env ───────────────────────────────────────────────────
+# apply_network_env
 
 
 class TestApplyNetworkEnv:
@@ -61,7 +61,7 @@ class TestApplyNetworkEnv:
         assert result is p
 
 
-# _merge_headers ──────────────────────────────────────────────────────
+# _merge_headers
 # (Also tested in test_auth.py::TestMergeHeaders — kept minimal here.)
 
 
@@ -71,7 +71,7 @@ class TestMergeHeaders:
         assert result == {"A": "new"}
 
 
-# create_transport_session ────────────────────────────────────────────
+# create_transport_session
 
 
 class TestCreateTransportSession:

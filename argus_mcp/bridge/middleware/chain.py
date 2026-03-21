@@ -11,6 +11,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
 
+from argus_mcp.constants import SHORT_ID_LENGTH
+
 
 class MCPHandler(Protocol):
     """Async callable that takes a RequestContext and returns a result."""
@@ -43,7 +45,7 @@ class RequestContext:
     capability_name: str
     mcp_method: str
     arguments: Optional[Dict[str, Any]] = None
-    request_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    request_id: str = field(default_factory=lambda: uuid.uuid4().hex[:SHORT_ID_LENGTH])
     server_name: Optional[str] = None
     original_name: Optional[str] = None
     start_time: float = field(default_factory=time.monotonic)

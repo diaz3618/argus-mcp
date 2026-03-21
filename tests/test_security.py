@@ -14,13 +14,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-# Middleware ──────────────────────────────────────────────────────────
+# Middleware
 from argus_mcp.bridge.middleware.auth import AuthMiddleware
 from argus_mcp.bridge.middleware.authz import AuthorizationError, AuthzMiddleware
 from argus_mcp.bridge.middleware.chain import RequestContext
 from argus_mcp.bridge.middleware.telemetry import TelemetryMiddleware
 
-# Secrets ─────────────────────────────────────────────────────────────
+# Secrets
 from argus_mcp.secrets.providers import EnvProvider, FileProvider, create_provider
 from argus_mcp.secrets.resolver import (
     SecretResolutionError,
@@ -29,7 +29,7 @@ from argus_mcp.secrets.resolver import (
 )
 from argus_mcp.secrets.store import SecretStore
 
-# JWT / Auth constructs ───────────────────────────────────────────────
+# JWT / Auth constructs
 from argus_mcp.server.auth.jwt import (
     JWTConfig,
     TokenClaims,
@@ -43,7 +43,7 @@ from argus_mcp.server.auth.providers import (
     UserIdentity,
 )
 
-# RBAC constructs ─────────────────────────────────────────────────────
+# RBAC constructs
 from argus_mcp.server.authz.engine import PolicyEngine
 from argus_mcp.server.authz.policies import (
     AuthzPolicy,
@@ -53,7 +53,7 @@ from argus_mcp.server.authz.policies import (
 )
 from argus_mcp.telemetry.metrics import get_meter, record_request
 
-# Telemetry (no-op paths) ────────────────────────────────────────────
+# Telemetry (no-op paths)
 from argus_mcp.telemetry.tracing import get_tracer, start_span
 
 # JWT / OIDC / Auth

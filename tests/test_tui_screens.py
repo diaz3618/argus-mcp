@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.css.query import NoMatches
 
-# ServerLogsScreen ────────────────────────────────────────────────────
+# ServerLogsScreen
 from argus_mcp.tui.screens.server_logs import ServerLogsScreen
 
 
@@ -122,7 +122,7 @@ class TestServerLogsCorrelation:
         assert screen._show_correlation is True
 
 
-# ExportImportScreen ──────────────────────────────────────────────────
+# ExportImportScreen
 
 from argus_mcp.config.export import ExportFilter, SecretHandling
 from argus_mcp.config.import_handler import ConflictStrategy
@@ -178,7 +178,7 @@ class TestImportConflictStrategy:
         assert {cs.value for cs in ConflictStrategy} == expected
 
 
-# CatalogBrowserScreen ───────────────────────────────────────────────
+# CatalogBrowserScreen
 
 from argus_mcp.registry.catalog import CatalogEntryStatus
 from argus_mcp.tui.screens.catalog_browser import (
@@ -231,7 +231,7 @@ class TestCatalogEntryStatusEnum:
         assert CatalogEntryStatus.FAILED.value == "failed"
 
 
-# ToolOpsPanel ────────────────────────────────────────────────────────
+# ToolOpsPanel
 
 from argus_mcp.tui.widgets.tool_ops_panel import ToolOpsPanel
 
@@ -381,7 +381,7 @@ class TestToolOpsValidationLogic:
         return issues
 
 
-# Screen registration ─────────────────────────────────────────────────
+# Screen registration
 
 
 class TestScreenRegistration:
@@ -413,7 +413,7 @@ class TestScreenRegistration:
         assert len(ArgusApp.MODES) >= 14
 
 
-# Import smoke tests ─────────────────────────────────────────────────
+# Import smoke tests
 
 
 class TestModuleImports:

@@ -23,7 +23,7 @@ from argus_mcp.secrets.resolver import (
 )
 from argus_mcp.secrets.store import SecretStore
 
-# EnvProvider ─────────────────────────────────────────────────────────
+# EnvProvider
 
 
 class TestEnvProvider:
@@ -70,7 +70,7 @@ class TestEnvProvider:
         assert p.list_names() == []
 
 
-# create_provider ─────────────────────────────────────────────────────
+# create_provider
 
 
 class TestCreateProvider:
@@ -96,7 +96,7 @@ class TestCreateProvider:
         assert isinstance(p, KeyringProvider)
 
 
-# SecretStore ─────────────────────────────────────────────────────────
+# SecretStore
 
 
 class TestSecretStore:
@@ -142,7 +142,7 @@ class TestSecretStore:
         assert store.provider_type == "env"
 
 
-# resolve_secrets ─────────────────────────────────────────────────────
+# resolve_secrets
 
 
 class TestResolveSecrets:
@@ -199,7 +199,7 @@ class TestResolveSecrets:
         assert result["token"] == "v"
 
 
-# find_secret_references ──────────────────────────────────────────────
+# find_secret_references
 
 
 class TestFindSecretReferences:

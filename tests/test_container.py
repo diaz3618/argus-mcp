@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from mcp import StdioServerParameters
 
-# runtime.py: new ABC layer ──────────────────────────────────────────
+# runtime.py: new ABC layer
 from argus_mcp.bridge.container.runtime import (
     DockerRuntime,
     KubernetesRuntime,
@@ -34,7 +34,7 @@ from argus_mcp.bridge.container.runtime import (
     pull_image,
 )
 
-# RuntimeType enum ───────────────────────────────────────────────────
+# RuntimeType enum
 
 
 class TestRuntimeType:
@@ -61,7 +61,7 @@ class TestRuntimeType:
             RuntimeType.from_str("invalid-runtime")
 
 
-# DockerRuntime (new ABC implementation) ──────────────────────────────
+# DockerRuntime (new ABC implementation)
 
 
 class TestDockerRuntime:
@@ -237,7 +237,7 @@ class TestDockerRuntime:
         ]
 
 
-# KubernetesRuntime (placeholder) ────────────────────────────────────
+# KubernetesRuntime (placeholder)
 
 
 class TestKubernetesRuntime:
@@ -258,7 +258,7 @@ class TestKubernetesRuntime:
             assert KubernetesRuntime.is_available() is True
 
 
-# RuntimeFactory ──────────────────────────────────────────────────────
+# RuntimeFactory
 
 
 class TestRuntimeFactory:
@@ -318,7 +318,7 @@ class TestRuntimeFactory:
         assert rt1 is not rt2
 
 
-# Backward-compat module-level functions ──────────────────────────────
+# Backward-compat module-level functions
 #    These delegate to DockerRuntime and still need to work.
 
 
@@ -435,7 +435,7 @@ class TestBuildImage:
         assert await build_image("docker", "/tmp/ctx", "myimage:abc") is False
 
 
-# templates.py ────────────────────────────────────────────────────────
+# templates.py
 
 from argus_mcp.bridge.container.templates import (
     IMAGE_PREFIX,
@@ -607,7 +607,7 @@ class TestComputeImageTag:
         assert "@" not in tag.split("/", 1)[1].split(":")[0]
 
 
-# image_builder.py ────────────────────────────────────────────────────
+# image_builder.py
 
 from argus_mcp.bridge.container.image_builder import (
     classify_command,
@@ -840,7 +840,7 @@ class TestEnsureImage:
         assert binary == "go"
 
 
-# network.py ──────────────────────────────────────────────────────────
+# network.py
 
 from argus_mcp.bridge.container.network import (
     ARGUS_NETWORK,
@@ -895,7 +895,7 @@ class TestNetworkPolicy:
         assert result is False
 
 
-# wrapper.py ──────────────────────────────────────────────────────────
+# wrapper.py
 
 from argus_mcp.bridge.container.wrapper import _active_containers, wrap_backend
 
@@ -944,7 +944,7 @@ class TestWrapBackend:
         rt.is_healthy = AsyncMock(return_value=healthy)
         return rt
 
-    # Disable paths ───────────────────────────────────────────────
+    # Disable paths
 
     @pytest.mark.asyncio
     async def test_disabled_via_enabled_false(self, monkeypatch):
@@ -963,7 +963,7 @@ class TestWrapBackend:
         assert not isolated
         assert wrapped.command == "uvx"
 
-    # Passthrough paths ───────────────────────────────────────────
+    # Passthrough paths
 
     @pytest.mark.asyncio
     async def test_already_containerised_passthrough(self, monkeypatch):
@@ -1018,7 +1018,7 @@ class TestWrapBackend:
         assert not isolated
         assert wrapped.command == "uvx"
 
-    # Runtime override ────────────────────────────────────────────
+    # Runtime override
 
     @pytest.mark.asyncio
     async def test_runtime_override_passed(self, monkeypatch):
@@ -1050,7 +1050,7 @@ class TestWrapBackend:
         assert wrapped.command == "podman"
         assert wrapped.args == ["start", "-ai", self._FAKE_CID]
 
-    # Health check caching ────────────────────────────────────────
+    # Health check caching
 
     @pytest.mark.asyncio
     async def test_health_check_cached(self, monkeypatch):
@@ -1079,7 +1079,7 @@ class TestWrapBackend:
         # is_healthy is called each time (caching is internal to DockerRuntime)
         assert mock_rt.is_healthy.await_count == 2
 
-    # Successful wrap paths ───────────────────────────────────────
+    # Successful wrap paths
 
     @pytest.mark.asyncio
     async def test_successful_wrap_uvx(self, monkeypatch):
@@ -1441,7 +1441,7 @@ class TestCleanupContainer:
         assert "ctx-svr" not in _active_containers
 
 
-# schema_backends.py ContainerConfig ──────────────────────────────────
+# schema_backends.py ContainerConfig
 
 from argus_mcp.config.schema_backends import ContainerConfig, StdioBackendConfig
 

@@ -130,7 +130,6 @@ class ToolsScreen(ArgusScreen):
             self._populate_tables(base)
             return
 
-        # Filter each category
         base_tools = self._get_base_tools()
         filtered_tools = [
             t

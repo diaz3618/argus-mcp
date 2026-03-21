@@ -23,7 +23,13 @@ from argus_mcp.bridge.health import HealthChecker
 from argus_mcp.config import load_and_validate_config
 from argus_mcp.config.diff import compute_diff
 from argus_mcp.config.loader import load_argus_config
-from argus_mcp.constants import RECONNECT_TIMEOUT, SERVER_NAME, SERVER_VERSION, SHUTDOWN_TIMEOUT
+from argus_mcp.constants import (
+    RECONNECT_TIMEOUT,
+    SERVER_NAME,
+    SERVER_VERSION,
+    SHORT_ID_LENGTH,
+    SHUTDOWN_TIMEOUT,
+)
 from argus_mcp.errors import BackendServerError
 from argus_mcp.runtime.models import (
     BackendInfo,
@@ -73,6 +79,8 @@ class ArgusService:
 
         # Auto re-auth flag — set externally by lifespan after construction.
         self._auto_reauth: bool = False
+        # Parallel build flag — set externally by lifespan after construction.
+        self._parallel: bool = False
 
         # Bridge components
         self._manager: ClientManager = ClientManager()
@@ -344,7 +352,9 @@ class ArgusService:
                 if progress_callback is not None:
                     progress_callback(name, phase, message)
 
-            await self._manager.start_all(config, progress_callback=_event_progress_cb)
+            await self._manager.start_all(
+                config, progress_callback=_event_progress_cb, parallel=self._parallel
+            )
             active_sessions = self._manager.get_all_sessions()
             self._backends_connected = len(active_sessions)
 
@@ -482,9 +492,9 @@ class ArgusService:
             await self._manager.stop_all()
             logger.info("All backend connections stopped.")
             self._transition(ServiceState.STOPPED)
-        except RuntimeError as e_rt:
+        except RuntimeError as exc:
             # anyio cancel-scope cross-task errors during forced shutdown
-            logger.warning("Cancel scope error during shutdown (safe to ignore): %s", e_rt)
+            logger.warning("Cancel scope error during shutdown (safe to ignore): %s", exc)
             self._transition(ServiceState.STOPPED)
         except Exception as exc:  # noqa: BLE001
             self._error_message = f"Shutdown error: {type(exc).__name__}: {exc}"
@@ -660,7 +670,7 @@ class ArgusService:
                 if cfg.server.management.reconnect_timeout is not None:
                     timeout = cfg.server.management.reconnect_timeout
             except Exception:  # noqa: BLE001
-                pass  # fall back to constant
+                logger.debug("Could not load reconnect timeout from config", exc_info=True)
 
         async with self._reload_lock:
             try:
@@ -677,7 +687,11 @@ class ArgusService:
                 try:
                     await self._disconnect_backend(name)
                 except Exception:  # noqa: BLE001
-                    pass
+                    logger.debug(
+                        "Error disconnecting backend '%s' during timeout cleanup",
+                        name,
+                        exc_info=True,
+                    )
                 self._backends_connected = self._manager.get_active_session_count()
                 return {
                     "name": name,
@@ -686,7 +700,7 @@ class ArgusService:
                 }
             except Exception as exc:  # noqa: BLE001
                 msg = f"{type(exc).__name__}: {exc}"
-                logger.error("Reconnect '%s' failed: %s", name, msg)
+                logger.error("Reconnect '%s' failed: %s", name, msg, exc_info=True)
                 return {"name": name, "reconnected": False, "error": msg}
 
     async def _do_reconnect(self, name: str) -> Dict[str, Any]:
@@ -767,7 +781,7 @@ class ArgusService:
             return {"name": name, "reauth_initiated": True, "error": None}
         except Exception as exc:  # noqa: BLE001
             msg = f"{type(exc).__name__}: {exc}"
-            logger.error("Re-auth for '%s' failed: %s", name, msg)
+            logger.error("Re-auth for '%s' failed: %s", name, msg, exc_info=True)
             return {"name": name, "reauth_initiated": False, "error": msg}
 
     async def shutdown(self, timeout_seconds: int = SHUTDOWN_TIMEOUT) -> None:
@@ -805,7 +819,7 @@ class ArgusService:
             success = await self._manager._start_backend_svr(name, config)
             return success
         except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to connect backend '%s': %s", name, exc)
+            logger.error("Failed to connect backend '%s': %s", name, exc, exc_info=True)
             return False
 
     def get_status(self) -> ServiceStatus:
@@ -869,7 +883,7 @@ class ArgusService:
     ) -> Dict[str, Any]:
         """Emit an event to the buffer and all subscribers."""
         event: Dict[str, Any] = {
-            "id": f"evt-{uuid.uuid4().hex[:12]}",
+            "id": f"evt-{uuid.uuid4().hex[:SHORT_ID_LENGTH]}",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stage": stage,
             "message": message,

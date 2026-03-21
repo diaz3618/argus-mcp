@@ -10,9 +10,7 @@ import pytest
 
 from argus_mcp.bridge.container.go_docker_adapter import GoDockerAdapter, is_available
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_adapter_with_mock_call(
@@ -25,9 +23,7 @@ def _make_adapter_with_mock_call(
     return adapter, mock
 
 
-# ---------------------------------------------------------------------------
 # is_available
-# ---------------------------------------------------------------------------
 
 
 class TestIsAvailable:
@@ -47,9 +43,7 @@ class TestIsAvailable:
         assert is_available() is True
 
 
-# ---------------------------------------------------------------------------
 # build()
-# ---------------------------------------------------------------------------
 
 
 class TestBuild:
@@ -116,9 +110,7 @@ class TestBuild:
         assert "build_args" not in sent
 
 
-# ---------------------------------------------------------------------------
 # create()
-# ---------------------------------------------------------------------------
 
 
 class TestCreate:
@@ -202,9 +194,7 @@ class TestCreate:
         assert set(sent.keys()) == {"image", "name"}
 
 
-# ---------------------------------------------------------------------------
 # _parse_memory_string (in wrapper module)
-# ---------------------------------------------------------------------------
 
 
 class TestParseMemoryString:

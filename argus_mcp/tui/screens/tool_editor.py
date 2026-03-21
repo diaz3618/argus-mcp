@@ -229,7 +229,6 @@ class ToolEditorScreen(ArgusScreen):
         original = tool_info.get("included", True) if tool_info else True
         current = self._modifications[self._selected_tool].get("included", original)
         self._modifications[self._selected_tool]["included"] = not current
-        # Refresh table to reflect the change
         self.load_tools(self._tools)
         self._update_diff_panel()
 

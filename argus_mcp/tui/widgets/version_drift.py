@@ -83,7 +83,6 @@ class VersionDriftPanel(Widget):
                 status = "[green]✓ Up to date[/green]"
             else:
                 updates_available += 1
-                # Check if major version change
                 cur_major = _parse_major(current)
                 reg_major = _parse_major(registry)
                 if cur_major is not None and reg_major is not None and reg_major > cur_major:

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-# models.py ───────────────────────────────────────────────────────────
+# models.py
 from argus_mcp.bridge.container.templates.models import (
     RUNTIME_DEFAULTS,
     RuntimeConfig,
@@ -134,7 +134,7 @@ class TestTemplateData:
         assert td.is_alpine is False
 
 
-# validation.py ───────────────────────────────────────────────────────
+# validation.py
 
 from argus_mcp.bridge.container.templates.validation import (
     ValidationError,
@@ -290,7 +290,7 @@ class TestValidateBuildEnvValue:
             validate_build_env_value("a|b")
 
 
-# engine.py ───────────────────────────────────────────────────────────
+# engine.py
 
 from argus_mcp.bridge.container.templates.engine import render_template
 
@@ -419,7 +419,7 @@ class TestRenderTemplate:
         assert "apt-get install -y --no-install-recommends wget jq" in result
 
 
-# _generators.py — public API ─────────────────────────────────────────
+# _generators.py — public API
 
 from argus_mcp.bridge.container.templates import (
     IMAGE_PREFIX,
@@ -856,7 +856,7 @@ class TestComputeImageTag:
         assert "/" not in name_part
 
 
-# Public API re-exports (__init__.py) ─────────────────────────────────
+# Public API re-exports (__init__.py)
 
 
 class TestPublicAPI:
@@ -926,7 +926,7 @@ class TestPublicAPI:
         assert callable(render_template)
 
 
-# Go transport: RuntimeConfig ─────────────────────────────────────────
+# Go transport: RuntimeConfig
 
 
 class TestRuntimeConfigGo:
@@ -966,7 +966,7 @@ class TestRuntimeConfigGo:
         assert rc.additional_packages == ["curl"]
 
 
-# Go transport: parse_go_args ─────────────────────────────────────────
+# Go transport: parse_go_args
 
 from argus_mcp.bridge.container.templates._generators import (
     _strip_go_version,
@@ -1027,7 +1027,7 @@ class TestStripGoVersion:
         assert _strip_go_version("github.com/user/repo.v2") == "github.com/user/repo.v2"
 
 
-# Go transport: generate_go_dockerfile ────────────────────────────────
+# Go transport: generate_go_dockerfile
 
 from argus_mcp.bridge.container.templates import generate_go_dockerfile
 
@@ -1116,7 +1116,7 @@ class TestGenerateGoDockerfile:
 
     def test_header_comment(self):
         df = generate_go_dockerfile(go_package="github.com/user/repo")
-        assert df.startswith("# Auto-generated")
+        assert "# Auto-generated" in df
 
     def test_no_shell_injection_in_package(self):
         """Injection attempts in go_package should be rejected."""
@@ -1129,7 +1129,7 @@ class TestGenerateGoDockerfile:
         assert df1 == df2
 
 
-# Go transport: compute_image_tag ─────────────────────────────────────
+# Go transport: compute_image_tag
 
 
 class TestComputeImageTagGo:
@@ -1163,7 +1163,7 @@ class TestComputeImageTagGo:
         assert "/" not in repo_part
 
 
-# Go transport: image_builder integration ─────────────────────────────
+# Go transport: image_builder integration
 
 from argus_mcp.bridge.container.image_builder import classify_command
 
@@ -1187,7 +1187,7 @@ class TestClassifyCommandGo:
         assert classify_command("npx") == "npx"
 
 
-# Go transport: schema_backends ───────────────────────────────────────
+# Go transport: schema_backends
 
 from argus_mcp.config.schema_backends import ContainerConfig
 

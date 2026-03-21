@@ -226,7 +226,6 @@ class TestSemgrepLiveScan:
             timeout=180,
             env={**os.environ, "SEMGREP_SEND_METRICS": "off"},
         )
-        # Parse JSON output for findings
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:

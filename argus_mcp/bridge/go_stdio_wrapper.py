@@ -110,7 +110,6 @@ async def manage_subproc_go(
             yield proc
         return
 
-    # Build the Go wrapper command.
     wrapper_cmd = [
         binary,
         "--kill-timeout",

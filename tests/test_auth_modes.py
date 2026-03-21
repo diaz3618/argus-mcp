@@ -25,7 +25,7 @@ from argus_mcp.server.auth.providers import (
 )
 from argus_mcp.server.auth_context import current_auth_mode
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_ctx(token: str | None = None) -> RequestContext:
@@ -57,7 +57,7 @@ _AUTHED_USER = UserIdentity(subject="alice", provider="jwt")
 _NEXT = AsyncMock(return_value="ok")
 
 
-# Config model tests ─────────────────────────────────────────────────
+# Config model tests
 
 
 class TestIncomingAuthConfigModel:
@@ -90,7 +90,7 @@ class TestIncomingAuthConfigModel:
         assert cfg.auth_mode == "strict"
 
 
-# Strict mode middleware tests ────────────────────────────────────────
+# Strict mode middleware tests
 
 
 class TestStrictModeMiddleware:
@@ -140,7 +140,7 @@ class TestStrictModeMiddleware:
         assert ctx.metadata["user_subject"] == "alice"
 
 
-# Permissive mode middleware tests ────────────────────────────────────
+# Permissive mode middleware tests
 
 
 class TestPermissiveModeMiddleware:
@@ -193,7 +193,7 @@ class TestPermissiveModeMiddleware:
         assert ctx.metadata.get("user_subject") == "anonymous"
 
 
-# Default mode tests ──────────────────────────────────────────────────
+# Default mode tests
 
 
 class TestDefaultModeSemantics:
@@ -209,7 +209,7 @@ class TestDefaultModeSemantics:
             await mw(ctx, AsyncMock())
 
 
-# ContextVar tests ────────────────────────────────────────────────────
+# ContextVar tests
 
 
 class TestAuthModeContextVar:
@@ -227,7 +227,7 @@ class TestAuthModeContextVar:
             current_auth_mode.reset(token)
 
 
-# Transport-level auth mode propagation ───────────────────────────────
+# Transport-level auth mode propagation
 
 
 class TestTransportAuthMode:
@@ -271,7 +271,7 @@ class TestTransportAuthMode:
             transport_mod._auth_mode = orig_mode
 
 
-# Edge cases ──────────────────────────────────────────────────────────
+# Edge cases
 
 
 class TestEdgeCases:

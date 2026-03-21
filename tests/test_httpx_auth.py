@@ -9,7 +9,7 @@ import pytest
 
 from argus_mcp.bridge.auth.httpx_auth import _MAX_401_RETRIES, McpBearerAuth
 
-# Helpers ─────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_provider(
@@ -54,7 +54,7 @@ async def _run_auth_flow(
     return responses[-1]
 
 
-# Tests ───────────────────────────────────────────────────────────
+# Tests
 
 
 class TestMcpBearerAuth:
@@ -122,7 +122,6 @@ class TestMcpBearerAuth:
 
         await flow.__anext__()
 
-        # Send 401 responses up to the max
         for _ in range(_MAX_401_RETRIES):
             resp_401 = httpx.Response(401, request=request)
             await flow.asend(resp_401)

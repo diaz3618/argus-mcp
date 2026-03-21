@@ -20,7 +20,7 @@ from argus_mcp.constants import (
     STARTUP_STAGGER_DELAY,
 )
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _fake_config(name: str, svr_type: str = "stdio") -> Dict[str, Any]:
@@ -53,7 +53,7 @@ class _ConcurrencyTracker:
         return True
 
 
-# Tests ───────────────────────────────────────────────────────────────
+# Tests
 
 
 @pytest.mark.asyncio
@@ -248,7 +248,7 @@ async def test_constants_have_sensible_defaults():
     assert STARTUP_STAGGER_DELAY <= 5
 
 
-# Signal Override Tests ───────────────────────────────────────────────
+# Signal Override Tests
 
 
 def test_signal_override_installs_and_restores():
@@ -267,7 +267,6 @@ def test_signal_override_installs_and_restores():
     before_sigint = _sig.getsignal(_sig.SIGINT)
     before_sigterm = _sig.getsignal(_sig.SIGTERM)
 
-    # Create a minimal mock service
     mock_svc = MagicMock()
     mock_svc._manager = MagicMock()
     mock_svc._manager.cancel_startup = MagicMock()
