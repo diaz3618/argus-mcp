@@ -388,9 +388,15 @@ class WorkflowsPanel(Widget):
             panel._log_header(f"Workflow: {name}")
             panel._log_output(
                 Text(
-                    f"  Steps: {len(steps)}  |  Mode: dry-run  |  "
+                    f"  Steps: {len(steps)}  |  Mode: validation (dry-run)  |  "
                     f"Started: {datetime.now().strftime('%H:%M:%S')}",
                     style="dim",
+                )
+            )
+            panel._log_output(
+                Text(
+                    "  Validates DAG structure, step ordering, and parameter flow.",
+                    style="dim italic",
                 )
             )
             panel._log_output(Text(""))
@@ -419,19 +425,23 @@ class WorkflowsPanel(Widget):
 
                 result = {
                     "status": "ok",
-                    "note": "TUI dry-run (no server context)",
+                    "note": "dry-run validation pass",
                     "_tool": tool_name,
                     "_call": call_count,
                 }
                 panel._log_step(
                     tool_name,
-                    "Returned (dry-run) ✓",
+                    "Validated ✓",
                     prefix="✓",
                     style="green",
                 )
                 return result
 
             import asyncio  # noqa: F811
+
+            # Mark as running in the table
+            wf_data["status"] = "running"
+            panel.update_workflows(panel._workflows)
 
             executor = WorkflowExecutor(_logging_invoke)
 

@@ -189,6 +189,7 @@ class SettingsScreen(ArgusScreen):
         self._refresh_theme()
         self._refresh_config()
         self._refresh_about()
+        self._refresh_middleware()
 
     def on_screen_resume(self) -> None:
         """Refresh theme display when returning from modal (e.g. theme picker)."""
@@ -314,6 +315,41 @@ class SettingsScreen(ArgusScreen):
             )
 
         self._set_text("#about-details", "\n".join(lines))
+
+    def _refresh_middleware(self) -> None:
+        """Update middleware pipeline based on feature flags."""
+        from argus_mcp.tui.widgets.middleware_panel import (
+            _DEFAULT_LAYERS,
+            MiddlewarePipelineWidget,
+        )
+
+        try:
+            mw_widget = self.query_one(MiddlewarePipelineWidget)
+        except NoMatches:
+            return
+
+        status = self.app.last_status
+        if status is None:
+            return
+
+        ff = getattr(status, "feature_flags", {}) or {}
+
+        # Build layers reflecting actual feature-flag state
+        flag_map = {
+            "Authentication": ff.get("outgoing_auth", True),
+            "Telemetry": ff.get("otel", False),
+            "Tool Call Filter": ff.get("optimizer", False),
+        }
+
+        layers = []
+        for layer in _DEFAULT_LAYERS:
+            entry = dict(layer)
+            name = entry["name"]
+            if name in flag_map:
+                entry["status"] = "enabled" if flag_map[name] else "disabled"
+            layers.append(entry)
+
+        mw_widget.update_pipeline(layers)
 
     def _set_text(self, selector: str, text: str) -> None:
         """Safely update a Static widget's content."""
@@ -445,10 +481,17 @@ class SettingsScreen(ArgusScreen):
             self._set_text("#config-validation-result", "[yellow]Could not validate[/yellow]")
 
     def _do_save_config(self) -> None:
-        """Save edited config back to disk (placeholder)."""
+        """Inform user that remote config writing is not supported.
+
+        The management API provides read-only config access and a reload
+        endpoint but does not accept config writes.  Config changes must
+        be made on the server's filesystem and then reloaded via
+        POST /manage/v1/reload.
+        """
         self.notify(
-            "Config save not yet connected to the server API.",
+            "Remote config save is not supported. "
+            "Edit the config file on the server and use Reload.",
             severity="information",
             title="Config",
-            timeout=4,
+            timeout=5,
         )

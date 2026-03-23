@@ -68,6 +68,21 @@ class HealthScreen(ArgusScreen):
                     self.query_one(ServerGroupsWidget).update_groups(details)
                 except NoMatches:
                     pass
+
+                # Feed version info into VersionDriftPanel
+                version_servers = []
+                for d in details:
+                    version_servers.append(
+                        {
+                            "name": d.get("name", "?"),
+                            "current_version": d.get("labels", {}).get("version", "—"),
+                            "registry_version": "—",
+                        }
+                    )
+                try:
+                    self.query_one(VersionDriftPanel).update_versions(version_servers)
+                except NoMatches:
+                    pass
             except (OSError, ConnectionError, ApiClientError):
                 pass
 

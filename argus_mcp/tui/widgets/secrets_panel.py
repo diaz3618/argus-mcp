@@ -155,7 +155,8 @@ class SecretsPanel(Widget):
             self.notify("Select a secret to rotate", severity="warning")
             return
         self.notify(
-            f"Rotation for '{secret.get('name', '?')}' — not yet implemented",
+            f"Rotation for '{secret.get('name', '?')}' — "
+            f"update the secret value and re-save to rotate",
             severity="information",
         )
 

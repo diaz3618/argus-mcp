@@ -840,9 +840,9 @@ class ArgusApp(App):
                 )
             elif result == "disconnect":
                 self.notify(
-                    f"Disconnect '{backend_name}' — not yet supported by the management API",
+                    f"Disconnect '{backend_name}' — use Reconnect to cycle the connection",
                     title="Disconnect",
-                    severity="warning",
+                    severity="information",
                     timeout=4,
                 )
 
