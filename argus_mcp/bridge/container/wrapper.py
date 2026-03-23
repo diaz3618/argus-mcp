@@ -54,6 +54,40 @@ _active_containers: Dict[str, Tuple[str, str]] = {}
 
 _MEM_SUFFIXES = {"k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
 
+_PATH_TRAVERSAL_PATTERN = ".."
+
+
+def _validate_volume_sources(svr_name: str, volumes: Optional[List[str]]) -> Optional[List[str]]:
+    """Validate volume mount source paths exist on the host.
+
+    Returns the validated list (unchanged) or ``None`` if the input was
+    ``None``.  Logs a warning for each source path that is missing so
+    operators can diagnose "Connection closed" errors caused by bind
+    mounts to non-existent directories.
+    """
+    if not volumes:
+        return volumes
+    for vol in volumes:
+        parts = vol.split(":")
+        if len(parts) >= 2:
+            src = parts[0]
+            if _PATH_TRAVERSAL_PATTERN in src:
+                logger.warning(
+                    "[%s] Volume source path contains '..': '%s' — "
+                    "use absolute paths to avoid path traversal.",
+                    svr_name,
+                    src,
+                )
+            elif not os.path.exists(src):
+                logger.warning(
+                    "[%s] Volume source path does not exist: '%s'. "
+                    "The backend may fail to start. Create the directory "
+                    "before starting the server.",
+                    svr_name,
+                    src,
+                )
+    return volumes
+
 
 def _parse_memory_string(mem: str) -> int:
     """Parse a Docker-style memory string (e.g. ``512m``) to bytes."""
@@ -246,6 +280,9 @@ async def wrap_backend(
     net_mode = effective_network(network)
     mem = memory or _DEFAULT_MEMORY
     cpu = cpus or _DEFAULT_CPUS
+
+    # Validate volume mount source paths exist on the host.
+    volumes = _validate_volume_sources(svr_name, volumes)
 
     # Try Go adapter first for container creation, fall back to subprocess.
     container_id: Optional[str] = None
