@@ -26,7 +26,7 @@ from textual.widgets import (
 )
 
 from argus_mcp._error_utils import safe_query
-from argus_mcp.config.loader import find_config_file
+from argus_mcp.tui._config_ops import resolve_config_path, trigger_reload
 from argus_mcp.tui.screens.base import ArgusScreen
 
 logger = logging.getLogger(__name__)
@@ -445,39 +445,15 @@ class SkillsScreen(ArgusScreen):
             w.update(text)
 
     def _resolve_config_path(self) -> Optional[str]:
-        """Find the config file path from server status or defaults."""
-        app = self.app
-        status = getattr(app, "_last_status", None)
-        if status is not None:
-            path = getattr(status.config, "file_path", None)
-            if path and os.path.isfile(path):
-                return path
-        path = find_config_file()
-        return path if os.path.isfile(path) else None
+        return resolve_config_path(self.app)
 
     def _trigger_reload(self) -> None:
-        """Post a config reload request to the server."""
-        mgr = getattr(self.app, "_server_manager", None)
-        if mgr is None:
-            return
-        client = getattr(mgr, "active_client", None)
-        if client is None:
-            return
-
-        async def _do_reload() -> None:
-            try:
-                result = await client.post_reload()
-                if result.reloaded:
-                    added = ", ".join(result.backends_added) or "none"
-                    self._set_status(f"Reload complete — added: {added}")
-                    self.notify("Config reloaded", title="Reload")
-                else:
-                    errors = "; ".join(result.errors) if result.errors else "unknown"
-                    self._set_status(f"Reload failed: {errors}")
-            except (OSError, AttributeError) as exc:
-                logger.warning("Reload failed: %s", exc)
-
-        self.app.run_worker(_do_reload(), exclusive=True, name="skills-reload")
+        trigger_reload(
+            self.app,
+            status_callback=self._set_status,
+            notify=self.notify,
+            worker_name="skills-reload",
+        )
 
 
 def _trunc(text: str, max_len: int = 50) -> str:

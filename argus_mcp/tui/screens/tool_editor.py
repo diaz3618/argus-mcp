@@ -19,7 +19,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Static
 
 from argus_mcp._error_utils import safe_query
-from argus_mcp.config.loader import find_config_file
+from argus_mcp.tui._config_ops import resolve_config_path, trigger_reload
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.param_editor import ParamEditorWidget
 from argus_mcp.tui.widgets.tool_preview import ToolPreviewWidget
@@ -124,7 +124,7 @@ class ToolEditorScreen(ArgusScreen):
     def on_show(self) -> None:
         """Populate the tool list from app-level cached capabilities."""
         app = self.app
-        caps = getattr(app, "_last_caps", None)
+        caps = app.last_caps
         if caps is not None:
             tools = []
             for t in caps.tools:
@@ -284,37 +284,14 @@ class ToolEditorScreen(ArgusScreen):
             self.notify(f"Save failed: {exc}", severity="error")
 
     def _resolve_config_path(self) -> Optional[str]:
-        """Find the config file path from server status or defaults."""
-        app = self.app
-        status = getattr(app, "_last_status", None)
-        if status is not None:
-            path = getattr(status.config, "file_path", None)
-            if path and os.path.isfile(path):
-                return path
-        path = find_config_file()
-        return path if os.path.isfile(path) else None
+        return resolve_config_path(self.app)
 
     def _trigger_reload(self) -> None:
-        """Request a config reload from the active server."""
-        mgr = getattr(self.app, "_server_manager", None)
-        if mgr is None:
-            return
-        client = getattr(mgr, "active_client", None)
-        if client is None:
-            return
-
-        async def _do_reload() -> None:
-            try:
-                result = await client.post_reload()
-                if result.reloaded:
-                    self.notify("Config reloaded — changes applied", title="Reload")
-                else:
-                    errors = "; ".join(result.errors) if result.errors else "unknown"
-                    self.notify(f"Reload warning: {errors}", severity="warning")
-            except (OSError, ConnectionError) as exc:
-                logger.warning("Reload after save failed: %s", exc)
-
-        self.app.run_worker(_do_reload(), exclusive=True, name="editor-reload")
+        trigger_reload(
+            self.app,
+            notify=self.notify,
+            worker_name="editor-reload",
+        )
 
     def action_reset_tool(self) -> None:
         """Reset modifications for the selected tool."""

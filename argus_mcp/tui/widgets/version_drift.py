@@ -87,7 +87,7 @@ class VersionDriftPanel(Widget):
                 reg_major = _parse_major(registry)
                 if cur_major is not None and reg_major is not None and reg_major > cur_major:
                     status = "[red]⬆ Major update[/red]"
-                elif current and registry and current < registry:
+                elif _version_tuple(current) < _version_tuple(registry):
                     status = "[yellow]⬆ Update available[/yellow]"
                 else:
                     status = "[yellow]⬆ Update available[/yellow]"
@@ -106,6 +106,19 @@ def _parse_major(version: str) -> Optional[int]:
         return int(v.split(".")[0])
     except (ValueError, IndexError, AttributeError):
         return None
+
+
+def _version_tuple(version: str) -> tuple:
+    """Parse a version string into a comparable tuple of ints.
+
+    Handles formats like ``"2.1.0"``, ``"v2.1.0"``, ``"2.1"``.
+    Non-numeric segments are treated as 0 so the comparison never raises.
+    """
+    try:
+        parts = version.lstrip("v").split(".")
+        return tuple(int(p) for p in parts)
+    except (ValueError, AttributeError):
+        return (0,)
 
 
 class ChangelogModal(ModalScreen[Optional[str]]):

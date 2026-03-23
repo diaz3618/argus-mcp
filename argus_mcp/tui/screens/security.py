@@ -151,7 +151,7 @@ class SecurityScreen(ArgusScreen):
 
     def _refresh_security(self) -> None:
         """Populate selectors from cached app state."""
-        caps = getattr(self.app, "_last_caps", None)
+        caps = self.app.last_caps
         if caps is None:
             return
         route_map = getattr(caps, "route_map", {})

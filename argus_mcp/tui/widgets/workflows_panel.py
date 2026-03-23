@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from rich.text import Text
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -262,15 +263,17 @@ class WorkflowsPanel(Widget):
         if detail := safe_query(self, "#wf-detail", Static):
             detail.update("\n".join(lines))
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle New / Run / Delete button presses."""
-        btn_id = event.button.id
-        if btn_id == "btn-wf-new":
-            self._action_new_workflow()
-        elif btn_id == "btn-wf-run":
-            self._action_run_workflow()
-        elif btn_id == "btn-wf-delete":
-            self._action_delete_workflow()
+    @on(Button.Pressed, "#btn-wf-new")
+    def _handle_new_workflow(self, event: Button.Pressed) -> None:
+        self._action_new_workflow()
+
+    @on(Button.Pressed, "#btn-wf-run")
+    def _handle_run_workflow(self, event: Button.Pressed) -> None:
+        self._action_run_workflow()
+
+    @on(Button.Pressed, "#btn-wf-delete")
+    def _handle_delete_workflow(self, event: Button.Pressed) -> None:
+        self._action_delete_workflow()
 
     def _log_output(self, text: str | Text) -> None:
         """Write a line to the execution output log."""
@@ -567,9 +570,11 @@ class WorkflowEditorModal(ModalScreen[Optional[str]]):
                 yield Button("Cancel", id="btn-wf-cancel", variant="default")
                 yield Button("Save", id="btn-wf-save", variant="primary")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-wf-save":
-            editor = self.query_one("#wf-yaml-editor", TextArea)
-            self.dismiss(editor.text)
-        elif event.button.id == "btn-wf-cancel":
-            self.dismiss(None)
+    @on(Button.Pressed, "#btn-wf-save")
+    def _handle_save(self, event: Button.Pressed) -> None:
+        editor = self.query_one("#wf-yaml-editor", TextArea)
+        self.dismiss(editor.text)
+
+    @on(Button.Pressed, "#btn-wf-cancel")
+    def _handle_cancel(self, event: Button.Pressed) -> None:
+        self.dismiss(None)

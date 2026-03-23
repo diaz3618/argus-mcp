@@ -60,7 +60,7 @@ class ToolsScreen(ArgusScreen):
     def on_show(self) -> None:
         """Re-populate capability tables from app-level cached data."""
         app = self.app
-        caps = getattr(app, "_last_caps", None)
+        caps = app.last_caps
         if caps is not None:
             tools = [t.model_dump() for t in caps.tools]
             resources = [r.model_dump() for r in caps.resources]

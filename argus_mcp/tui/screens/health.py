@@ -44,12 +44,12 @@ class HealthScreen(ArgusScreen):
     def _refresh_from_app(self) -> None:
         """Pull latest backend data from the app cache into widgets."""
         app = self.app
-        last_status = getattr(app, "_last_status", None)
+        last_status = app.last_status
         if last_status is None:
             return
 
         # Feed backends into health panel + server groups
-        mgr = getattr(app, "_server_manager", None)
+        mgr = app.server_manager
         if mgr is None:
             return
         client = getattr(mgr, "active_client", None)
@@ -72,7 +72,7 @@ class HealthScreen(ArgusScreen):
                 pass
 
             # Feed sessions into SessionsPanel
-            sessions_resp = getattr(app, "_last_sessions", None)
+            sessions_resp = app.last_sessions
             if sessions_resp is not None:
                 sessions_list = []
                 for s in getattr(sessions_resp, "sessions", []):
@@ -93,7 +93,7 @@ class HealthScreen(ArgusScreen):
                     pass
 
             # Feed groups into ServerGroupsWidget from cached groups data
-            groups_resp = getattr(app, "_last_groups", None)
+            groups_resp = app.last_groups
             if groups_resp is not None:
                 try:
                     inner = groups_resp.get("groups", {}) if isinstance(groups_resp, dict) else {}
@@ -113,7 +113,7 @@ class HealthScreen(ArgusScreen):
 
     def _get_api_client(self):
         """Return the active :class:`ApiClient` or *None*."""
-        mgr = getattr(self.app, "_server_manager", None)
+        mgr = self.app.server_manager
         if mgr is None:
             return None
         return getattr(mgr, "active_client", None)

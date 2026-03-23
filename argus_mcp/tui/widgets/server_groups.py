@@ -15,6 +15,7 @@ from textual.widget import Widget
 from textual.widgets import Label, Tree
 
 from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._constants import phase_icon
 
 logger = logging.getLogger(__name__)
 
@@ -98,18 +99,7 @@ class ServerGroupsWidget(Widget):
                 tools = b.get("capabilities", {}).get("tools", 0) if b.get("capabilities") else "?"
                 transport = b.get("type", "?")
 
-                if phase == "ready":
-                    icon = "●"
-                elif phase == "degraded":
-                    icon = "◑"
-                elif phase == "failed":
-                    icon = "✕"
-                elif phase == "pending":
-                    icon = "◌"
-                elif phase == "initializing":
-                    icon = "⟳"
-                else:
-                    icon = "?"
+                icon = phase_icon(phase)
 
                 group_node.add_leaf(f"{icon} {member_name}  {transport}  {tools} tools")
                 group_backends.append(b)

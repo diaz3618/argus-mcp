@@ -181,7 +181,7 @@ class OptimizerPanel(Widget):
 
             # Fallback: substring match against cached capabilities
             app = self.app
-            caps = getattr(app, "_last_caps", None)
+            caps = app.last_caps
             if caps is None:
                 self.app.notify(
                     "No capabilities cached — connect to a server first",

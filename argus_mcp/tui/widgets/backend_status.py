@@ -12,34 +12,9 @@ from textual.widget import Widget
 from textual.widgets import DataTable, Static
 
 from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._constants import PHASE_ICON, PHASE_STYLE
 
 logger = logging.getLogger(__name__)
-
-_PHASE_STYLE: Dict[str, tuple] = {
-    "pending": ("◌", "dim"),
-    "initializing": ("⟳", "yellow"),
-    "ready": ("●", "green"),
-    "degraded": ("◑", "dark_orange"),
-    "failed": ("✕", "red"),
-    "shutting_down": ("◑", "cyan"),
-}
-
-# Transport type → display badge
-_TRANSPORT_BADGE: Dict[str, str] = {
-    "stdio": "[cyan]stdio[/cyan]",
-    "sse": "[yellow]SSE[/yellow]",
-    "streamable-http": "[green]StreamableHTTP[/green]",
-    "streamable_http": "[green]StreamableHTTP[/green]",
-}
-
-_PHASE_SUMMARY: Dict[str, str] = {
-    "ready": "●",
-    "degraded": "◑",
-    "failed": "✕",
-    "pending": "◌",
-    "initializing": "⟳",
-    "shutting_down": "◑",
-}
 
 
 class BackendStatusWidget(Widget):
@@ -95,7 +70,7 @@ class BackendStatusWidget(Widget):
         table.clear()
         for b in details:
             phase = b.get("phase", "pending")
-            icon, color = _PHASE_STYLE.get(phase, ("?", "dim"))
+            icon, color = PHASE_STYLE.get(phase, ("?", "dim"))
             name = b.get("name", "?")
             transport = b.get("type", "?")
             transport_plain = {
@@ -129,8 +104,8 @@ class BackendStatusWidget(Widget):
         for phase_key in ("ready", "degraded", "failed", "pending", "initializing"):
             cnt = counts.get(phase_key, 0)
             if cnt > 0:
-                icon_char = _PHASE_SUMMARY.get(phase_key, "?")
-                _, color = _PHASE_STYLE.get(phase_key, ("?", "dim"))
+                icon_char = PHASE_ICON.get(phase_key, "?")
+                _, color = PHASE_STYLE.get(phase_key, ("?", "dim"))
                 parts.append(f"[{color}]{icon_char} {phase_key.title()}={cnt}[/{color}]")
         return "  ".join(parts)
 

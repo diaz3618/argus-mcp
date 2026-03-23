@@ -160,6 +160,34 @@ class ArgusApp(App):
         self._last_sessions: Optional[Any] = None
         self._last_groups: Optional[Any] = None
 
+    # ------------------------------------------------------------------
+    # Public accessors for cached poll data
+    # ------------------------------------------------------------------
+
+    @property
+    def server_manager(self) -> Optional[object]:
+        return self._server_manager
+
+    @property
+    def last_status(self) -> Optional[Any]:
+        return self._last_status
+
+    @property
+    def last_caps(self) -> Optional[Any]:
+        return self._last_caps
+
+    @property
+    def last_sessions(self) -> Optional[Any]:
+        return self._last_sessions
+
+    @property
+    def last_groups(self) -> Optional[Any]:
+        return self._last_groups
+
+    @property
+    def last_events(self) -> Optional[list]:
+        return getattr(self, "_last_events", None)
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
@@ -403,15 +431,22 @@ class ArgusApp(App):
         if self._poll_timer is not None:
             self._poll_timer.stop()
 
-        # Close API clients via server manager
+        # Close API clients via server manager.
+        # During Textual shutdown the async event loop is being torn down,
+        # so we use the synchronous fallback to close httpx transports.
         if self._server_manager is not None:
             from argus_mcp.tui.server_manager import ServerManager
 
             if isinstance(self._server_manager, ServerManager):
-                self.run_worker(self._server_manager.close_all(), exclusive=True)
+                self._server_manager.close_all_sync()
 
-        # Stop capturing print()
-        ew = safe_query(self.screen, "EventLogWidget", EventLogWidget)
+        # Stop capturing print() — guard against empty screen stack
+        # during Textual shutdown.
+        try:
+            screen = self.screen
+        except Exception:  # noqa: BLE001
+            return
+        ew = safe_query(screen, "EventLogWidget", EventLogWidget)
         if ew is not None:
             ew.stop_capture()
 
@@ -994,7 +1029,7 @@ class ArgusApp(App):
         """Open the client configuration export modal."""
         # Determine the server URL for the snippet
         sse_url = self._server_url or ""
-        status = getattr(self, "_last_status", None)
+        status = self.last_status
         if status is not None:
             url = getattr(status.transport, "sse_url", None)
             if url:
