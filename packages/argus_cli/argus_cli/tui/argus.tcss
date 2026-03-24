@@ -1,0 +1,544 @@
+/* Argus MCP TUI Layout */
+
+Screen {
+    background: $surface;
+}
+
+#top-row {
+    height: 2fr;
+    min-height: 14;
+}
+
+#sidebar {
+    width: 75;
+    min-width: 60;
+    height: 100%;
+}
+
+#main-area {
+    height: 100%;
+}
+
+#srv-selector {
+    height: auto;
+    max-height: 10;
+    border: round $accent;
+    padding: 0 1;
+}
+
+#srv-selector #srv-selector-title {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 0;
+}
+
+#srv-selector #srv-option-list {
+    height: auto;
+    max-height: 6;
+    scrollbar-size: 1 1;
+}
+
+ServerInfoWidget {
+    height: auto;
+    max-height: 10;
+    border: round $accent;
+    padding: 0 1;
+}
+
+ServerInfoWidget .label {
+    color: $text-muted;
+}
+
+ServerInfoWidget .value {
+    color: $text;
+    text-style: bold;
+}
+
+ServerInfoWidget #title-row {
+    text-style: bold;
+    color: $success;
+    text-align: center;
+    width: 100%;
+    margin-bottom: 1;
+}
+
+BackendStatusWidget {
+    height: auto;
+    max-height: 12;
+    border: round $accent;
+    padding: 0 1;
+}
+
+BackendStatusWidget #backend-title {
+    text-style: bold;
+    color: $warning;
+    margin-bottom: 0;
+}
+
+BackendStatusWidget #backend-table {
+    height: auto;
+    max-height: 8;
+}
+
+BackendStatusWidget #backend-detail {
+    color: $text;
+}
+
+BackendDetailModal {
+    align: center middle;
+}
+
+BackendDetailModal > Vertical {
+    width: 80;
+    max-height: 40;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+
+BackendDetailModal #bdm-header {
+    text-style: bold;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+BackendDetailModal .bdm-field {
+    margin-bottom: 0;
+}
+
+BackendDetailModal #bdm-conditions-table {
+    height: auto;
+    max-height: 8;
+    margin-top: 1;
+}
+
+BackendDetailModal #bdm-actions {
+    dock: bottom;
+    height: 3;
+    align: center middle;
+    margin-top: 1;
+}
+
+EventLogWidget {
+    border: round $accent;
+    min-height: 8;
+}
+
+EventLogWidget RichLog {
+    height: 100%;
+    scrollbar-size: 1 1;
+}
+
+#cap-section {
+    height: 1fr;
+    min-height: 8;
+    border: round $accent;
+}
+
+#cap-section ContentSwitcher {
+    height: 1fr;
+}
+
+#cap-tabs {
+    height: 1fr;
+}
+
+#cap-section DataTable {
+    height: 1fr;
+}
+
+Footer {
+    background: $panel;
+}
+
+Header {
+    background: $panel;
+    color: $text;
+}
+
+#tools-layout {
+    height: 1fr;
+}
+
+#tools-header-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+#tools-header {
+    width: auto;
+    content-align: left middle;
+}
+
+#tools-search {
+    width: 1fr;
+    margin-left: 2;
+}
+
+#tools-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    background: $boost;
+}
+
+#tools-cap-section {
+    height: 1fr;
+    min-height: 8;
+    border: round $accent;
+}
+
+#tools-cap-section ContentSwitcher {
+    height: 1fr;
+}
+
+#tools-cap-section DataTable {
+    height: 1fr;
+}
+
+#tools-detail-panel {
+    height: auto;
+    max-height: 6;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#registry-content {
+    height: 1fr;
+}
+
+#registry-header {
+    height: 1;
+    padding: 0 1;
+    background: $panel;
+    text-style: bold;
+}
+
+#registry-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#registry-layout {
+    height: 1fr;
+}
+
+#registry-browser {
+    width: 2fr;
+    height: 100%;
+    border: round $accent;
+}
+
+#install-panel {
+    width: 1fr;
+    height: 100%;
+    border: round $primary;
+    padding: 1;
+}
+
+#settings-tabs {
+    height: 1fr;
+}
+
+#general-section,
+#servers-section,
+#config-section,
+#about-section,
+#theme-section-content {
+    padding: 1 2;
+    height: 1fr;
+}
+
+.setting-row {
+    height: 3;
+    align: left middle;
+    margin-bottom: 1;
+}
+
+.setting-label {
+    width: 22;
+    content-align: left middle;
+    color: $text-muted;
+}
+
+.setting-row Input {
+    width: 1fr;
+}
+
+.setting-row Select {
+    width: 1fr;
+}
+
+.setting-row Button {
+    margin-right: 1;
+}
+
+#flags-display {
+    margin: 1 0;
+    padding: 0 1;
+    color: $text;
+}
+
+#conflict-title {
+    text-style: bold;
+    margin-top: 1;
+}
+
+#conflict-priority-hint {
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+#servers-viewer,
+#config-viewer {
+    height: 1fr;
+    min-height: 8;
+}
+
+#about-details {
+    margin: 1 0;
+    padding: 0 1;
+}
+
+#skills-container {
+    height: 1fr;
+}
+
+#skills-title {
+    text-style: bold;
+    padding: 0 1;
+    color: $primary;
+}
+
+#skills-filter-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+#skills-search {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#skills-category-select {
+    width: 26;
+}
+
+#skills-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#skills-table {
+    height: 1fr;
+}
+
+#detail-panel {
+    height: auto;
+    max-height: 12;
+    border-top: heavy $accent;
+    padding: 1 2;
+}
+
+#actions-bar {
+    height: 3;
+    padding: 0 2;
+}
+
+#actions-bar Button {
+    margin-right: 1;
+}
+
+#tool-list-panel {
+    width: 1fr;
+    border: solid $primary;
+    padding: 1;
+}
+
+#editor-panel {
+    width: 2fr;
+    border: solid $accent;
+    padding: 1;
+}
+
+#preview-panel {
+    width: 1fr;
+    border: solid $success;
+    padding: 1;
+}
+
+#rename-input {
+    margin: 1 0;
+}
+
+.editor-section {
+    margin-bottom: 1;
+}
+
+#audit-layout {
+    height: 1fr;
+}
+
+#audit-filter-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $boost;
+}
+
+#audit-filter-bar Input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#audit-filter-bar Select {
+    width: 18;
+    margin-right: 1;
+}
+
+#audit-table {
+    height: 1fr;
+}
+
+#audit-status-bar {
+    height: 3;
+    padding: 0 1;
+    color: $text-muted;
+    background: $boost;
+    align: left middle;
+}
+
+#audit-stats {
+    width: 1fr;
+    color: $text-muted;
+    content-align: left middle;
+}
+
+#registries-section {
+    padding: 1 2;
+    height: 1fr;
+}
+
+#sec-auth-section,
+#sec-authz-section {
+    padding: 1 2;
+    height: 1fr;
+}
+
+#sec-incoming-title,
+#sec-outgoing-title,
+#sec-authz-title {
+    text-style: bold;
+    margin-top: 1;
+    margin-bottom: 0;
+}
+
+#sec-bearer-section,
+#sec-oidc-section {
+    padding: 0 2;
+}
+
+#sec-authz-policies-editor {
+    height: 8;
+    min-height: 6;
+    margin-top: 1;
+}
+
+#registries-viewer {
+    height: 8;
+    min-height: 6;
+}
+
+#config-validation-result {
+    height: 1;
+    padding: 0 1;
+    margin-top: 1;
+}
+
+ExitModal {
+    align: center middle;
+}
+
+#srvlog-filter-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $boost;
+}
+
+#srvlog-filter-bar Select { width: 18; margin-right: 1; }
+#srvlog-filter-bar Input  { width: 1fr; margin-right: 1; }
+
+#srvlog-table { height: 1fr; }
+
+#srvlog-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    background: $boost;
+}
+
+#srvlog-stats { dock: right; width: auto; color: $text-muted; }
+
+#ei-tabs { height: 1fr; }
+
+#export-control-bar,
+#import-control-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $boost;
+}
+
+#export-control-bar Select,
+#import-control-bar Select { width: 22; margin-right: 1; }
+
+#export-preview-table,
+#import-results-table { height: 10; }
+
+#export-yaml-output,
+#import-yaml-input { height: 1fr; min-height: 6; }
+
+#catalog-control-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $boost;
+}
+
+#catalog-yaml-input { height: 10; min-height: 6; }
+
+#catalog-results-table { height: 1fr; }
+
+#catalog-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    background: $boost;
+}
+
+#catalog-stats { dock: right; width: auto; color: $text-muted; }
+
+#toolops-control-bar {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $boost;
+}
+
+#toolops-control-bar Input { width: 1fr; margin-right: 1; }
+
+#toolops-table { height: 1fr; }
+
+#toolops-status-bar {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    background: $boost;
+}
+
+#toolops-stats { dock: right; width: auto; color: $text-muted; }

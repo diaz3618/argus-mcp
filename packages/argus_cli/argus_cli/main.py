@@ -209,3 +209,31 @@ def shell() -> None:
 
     config = get_config()
     start_repl(config)
+
+
+@app.command()
+def tui(
+    server: Annotated[
+        str | None,
+        typer.Option("--server", "-s", help="Argus server URL."),
+    ] = None,
+    token: Annotated[
+        str | None,
+        typer.Option("--token", "-t", help="Management API token."),
+    ] = None,
+) -> None:
+    """Launch the Textual TUI dashboard."""
+    try:
+        from argus_cli.tui.app import ArgusApp
+    except ImportError:
+        typer.echo(
+            "Textual TUI requires the 'tui' extra: pip install argus-cli[tui]",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+
+    config = get_config()
+    url = server or config.server_url
+    tok = token or config.token
+    app_instance = ArgusApp(server_url=url, token=tok)
+    app_instance.run()

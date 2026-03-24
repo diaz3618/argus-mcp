@@ -89,6 +89,8 @@ ignore = [
 "argus_cli/output.py" = ["TC"]
 "argus_cli/repl/**" = ["TC"]
 "argus_cli/widgets/**" = ["TC"]
+# TUI files copied from server package — will be refactored in Phase 2+
+"argus_cli/tui/**" = ["E501", "RUF003", "RUF012", "S110", "S607", "SIM", "TC", "UP045"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["argus_cli"]
