@@ -176,7 +176,6 @@ async def ensure_image(
     if not transport or transport == "docker":
         return None, command, list(args)
 
-    # Build RuntimeConfig from overrides
     overrides: Dict[str, object] = {}
     if builder_image:
         overrides["builder_image"] = builder_image
@@ -457,7 +456,6 @@ async def _ensure_source_image(
     if any(ind in steps_joined for ind in node_indicators) or ep_first == "node":
         transport = "npx"
 
-    # Build RuntimeConfig from overrides
     overrides: Dict[str, object] = {}
     if builder_image:
         overrides["builder_image"] = builder_image

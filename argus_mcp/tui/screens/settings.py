@@ -358,8 +358,6 @@ class SettingsScreen(ArgusScreen):
         except NoMatches:
             pass
 
-    # ── Button handlers (using @on decorators) ───────────────────────
-
     @on(Button.Pressed, "#btn-theme-picker")
     def _handle_theme_picker(self, event: Button.Pressed) -> None:
         self.app.action_open_theme_picker()

@@ -38,8 +38,6 @@ class ServerLogsScreen(BaseLogScreen):
         self._filter_search: str = ""
         self._show_correlation: bool = True
 
-    # ── Template method overrides ────────────────────────────────────
-
     def _table_id(self) -> str:
         return "srvlog-table"
 
@@ -94,8 +92,6 @@ class ServerLogsScreen(BaseLogScreen):
     def _export_filename(self) -> str:
         return "server-logs-export.json"
 
-    # ── UI composition ───────────────────────────────────────────────
-
     def compose_content(self) -> ComposeResult:
         with Vertical(id="srvlog-layout"):
             yield Static(
@@ -142,8 +138,6 @@ class ServerLogsScreen(BaseLogScreen):
                 )
                 yield Button("Export JSON", id="btn-srvlog-export", variant="primary")
 
-    # ── Lifecycle ────────────────────────────────────────────────────
-
     def on_mount(self) -> None:
         self._setup_table()
         self._populate_server_dropdown()
@@ -152,8 +146,6 @@ class ServerLogsScreen(BaseLogScreen):
         self._load_events_from_app()
         self._populate_server_dropdown()
         self._refresh_table()
-
-    # ── Screen-specific helpers ──────────────────────────────────────
 
     def _populate_server_dropdown(self) -> None:
         """Fill the server dropdown from current events and server manager."""
@@ -207,8 +199,6 @@ class ServerLogsScreen(BaseLogScreen):
             return events
         q = self._filter_search.lower()
         return [e for e in events if q in _json.dumps(e, default=str).lower()]
-
-    # ── Event handlers ───────────────────────────────────────────────
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "srvlog-search":

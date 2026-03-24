@@ -165,11 +165,9 @@ class ToolEditorScreen(ArgusScreen):
         if not tool_info:
             return
 
-        # Get modifications if any
         mods = self._modifications.get(tool_name, {})
         display_name = mods.get("rename", tool_name)
 
-        # Update rename input
         rename = self.query_one("#rename-input", Input)
         rename.value = display_name
 

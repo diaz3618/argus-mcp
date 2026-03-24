@@ -312,7 +312,6 @@ class DockerRuntime(ContainerRuntime):
         *,
         internal: bool = False,
     ) -> bool:
-        # Check existence first
         try:
             proc = await asyncio.create_subprocess_exec(
                 self._binary,

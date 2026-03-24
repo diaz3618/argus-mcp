@@ -373,14 +373,12 @@ def generate_uvx_dockerfile(
         Per-transport runtime configuration.  When ``None``, uses
         defaults for the ``"uvx"`` transport.
     """
-    # Resolve runtime config
     rc = runtime_config or RuntimeConfig.for_transport("uvx")
     image = builder_image or rc.builder_image
 
     package, validated_env, validated_deps = _validate_build_inputs(package, build_env, system_deps)
     validated_build_deps = validate_system_deps(build_system_deps or [])
 
-    # Build typed template data
     data = TemplateData(
         package=package,
         package_clean=_strip_version(package),
@@ -427,7 +425,6 @@ def generate_npx_dockerfile(
     runtime_config:
         Per-transport runtime configuration.
     """
-    # Resolve runtime config
     rc = runtime_config or RuntimeConfig.for_transport("npx")
     image = builder_image or rc.builder_image
 
@@ -437,7 +434,6 @@ def generate_npx_dockerfile(
     clean_name = _strip_version(package)
     bin_name = _npm_bin_name(clean_name)
 
-    # Build typed template data
     data = TemplateData(
         package=package,
         package_clean=clean_name,
@@ -489,7 +485,6 @@ def generate_go_dockerfile(
     runtime_args:
         Arguments to bake into the ENTRYPOINT.
     """
-    # Resolve runtime config
     rc = runtime_config or RuntimeConfig.for_transport("go")
     image = builder_image or rc.builder_image
 
@@ -498,10 +493,8 @@ def generate_go_dockerfile(
     )
     validated_build_deps = validate_system_deps(build_system_deps or [])
 
-    # Strip version from Go package for clean name
     clean_name = _strip_go_version(go_package)
 
-    # Build typed template data
     data = TemplateData(
         package=go_package,
         package_clean=clean_name,

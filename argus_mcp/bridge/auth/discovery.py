@@ -112,7 +112,6 @@ async def discover_oauth_metadata(
     """
     _validate_discovery_url(mcp_server_url)
 
-    # Check cache first
     cached = _metadata_cache.get(mcp_server_url)
     if cached:
         age = time.monotonic() - cached["cached_at"]

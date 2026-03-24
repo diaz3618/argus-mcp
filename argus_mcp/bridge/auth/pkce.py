@@ -307,11 +307,9 @@ class PKCEFlow:
         pkce = generate_pkce_challenge()
         state = generate_state()
 
-        # Start callback server
         loop = asyncio.get_running_loop()
         ready = asyncio.Event()
 
-        # Reset handler class-level state
         _CallbackHandler.result = None
         _CallbackHandler.error = None
         _CallbackHandler.ready_event = ready
@@ -331,7 +329,6 @@ class PKCEFlow:
         server_thread.start()
 
         try:
-            # Build authorization URL
             auth_params = {
                 "response_type": "code",
                 "client_id": self._client_id,
@@ -348,7 +345,6 @@ class PKCEFlow:
             # Present auth URL (opens browser or prints to stderr in headless)
             _present_auth_url(auth_url, redirect_uri)
 
-            # Wait for callback
             try:
                 await asyncio.wait_for(ready.wait(), timeout=self._timeout)
             except asyncio.CancelledError:
@@ -360,7 +356,6 @@ class PKCEFlow:
                     "Please retry and complete the browser flow."
                 ) from None
 
-            # Check for errors
             if _CallbackHandler.error:
                 raise RuntimeError(f"OAuth authorization failed: {_CallbackHandler.error}")
 

@@ -188,7 +188,6 @@ def _detach_server(args: argparse.Namespace) -> None:
     else:
         session_name = auto_name(args.port, DEFAULT_PORT)
 
-    # Check for port conflict with existing sessions
     conflict = check_port_conflict(args.host, args.port)
     if conflict is not None:
         print(

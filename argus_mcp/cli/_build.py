@@ -150,7 +150,6 @@ def _cmd_build(args: argparse.Namespace) -> None:
                 log.error("[%s] Build failed: %s", name, exc, exc_info=True)
                 return (name, "fail")
 
-        # Collect valid build jobs
         jobs: list[tuple[str, dict]] = []
         skip = 0
         for name, conf in stdio_backends.items():

@@ -254,7 +254,6 @@ def _import_backends(
                     )
                 )
                 continue
-            # UPDATE
             if not dry_run:
                 target.backends[name] = validated
             items.append(
@@ -349,7 +348,6 @@ def _import_registries(
                     )
                 )
                 continue
-            # RENAME
             new_name = _generate_rename(reg_name, existing_names)
             validated_reg = validated_reg.model_copy(update={"name": new_name})
             if not dry_run:

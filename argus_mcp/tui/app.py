@@ -160,10 +160,6 @@ class ArgusApp(App):
         self._last_sessions: Optional[Any] = None
         self._last_groups: Optional[Any] = None
 
-    # ------------------------------------------------------------------
-    # Public accessors for cached poll data
-    # ------------------------------------------------------------------
-
     @property
     def server_manager(self) -> Optional[object]:
         return self._server_manager
@@ -343,7 +339,6 @@ class ArgusApp(App):
 
     def on_mount(self) -> None:
         """Called after the TUI is fully mounted."""
-        # Load saved theme preference
         from argus_mcp.tui.settings import load_settings
 
         settings = load_settings()
@@ -742,7 +737,6 @@ class ArgusApp(App):
         mgr.set_active(name)
         mgr.save()
 
-        # Reset state for the new server
         self._connected = False
         self._caps_loaded = False
         self._seen_event_ids.clear()

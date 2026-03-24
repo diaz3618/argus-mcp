@@ -263,7 +263,6 @@ class HealthChecker:
         if target_phase is None or target_phase == record.phase:
             return
 
-        # Build a descriptive message
         if health.state == HealthState.DEGRADED:
             msg = f"High latency: {health.last_latency_ms:.0f}ms"
         elif health.state == HealthState.UNHEALTHY:

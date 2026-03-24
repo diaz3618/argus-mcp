@@ -141,7 +141,6 @@ def parse_workflow(data: Dict[str, Any]) -> WorkflowDefinition:
         output=data.get("output", ""),
     )
 
-    # Validate acyclicity
     wf.topological_order()
 
     return wf

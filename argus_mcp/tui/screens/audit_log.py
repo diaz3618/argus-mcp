@@ -37,8 +37,6 @@ class AuditLogScreen(BaseLogScreen):
         self._filter_user: str = ""
         self._filter_server: str = ""
 
-    # ── Template method overrides ────────────────────────────────────
-
     def _table_id(self) -> str:
         return "audit-table"
 
@@ -103,8 +101,6 @@ class AuditLogScreen(BaseLogScreen):
     def _export_filename(self) -> str:
         return "audit-export.json"
 
-    # ── UI composition ───────────────────────────────────────────────
-
     def compose_content(self) -> ComposeResult:
         with Vertical(id="audit-layout"):
             yield Static("[b]Audit Log[/b]  •  Structured event history", id="audit-title")
@@ -138,16 +134,12 @@ class AuditLogScreen(BaseLogScreen):
                 yield Static("Events: 0  │  Errors: 0  │  Denied: 0", id="audit-stats")
                 yield Button("Export JSON", id="btn-audit-export", variant="primary")
 
-    # ── Lifecycle ────────────────────────────────────────────────────
-
     def on_mount(self) -> None:
         self._setup_table()
 
     def on_show(self) -> None:
         self._load_events_from_app()
         self._refresh_table()
-
-    # ── Event handlers ───────────────────────────────────────────────
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "audit-user-filter":

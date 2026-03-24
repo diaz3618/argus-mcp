@@ -328,7 +328,6 @@ class ArgusService:
             # Build conflict strategy from full config (needs v1 envelope).
             self._registry = self._build_registry()
 
-            # Build server group manager from per-backend group fields.
             self._group_manager = self._build_group_manager(config)
 
             logger.info("Connecting %d backend service(s)...", self._backends_total)
@@ -348,7 +347,6 @@ class ArgusService:
                 stage = f"backend_{phase}"
                 msg = message or phase
                 self.emit_event(stage, f"[{name}] {msg}", severity=severity, backend=name)
-                # Also call original callback if provided
                 if progress_callback is not None:
                     progress_callback(name, phase, message)
 
@@ -559,7 +557,6 @@ class ArgusService:
                 logger.info("Removing backend '%s' (no longer in config).", name)
                 await self._disconnect_backend(name)
 
-            # Reconnect changed backends
             for name in diff.changed:
                 logger.info("Reconnecting changed backend '%s'.", name)
                 await self._disconnect_backend(name)
@@ -567,19 +564,16 @@ class ArgusService:
                 if not success:
                     result["errors"].append(f"Failed to reconnect backend '{name}'.")
 
-            # Add new backends
             for name in diff.added:
                 logger.info("Adding new backend '%s'.", name)
                 success = await self._connect_backend(name, new_config[name])
                 if not success:
                     result["errors"].append(f"Failed to connect new backend '{name}'.")
 
-            # Update internal state
             self._config_data = new_config
             self._backends_total = len(new_config)
             self._backends_connected = self._manager.get_active_session_count()
 
-            # Re-discover capabilities
             active_sessions = self._manager.get_all_sessions()
             if active_sessions:
                 self._registry = self._build_registry()
@@ -609,7 +603,6 @@ class ArgusService:
 
         logger.info("Config file change detected by watcher, invoking reload...")
 
-        # Compute config hash for the sync widget
         config_hash = ""
         if self._config_path:
             try:

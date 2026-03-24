@@ -182,7 +182,6 @@ class ToolIndex:
         query_vec = self._vectorizer.transform([query])
         scores = _cosine(query_vec, self._tfidf_matrix).flatten()
 
-        # Combine with results, filter zero scores
         results: List[Tuple[float, ToolEntry]] = []
         for idx, score in enumerate(scores):
             if score > 0.0:

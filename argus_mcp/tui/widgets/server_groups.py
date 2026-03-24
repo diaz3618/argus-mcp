@@ -71,7 +71,6 @@ class ServerGroupsWidget(Widget):
             return
         tree.clear()
 
-        # Build group mapping
         if groups is None:
             groups = {}
             for b in backends:

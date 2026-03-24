@@ -102,7 +102,6 @@ class RegistryManagerPanel(Static):
         self.notify(f"Added registry '{name}'", title="Registry Added")
         self.refresh_registries()
 
-        # Clear inputs
         try:
             self.query_one("#reg-name-input", Input).value = ""
             self.query_one("#reg-url-input", Input).value = ""

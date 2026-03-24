@@ -105,7 +105,6 @@ async def handle_health(request: Request) -> JSONResponse:
     else:
         health = "unhealthy"
 
-    # Compute actual healthy count from health checker when available
     health_checker = service.health_checker
     if health_checker is not None:
         all_health = health_checker.get_all_health()
@@ -178,7 +177,6 @@ async def handle_backends(request: Request) -> JSONResponse:
     service = _get_service(request)
     route_map = service.registry.get_route_map()
 
-    # Build per-backend capability counts
     def _count_by_backend(items, name_fn):
         counts: Dict[str, int] = {}
         for item in items:
@@ -538,7 +536,6 @@ async def handle_shutdown(request: Request) -> JSONResponse:
     """Graceful server shutdown with backend cleanup."""
     service = _get_service(request)
 
-    # Parse optional timeout from request body
     try:
         body = await request.json()
     except (json.JSONDecodeError, ValueError):  # noqa: E501

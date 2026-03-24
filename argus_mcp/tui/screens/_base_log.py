@@ -41,8 +41,6 @@ class BaseLogScreen(ArgusScreen):
         self._events: List[Dict[str, Any]] = []
         self._paused: bool = False
 
-    # ── Template methods (override in subclass) ──────────────────────
-
     def _table_id(self) -> str:
         raise NotImplementedError
 
@@ -69,8 +67,6 @@ class BaseLogScreen(ArgusScreen):
 
     def _export_filename(self) -> str:
         raise NotImplementedError
-
-    # ── Shared logic ─────────────────────────────────────────────────
 
     def _setup_table(self) -> None:
         """Add columns and configure the DataTable."""

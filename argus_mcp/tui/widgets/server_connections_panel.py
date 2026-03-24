@@ -90,7 +90,6 @@ class ServerConnectionsPanel(Static):
         self.notify(f"Added server '{name}' ({url})", title="Server Added")
         self.refresh_servers()
 
-        # Clear inputs
         try:
             self.query_one("#server-name-input", Input).value = ""
             self.query_one("#server-url-input", Input).value = ""

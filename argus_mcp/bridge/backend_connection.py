@@ -364,7 +364,6 @@ async def connect_backend(
         auth=auth,
     )
 
-    # Initialize MCP session with appropriate timeout
     if svr_type == "stdio":
         init_timeout = svr_conf.get("init_timeout", STDIO_MCP_INIT_TIMEOUT)
         suffix = " (post-build)"

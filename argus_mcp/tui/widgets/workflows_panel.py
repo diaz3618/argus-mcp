@@ -324,7 +324,6 @@ class WorkflowsPanel(Widget):
                 self.app.notify("Invalid workflow: must have a 'name' field.", severity="error")
                 return
 
-            # Validate the DAG structure
             from argus_mcp.workflows.dsl import WorkflowValidationError, parse_workflow
 
             try:
@@ -370,7 +369,6 @@ class WorkflowsPanel(Widget):
         name = wf_data.get("name", "?")
         self.app.notify(f"Running workflow '{name}'…")
 
-        # Clear previous output
         if log_widget := safe_query(self, "#wf-output-log", RichLog):
             log_widget.clear()
 
