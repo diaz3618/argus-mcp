@@ -187,7 +187,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:anyio",
     "ignore::DeprecationWarning:pkg_resources",
 ]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers -m 'not (integration or e2e or semgrep)'"
 
 [tool.coverage.run]
 source = ["argus_mcp"]

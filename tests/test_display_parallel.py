@@ -678,7 +678,7 @@ class TestColumnWidthConstants:
 
     def test_constants_defined(self):
         assert _COL_ICON == 2
-        assert _COL_NAME == 42
+        assert _COL_NAME == 50
         assert _COL_BAR == 19
         assert _COL_STATUS == 36
         assert _COL_TIMER == 7

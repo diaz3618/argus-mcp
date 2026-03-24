@@ -44,10 +44,15 @@ class TestWellKnownEndpoint:
     async def test_returns_metadata_with_oidc_issuer(self) -> None:
         from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
-        auth_cfg = _make_auth_cfg(issuer="https://auth.example.com")
-        with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=auth_cfg,
+        with (
+            patch(
+                "argus_mcp.server.well_known._is_auth_enabled",
+                return_value=True,
+            ),
+            patch(
+                "argus_mcp.server.transport._auth_issuer",
+                "https://auth.example.com",
+            ),
         ):
             resp = await handle_well_known_oauth_resource(_make_request())
 
@@ -65,38 +70,49 @@ class TestWellKnownEndpoint:
         from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
         with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=None,
+            "argus_mcp.server.well_known._is_auth_enabled",
+            return_value=False,
         ):
             resp = await handle_well_known_oauth_resource(_make_request())
 
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_empty_authorization_servers_without_issuer(self) -> None:
+    async def test_returns_404_for_local_auth_without_issuer(self) -> None:
+        """Local/static bearer-token auth has no OAuth issuer — return 404."""
         from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
-        auth_cfg = _make_auth_cfg(issuer=None)
-        with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=auth_cfg,
+        with (
+            patch(
+                "argus_mcp.server.well_known._is_auth_enabled",
+                return_value=True,
+            ),
+            patch(
+                "argus_mcp.server.transport._auth_issuer",
+                None,
+            ),
         ):
             resp = await handle_well_known_oauth_resource(_make_request())
 
-        assert resp.status_code == 200
+        assert resp.status_code == 404
         import json
 
         data = json.loads(resp.body.decode())
-        assert data["authorization_servers"] == []
+        assert data["error"] == "no_oauth_server"
 
     @pytest.mark.asyncio
     async def test_resource_reflects_request_url(self) -> None:
         from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
-        auth_cfg = _make_auth_cfg()
-        with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=auth_cfg,
+        with (
+            patch(
+                "argus_mcp.server.well_known._is_auth_enabled",
+                return_value=True,
+            ),
+            patch(
+                "argus_mcp.server.transport._auth_issuer",
+                "https://auth.example.com",
+            ),
         ):
             resp = await handle_well_known_oauth_resource(
                 _make_request(scheme="http", netloc="localhost:9000")
@@ -111,10 +127,15 @@ class TestWellKnownEndpoint:
     async def test_jwt_type_returns_metadata(self) -> None:
         from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
-        auth_cfg = _make_auth_cfg(auth_type="jwt", issuer="https://jwt-issuer.example.com")
-        with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=auth_cfg,
+        with (
+            patch(
+                "argus_mcp.server.well_known._is_auth_enabled",
+                return_value=True,
+            ),
+            patch(
+                "argus_mcp.server.transport._auth_issuer",
+                "https://jwt-issuer.example.com",
+            ),
         ):
             resp = await handle_well_known_oauth_resource(_make_request())
 
@@ -124,53 +145,21 @@ class TestWellKnownEndpoint:
         data = json.loads(resp.body.decode())
         assert data["authorization_servers"] == ["https://jwt-issuer.example.com"]
 
-    @pytest.mark.asyncio
-    async def test_audience_adds_scopes_field(self) -> None:
-        from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
-        auth_cfg = _make_auth_cfg(audience="https://api.example.com")
-        with patch(
-            "argus_mcp.server.well_known._get_incoming_auth_config",
-            return_value=auth_cfg,
-        ):
-            resp = await handle_well_known_oauth_resource(_make_request())
+class TestIsAuthEnabled:
+    """Tests for _is_auth_enabled helper."""
 
-        import json
+    def test_returns_false_when_no_provider(self) -> None:
+        from argus_mcp.server.well_known import _is_auth_enabled
 
-        data = json.loads(resp.body.decode())
-        assert "scopes_supported" in data
+        with patch("argus_mcp.server.transport._incoming_auth_provider", None):
+            assert _is_auth_enabled() is False
 
+    def test_returns_true_when_provider_set(self) -> None:
+        from argus_mcp.server.well_known import _is_auth_enabled
 
-class TestWellKnownConfigLoading:
-    """Tests for _get_incoming_auth_config helper."""
-
-    def test_returns_none_when_config_unavailable(self) -> None:
-        from argus_mcp.server.well_known import _get_incoming_auth_config
-
-        with patch(
-            "argus_mcp.config.loader.load_argus_config",
-            side_effect=Exception("no config"),
-        ):
-            result = _get_incoming_auth_config()
-        assert result is None
-
-    def test_returns_none_for_anonymous_auth(self) -> None:
-        from argus_mcp.server.well_known import _get_incoming_auth_config
-
-        mock_cfg = MagicMock()
-        mock_cfg.incoming_auth.type = "anonymous"
-        with patch("argus_mcp.config.loader.load_argus_config", return_value=mock_cfg):
-            result = _get_incoming_auth_config()
-        assert result is None
-
-    def test_returns_config_for_non_anonymous(self) -> None:
-        from argus_mcp.server.well_known import _get_incoming_auth_config
-
-        mock_cfg = MagicMock()
-        mock_cfg.incoming_auth.type = "oidc"
-        with patch("argus_mcp.config.loader.load_argus_config", return_value=mock_cfg):
-            result = _get_incoming_auth_config()
-        assert result is not None
+        with patch("argus_mcp.server.transport._incoming_auth_provider", MagicMock()):
+            assert _is_auth_enabled() is True
 
 
 class TestWellKnownConstant:

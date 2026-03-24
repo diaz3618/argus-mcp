@@ -53,9 +53,22 @@ MGMT_HEADERS: dict[str, str] = {}
 if _MGMT_TOKEN:
     MGMT_HEADERS["Authorization"] = f"Bearer {_MGMT_TOKEN}"
 
+
+def _server_reachable() -> bool:
+    """Check if the integration-test target server is reachable."""
+    if not HAS_HTTPX:
+        return False
+    try:
+        httpx.get(BASE_URL, timeout=2.0)
+        return True
+    except (httpx.ConnectError, httpx.TimeoutException, OSError):
+        return False
+
+
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(not HAS_HTTPX, reason="httpx not installed"),
+    pytest.mark.skipif(not _server_reachable(), reason=f"No server at {BASE_URL}"),
 ]
 
 

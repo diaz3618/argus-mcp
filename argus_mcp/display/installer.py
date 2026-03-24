@@ -55,7 +55,7 @@ _BUILDKIT_STEP_RE = re.compile(r"\[(\d+)/(\d+)\]")
 
 # Shared column widths for consistent alignment between parallel and completed tables
 _COL_ICON = 2
-_COL_NAME = 42
+_COL_NAME = 50
 _COL_BAR = 19
 _COL_STATUS = 36
 _COL_TIMER = 7
