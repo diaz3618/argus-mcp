@@ -35,7 +35,7 @@ try:
     logger.debug("Rust YAML parser loaded")
 except ImportError:
     _USE_RUST_YAML = False
-    _rust_parse_yaml = None  # type: ignore[assignment]
+    _rust_parse_yaml = None
 
 # Recognised config file extensions.
 _YAML_EXTS = frozenset({".yaml", ".yml"})

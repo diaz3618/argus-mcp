@@ -119,7 +119,7 @@ async def build_and_connect_stdio(
             if isinstance(result, asyncio.CancelledError):
                 logger.info("[%s] Stdio startup cancelled.", svr_name)
                 stdio_results[svr_name] = False
-            elif isinstance(result, Exception):
+            elif isinstance(result, BaseException):
                 logger.error(
                     "[%s] Startup task failed with exception '%s'.",
                     svr_name,

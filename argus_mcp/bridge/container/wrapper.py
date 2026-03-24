@@ -572,7 +572,7 @@ async def _remove_stale_named_container(runtime: str, name: str) -> None:
         except asyncio.TimeoutError:
             # Kill the hung process before retrying.
             with contextlib.suppress(ProcessLookupError):
-                proc.kill()  # type: ignore[union-attr]
+                proc.kill()
             if attempt == 0:
                 logger.debug(
                     "[%s] docker rm -f timed out, retrying after 2 s…",

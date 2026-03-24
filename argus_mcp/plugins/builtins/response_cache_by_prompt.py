@@ -29,7 +29,7 @@ try:
     logger.debug("Rust cache key hasher loaded")
 except ImportError:
     _USE_RUST_HASH = False
-    _rust_json_sha256 = None  # type: ignore[assignment]
+    _rust_json_sha256 = None
 
 
 class ResponseCachePlugin(PluginBase):

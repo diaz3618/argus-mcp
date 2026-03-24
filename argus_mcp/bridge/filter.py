@@ -74,5 +74,5 @@ def build_filter(
     available, otherwise falls back to the pure-Python implementation.
     """
     if _FILTER_RUST and _RustFilter is not None:
-        return _RustFilter(allow=allow or [], deny=deny or [])  # type: ignore[return-value]
+        return _RustFilter(allow=allow or [], deny=deny or [])
     return CapabilityFilter(allow=allow, deny=deny)
