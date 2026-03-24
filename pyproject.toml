@@ -157,6 +157,7 @@ layers = [
     "bridge : runtime : plugins : registry : skills : workflows",  # L3 — business
     "config : telemetry",                          # L2 — config
     "display : audit : secrets : sessions",        # L1 — core services
+    "api",                                         # L0.5 — shared API layer (client-safe)
     "constants : errors : _task_utils : _error_utils",  # L0 — foundation
 ]
 containers = ["argus_mcp"]
