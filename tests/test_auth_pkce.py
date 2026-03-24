@@ -17,11 +17,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# pkce.py ─────────────────────────────────────────────────────────────
+# pkce.py
 from argus_mcp.bridge.auth.pkce import (
     PKCEChallenge,
     PKCEFlow,
     TokenSet,
+    _is_headless,
+    _present_auth_url,
     generate_pkce_challenge,
     generate_state,
 )
@@ -134,7 +136,7 @@ class TestRefreshAccessToken:
         assert tokens.refresh_token == "new-refresh"
 
 
-# PKCEFlow ────────────────────────────────────────────────────────────
+# PKCEFlow
 
 
 class TestPKCEFlowInit:
@@ -463,7 +465,7 @@ class TestCallbackHandler:
         handler.send_error.assert_called_once_with(404)
 
 
-# store.py ────────────────────────────────────────────────────────────
+# store.py
 
 from argus_mcp.bridge.auth.store import TokenStore
 
@@ -551,7 +553,7 @@ class TestTokenStore:
         assert (tmp_path / "my_weird_name.json").exists()
 
 
-# discovery.py ────────────────────────────────────────────────────────
+# discovery.py
 
 from argus_mcp.bridge.auth.discovery import (
     OAuthMetadata,
@@ -654,7 +656,7 @@ class TestDiscoverOAuthMetadata:
         assert meta is None
 
 
-# provider.py — PKCEAuthProvider ──────────────────────────────────────
+# provider.py — PKCEAuthProvider
 
 from argus_mcp.bridge.auth.provider import (
     PKCEAuthProvider,
@@ -764,7 +766,7 @@ class TestCreateAuthProviderPKCE:
             create_auth_provider({"type": "magic"})
 
 
-# schema_backends.py — PKCEAuthConfig ─────────────────────────────────
+# schema_backends.py — PKCEAuthConfig
 
 from argus_mcp.config.schema_backends import PKCEAuthConfig
 
@@ -803,3 +805,84 @@ class TestPKCEAuthConfig:
             }
         )
         assert cfg.client_secret == "${MY_SECRET}"
+
+
+# Headless OAuth
+
+
+class TestIsHeadless:
+    """Tests for headless environment detection."""
+
+    def test_ssh_connection(self):
+        with patch.dict("os.environ", {"SSH_CONNECTION": "1.2.3.4 22 5.6.7.8 45678"}, clear=False):
+            assert _is_headless() is True
+
+    def test_ssh_tty(self):
+        with patch.dict("os.environ", {"SSH_TTY": "/dev/pts/0"}, clear=False):
+            assert _is_headless() is True
+
+    @patch("argus_mcp.bridge.auth.pkce.sys")
+    def test_linux_no_display(self, mock_sys):
+        mock_sys.platform = "linux"
+        env = {
+            k: v
+            for k, v in __import__("os").environ.items()
+            if k not in ("SSH_CONNECTION", "SSH_TTY", "DISPLAY", "WAYLAND_DISPLAY")
+        }
+        with patch.dict("os.environ", env, clear=True):
+            assert _is_headless() is True
+
+    def test_graphical_environment(self):
+        env = {"DISPLAY": ":0"}
+        # Remove SSH vars if present
+        with patch.dict("os.environ", env, clear=False):
+            with patch.dict("os.environ", {}, clear=False):
+                # Clear SSH vars
+                import os
+
+                old_ssh = os.environ.pop("SSH_CONNECTION", None)
+                old_tty = os.environ.pop("SSH_TTY", None)
+                try:
+                    assert _is_headless() is False
+                finally:
+                    if old_ssh is not None:
+                        os.environ["SSH_CONNECTION"] = old_ssh
+                    if old_tty is not None:
+                        os.environ["SSH_TTY"] = old_tty
+
+
+class TestPresentAuthUrl:
+    """Tests for auth URL presentation with headless fallback."""
+
+    AUTH_URL = "https://auth.example.com/authorize?code_challenge=abc"
+    REDIRECT = "http://127.0.0.1:12345/callback"
+
+    @patch("argus_mcp.bridge.auth.pkce.webbrowser.open")
+    @patch("argus_mcp.bridge.auth.pkce._is_headless", return_value=False)
+    def test_opens_browser_when_graphical(self, mock_headless, mock_open):
+        _present_auth_url(self.AUTH_URL, self.REDIRECT)
+        mock_open.assert_called_once_with(self.AUTH_URL)
+
+    @patch("argus_mcp.bridge.auth.pkce.webbrowser.open")
+    @patch("argus_mcp.bridge.auth.pkce._is_headless", return_value=True)
+    def test_no_browser_when_headless(self, mock_headless, mock_open, capsys):
+        _present_auth_url(self.AUTH_URL, self.REDIRECT)
+        mock_open.assert_not_called()
+        captured = capsys.readouterr()
+        assert self.AUTH_URL in captured.err
+        assert "OAUTH AUTHORIZATION REQUIRED" in captured.err
+
+    @patch("argus_mcp.bridge.auth.pkce.webbrowser.open")
+    @patch("argus_mcp.bridge.auth.pkce._is_headless", return_value=True)
+    def test_headless_prints_redirect_uri(self, mock_headless, mock_open, capsys):
+        _present_auth_url(self.AUTH_URL, self.REDIRECT)
+        captured = capsys.readouterr()
+        assert self.REDIRECT in captured.err
+
+    @patch("argus_mcp.bridge.auth.pkce.webbrowser.open")
+    @patch("argus_mcp.bridge.auth.pkce._is_headless", return_value=True)
+    def test_headless_does_not_leak_to_stdout(self, mock_headless, mock_open, capsys):
+        """Auth URLs must not appear in stdout (only stderr for security)."""
+        _present_auth_url(self.AUTH_URL, self.REDIRECT)
+        captured = capsys.readouterr()
+        assert self.AUTH_URL not in captured.out

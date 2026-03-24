@@ -67,6 +67,9 @@ requests that exceed the threshold.
 Trips open after a threshold of consecutive failures. While open, requests
 are rejected immediately until the cooldown elapses and the circuit resets.
 
+An optional Rust-accelerated state machine (`circuit_breaker_rs`) is used
+when the native extension is available.
+
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `failure_threshold` | integer | `5` | Failures before tripping |
@@ -106,6 +109,11 @@ retries on transient errors.
 
 Caches tool responses keyed by the full prompt text. Reduces backend load
 for repeated identical requests.
+
+An optional Rust-accelerated cache key hasher (`hash_rs`) is used when
+available. It combines JSON serialization and SHA-256 hashing in a single
+FFI call, falling back to Python's `json.dumps` + `hashlib.sha256`
+otherwise.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|

@@ -171,8 +171,9 @@ class OptimizerPanel(Widget):
 
             # Prefer the real ToolIndex from the optimizer
             from argus_mcp.server.app import mcp_server
+            from argus_mcp.server.state import get_state
 
-            optimizer_index = getattr(mcp_server, "optimizer_index", None)
+            optimizer_index = get_state(mcp_server).optimizer_index
             if optimizer_index is not None:
                 results = optimizer_index.search(query, limit=limit)
                 self.update_search_results(results)
@@ -180,7 +181,7 @@ class OptimizerPanel(Widget):
 
             # Fallback: substring match against cached capabilities
             app = self.app
-            caps = getattr(app, "_last_caps", None)
+            caps = app.last_caps
             if caps is None:
                 self.app.notify(
                     "No capabilities cached — connect to a server first",

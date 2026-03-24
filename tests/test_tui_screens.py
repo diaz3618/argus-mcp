@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.css.query import NoMatches
 
-# ServerLogsScreen ────────────────────────────────────────────────────
+# ServerLogsScreen
 from argus_mcp.tui.screens.server_logs import ServerLogsScreen
 
 
@@ -24,8 +24,6 @@ class TestServerLogsScreenInit:
         screen = ServerLogsScreen()
         assert screen._events == []
         assert screen._paused is False
-        assert screen._filter_server == ""
-        assert screen._filter_method == "all"
         assert screen._filter_search == ""
         assert screen._show_correlation is True
 
@@ -122,7 +120,7 @@ class TestServerLogsCorrelation:
         assert screen._show_correlation is True
 
 
-# ExportImportScreen ──────────────────────────────────────────────────
+# ExportImportScreen
 
 from argus_mcp.config.export import ExportFilter, SecretHandling
 from argus_mcp.config.import_handler import ConflictStrategy
@@ -178,7 +176,7 @@ class TestImportConflictStrategy:
         assert {cs.value for cs in ConflictStrategy} == expected
 
 
-# CatalogBrowserScreen ───────────────────────────────────────────────
+# CatalogBrowserScreen
 
 from argus_mcp.registry.catalog import CatalogEntryStatus
 from argus_mcp.tui.screens.catalog_browser import (
@@ -231,18 +229,18 @@ class TestCatalogEntryStatusEnum:
         assert CatalogEntryStatus.FAILED.value == "failed"
 
 
-# ToolOpsPanel ────────────────────────────────────────────────────────
+# ToolOpsPanel
 
 from argus_mcp.tui.widgets.tool_ops_panel import ToolOpsPanel
 
 
 class TestToolOpsPanelGetTools:
-    """Test _get_tools() with mock app._last_caps."""
+    """Test _get_tools() with mock app.last_caps."""
 
     def _make_panel(self, caps: Any = None) -> ToolOpsPanel:
         panel = ToolOpsPanel()
         mock_app = MagicMock()
-        mock_app._last_caps = caps
+        mock_app.last_caps = caps
         # Patch the app property to return our mock
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda self: mock_app)):
             panel._mock_app = mock_app  # stash for assertions
@@ -251,7 +249,7 @@ class TestToolOpsPanelGetTools:
     def test_returns_empty_when_no_caps(self):
         panel = ToolOpsPanel()
         mock_app = MagicMock()
-        mock_app._last_caps = None
+        mock_app.last_caps = None
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_tools()
         assert result == []
@@ -263,7 +261,7 @@ class TestToolOpsPanelGetTools:
         tool2 = MagicMock()
         tool2.model_dump.return_value = {"name": "t2", "description": "Tool 2"}
         mock_app = MagicMock()
-        mock_app._last_caps = MagicMock(tools=[tool1, tool2])
+        mock_app.last_caps = MagicMock(tools=[tool1, tool2])
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_tools()
         assert len(result) == 2
@@ -274,7 +272,7 @@ class TestToolOpsPanelGetTools:
         panel = ToolOpsPanel()
         mock_app = MagicMock()
         caps = MagicMock(spec=[])
-        mock_app._last_caps = caps
+        mock_app.last_caps = caps
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_tools()
         assert result == []
@@ -284,7 +282,7 @@ class TestToolOpsPanelGetRouteMap:
     def test_returns_empty_when_no_caps(self):
         panel = ToolOpsPanel()
         mock_app = MagicMock()
-        mock_app._last_caps = None
+        mock_app.last_caps = None
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_route_map()
         assert result == {}
@@ -292,7 +290,7 @@ class TestToolOpsPanelGetRouteMap:
     def test_returns_route_map(self):
         panel = ToolOpsPanel()
         mock_app = MagicMock()
-        mock_app._last_caps = MagicMock(route_map={"tool1": "backend-a", "tool2": "backend-b"})
+        mock_app.last_caps = MagicMock(route_map={"tool1": "backend-a", "tool2": "backend-b"})
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_route_map()
         assert result == {"tool1": "backend-a", "tool2": "backend-b"}
@@ -300,7 +298,7 @@ class TestToolOpsPanelGetRouteMap:
     def test_returns_empty_when_route_map_none(self):
         panel = ToolOpsPanel()
         mock_app = MagicMock()
-        mock_app._last_caps = MagicMock(route_map=None)
+        mock_app.last_caps = MagicMock(route_map=None)
         with patch.object(type(panel), "app", new_callable=lambda: property(lambda s: mock_app)):
             result = panel._get_route_map()
         assert result == {}
@@ -381,7 +379,7 @@ class TestToolOpsValidationLogic:
         return issues
 
 
-# Screen registration ─────────────────────────────────────────────────
+# Screen registration
 
 
 class TestScreenRegistration:
@@ -413,7 +411,7 @@ class TestScreenRegistration:
         assert len(ArgusApp.MODES) >= 14
 
 
-# Import smoke tests ─────────────────────────────────────────────────
+# Import smoke tests
 
 
 class TestModuleImports:

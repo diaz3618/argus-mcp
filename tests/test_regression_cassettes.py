@@ -30,7 +30,7 @@ import pytest
 CASSETTES_DIR = Path(__file__).parent / "cassettes"
 SERVER_URL = "http://127.0.0.1:9000"
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _cassette_path(name: str) -> Path:
@@ -91,7 +91,7 @@ def _load_cassette(name: str) -> dict:
         return json.load(f)
 
 
-# Precondition checks ────────────────────────────────────────────────
+# Precondition checks
 
 
 def _server_reachable() -> bool:
@@ -114,7 +114,7 @@ pytestmark = [
 ]
 
 
-# Protocol handshake regression ───────────────────────────────────────
+# Protocol handshake regression
 
 
 class TestProtocolHandshake:
@@ -151,7 +151,7 @@ class TestProtocolHandshake:
         assert version in known, f"Unknown protocol version: {version}"
 
 
-# Tool schema regression ──────────────────────────────────────────────
+# Tool schema regression
 
 
 class TestToolSchemas:
@@ -192,7 +192,7 @@ class TestToolSchemas:
             assert "inputSchema" in tool, f"Tool {tool['name']} missing inputSchema"
 
 
-# Resource list regression ────────────────────────────────────────────
+# Resource list regression
 
 
 class TestResourceList:
@@ -221,7 +221,7 @@ class TestResourceList:
             assert "name" in r, f"Resource missing name: {r}"
 
 
-# Error handling regression ───────────────────────────────────────────
+# Error handling regression
 
 
 class TestErrorHandling:

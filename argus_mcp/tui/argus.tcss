@@ -405,16 +405,17 @@ Header {
 }
 
 #audit-status-bar {
-    height: 1;
+    height: 3;
     padding: 0 1;
     color: $text-muted;
     background: $boost;
+    align: left middle;
 }
 
 #audit-stats {
-    dock: right;
-    width: auto;
+    width: 1fr;
     color: $text-muted;
+    content-align: left middle;
 }
 
 #registries-section {

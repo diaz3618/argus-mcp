@@ -160,7 +160,6 @@ class BearerAuthMiddleware:
             await self._handle_no_auth(scope, receive, send)
             return
 
-        # Extract Authorization header from raw ASGI headers
         auth_header = ""
         for key, value in scope.get("headers", []):
             if key == b"authorization":

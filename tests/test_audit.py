@@ -22,7 +22,7 @@ from argus_mcp.audit.models import (
     AuditTarget,
 )
 
-# AuditSource ─────────────────────────────────────────────────────────
+# AuditSource
 
 
 class TestAuditSource:
@@ -46,7 +46,7 @@ class TestAuditSource:
         assert restored == src
 
 
-# AuditTarget ─────────────────────────────────────────────────────────
+# AuditTarget
 
 
 class TestAuditTarget:
@@ -72,7 +72,7 @@ class TestAuditTarget:
             AuditTarget()  # method and capability_name are required
 
 
-# AuditOutcome ────────────────────────────────────────────────────────
+# AuditOutcome
 
 
 class TestAuditOutcome:
@@ -96,7 +96,7 @@ class TestAuditOutcome:
         assert outcome.error_type == "ConnectionError"
 
 
-# AuditEvent ──────────────────────────────────────────────────────────
+# AuditEvent
 
 
 class TestAuditEvent:
@@ -149,7 +149,7 @@ class TestAuditEvent:
         assert event.source.user_id == "bob"
 
 
-# AuditLogger ─────────────────────────────────────────────────────────
+# AuditLogger
 
 
 class TestAuditLogger:

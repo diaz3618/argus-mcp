@@ -108,7 +108,6 @@ class TestGuardedWriteStream:
             spin_window=10.0,  # wide window
             spin_threshold=5,  # low threshold
         )
-        # Send enough messages to exceed threshold
         for _ in range(10):
             await gw.send("x")
         assert metrics.spin_loop_warnings > 0

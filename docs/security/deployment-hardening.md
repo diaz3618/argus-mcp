@@ -136,6 +136,20 @@ Argus connects to backend MCP servers at URLs specified in
    instance metadata service (169.254.169.254) is unreachable from
    the Argus container.
 
+### Built-in SSRF Protections
+
+Argus validates outgoing URLs at multiple layers:
+
+- **Config validation** — backend URLs in `config.yaml` are checked
+  against private/loopback IP ranges at config parse time.
+- **OAuth/OIDC discovery** — every URL fetched during auth discovery
+  (RFC 9728) is validated against SSRF targets. Automatic HTTP redirect
+  following is disabled; each redirect hop is validated individually.
+- **Dynamic Client Registration** — DCR registration endpoints are
+  validated against SSRF before any registration request is sent.
+- **HTTP pool** — the shared HTTP connection pool uses
+  `follow_redirects=False` by default to prevent redirect-based SSRF.
+
 ### Docker Network Isolation
 
 ```bash

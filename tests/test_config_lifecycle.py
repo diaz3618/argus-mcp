@@ -45,7 +45,7 @@ from argus_mcp.registry.catalog import (
     stage_catalog,
 )
 
-# Helpers ────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_config(**overrides: Any) -> ArgusConfig:
@@ -77,7 +77,7 @@ def _make_config_with_secrets() -> ArgusConfig:
     )
 
 
-# EXPORT TESTS
+# Export tests
 
 
 class TestExportConfig:
@@ -157,7 +157,7 @@ class TestExportConfig:
         assert flags.get("dark_mode") is True
 
 
-# IMPORT TESTS
+# Import tests
 
 
 class TestParseImportPayload:
@@ -254,7 +254,7 @@ class TestImportConfig:
         assert "Too many backends" in result.errors[0]
 
 
-# METADATA PROVENANCE TESTS
+# Metadata provenance tests
 
 
 class TestMetadataProvenance:
@@ -326,7 +326,7 @@ class TestMetadataProvenance:
         assert cfg.created_by is None
 
 
-# CATALOG SERVICE TESTS
+# Catalog service tests
 
 
 class TestParseCatalog:
@@ -566,7 +566,7 @@ class TestCommitCatalog:
         assert "catalog=" in summary
 
 
-# ROUND-TRIP TESTS
+# Round-trip tests
 
 
 class TestExportImportRoundTrip:

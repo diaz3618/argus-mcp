@@ -19,6 +19,7 @@ from argus_mcp.constants import (
     MGMT_BACKEND_NAME_MAX_LEN,
     MGMT_EVENTS_LIMIT_MAX,
     MGMT_EVENTS_LIMIT_MIN,
+    MGMT_QUERY_PARAM_MAX_LEN,
     MGMT_SHUTDOWN_TIMEOUT_MAX,
     MGMT_SHUTDOWN_TIMEOUT_MIN,
     SERVER_VERSION,
@@ -62,6 +63,8 @@ _background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
 
 _BACKEND_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
+_SAFE_QUERY_RE = re.compile(r"^[a-zA-Z0-9_\-\.\s/\*]+$")
+
 
 def _get_service(request: Request) -> ArgusService:
     """Retrieve the ArgusService instance from app state."""
@@ -79,8 +82,9 @@ def _error_json(error: str, message: str, status_code: int = 500) -> JSONRespons
 def _get_feature_flags() -> Dict[str, bool]:
     """Return feature flags from the mcp_server instance, or empty dict."""
     from argus_mcp.server.app import mcp_server
+    from argus_mcp.server.state import get_state
 
-    ff = getattr(mcp_server, "feature_flags", None)
+    ff = get_state(mcp_server).feature_flags
     if ff is None:
         return {}
     return ff.all_flags()
@@ -101,7 +105,6 @@ async def handle_health(request: Request) -> JSONResponse:
     else:
         health = "unhealthy"
 
-    # Compute actual healthy count from health checker when available
     health_checker = service.health_checker
     if health_checker is not None:
         all_health = health_checker.get_all_health()
@@ -174,7 +177,6 @@ async def handle_backends(request: Request) -> JSONResponse:
     service = _get_service(request)
     route_map = service.registry.get_route_map()
 
-    # Build per-backend capability counts
     def _count_by_backend(items, name_fn):
         counts: Dict[str, int] = {}
         for item in items:
@@ -214,7 +216,6 @@ async def handle_backends(request: Request) -> JSONResponse:
             gm: GroupManager = service.group_manager  # type: ignore[assignment]
             group_name = gm.group_of(bi.name)
 
-        # Extract status phase and conditions from BackendStatusRecord
         status_phase = "pending"
         status_error: Optional[str] = None
         status_conditions: list = []
@@ -259,6 +260,12 @@ async def handle_groups(request: Request) -> JSONResponse:
     service = _get_service(request)
     filter_group = request.query_params.get("group")
 
+    if filter_group:
+        if len(filter_group) > MGMT_QUERY_PARAM_MAX_LEN:
+            return _error_json("bad_request", "Group name is too long.", 400)
+        if not _SAFE_QUERY_RE.match(filter_group):
+            return _error_json("bad_request", "Group name contains invalid characters.", 400)
+
     if service.group_manager is None:
         return JSONResponse({"groups": {}, "total_groups": 0, "total_servers": 0})
 
@@ -286,10 +293,22 @@ async def handle_capabilities(request: Request) -> JSONResponse:
     service = _get_service(request)
     route_map = service.registry.get_route_map()
 
-    # Query parameters
+    # Query parameters with validation
     filter_type = request.query_params.get("type")
     filter_backend = request.query_params.get("backend")
     filter_search = request.query_params.get("search", "").lower()
+
+    for param_name, param_val in [
+        ("type", filter_type),
+        ("backend", filter_backend),
+        ("search", filter_search),
+    ]:
+        if param_val is not None and len(param_val) > MGMT_QUERY_PARAM_MAX_LEN:
+            return _error_json("bad_request", f"Query parameter '{param_name}' is too long.", 400)
+    if filter_backend and not _BACKEND_NAME_RE.match(filter_backend):
+        return _error_json("bad_request", "Backend name contains invalid characters.", 400)
+    if filter_type and filter_type not in ("tools", "resources", "prompts"):
+        return _error_json("bad_request", "Type must be one of: tools, resources, prompts.", 400)
 
     def _filter_caps(type_name, items, name_fn, detail_fn):
         """Filter capabilities by backend/search and build detail objects."""
@@ -344,13 +363,15 @@ async def handle_capabilities(request: Request) -> JSONResponse:
 
     # Determine optimizer state for informational fields
     from argus_mcp.server.app import mcp_server as _mcp_server
+    from argus_mcp.server.state import get_state
 
-    optimizer_active = getattr(_mcp_server, "optimizer_enabled", False)
+    _svr_state = get_state(_mcp_server)
+    optimizer_active = _svr_state.optimizer_enabled
     mcp_visible_tool_count = len(tools)
     if optimizer_active:
         from argus_mcp.bridge.optimizer.meta_tools import META_TOOLS
 
-        keep_list = getattr(_mcp_server, "optimizer_keep_list", [])
+        keep_list = _svr_state.optimizer_keep_list
         keep_names = set(keep_list)
         kept_count = sum(1 for t in service.tools if t.name in keep_names)
         mcp_visible_tool_count = len(META_TOOLS) + kept_count
@@ -408,7 +429,6 @@ async def handle_events_stream(request: Request) -> StreamingResponse:
     async def event_generator():
         queue = service.subscribe()
         try:
-            # Send initial heartbeat
             yield _sse_format("heartbeat", {"message": "connected"}, "hb-0")
 
             while True:  # nosemgrep: mcp-unbounded-tool-loop
@@ -479,7 +499,6 @@ async def handle_reconnect(request: Request) -> JSONResponse:
     if not service.is_running:
         return _error_json("service_unavailable", "Service is not running.", 503)
 
-    # Check if backend exists
     if service.config_data and name not in service.config_data:
         return _error_json("not_found", f"Backend '{name}' not found.", 404)
 
@@ -517,7 +536,6 @@ async def handle_shutdown(request: Request) -> JSONResponse:
     """Graceful server shutdown with backend cleanup."""
     service = _get_service(request)
 
-    # Parse optional timeout from request body
     try:
         body = await request.json()
     except (json.JSONDecodeError, ValueError):  # noqa: E501
@@ -558,8 +576,9 @@ async def _deferred_shutdown(service: ArgusService, timeout: int) -> None:
 async def handle_sessions(request: Request) -> JSONResponse:
     """List active client sessions."""
     from argus_mcp.server.app import mcp_server
+    from argus_mcp.server.state import get_state
 
-    session_mgr = getattr(mcp_server, "session_manager", None)
+    session_mgr = get_state(mcp_server).session_manager
     if session_mgr is None:
         return JSONResponse(SessionsResponse(active_sessions=0, sessions=[]).model_dump())
 

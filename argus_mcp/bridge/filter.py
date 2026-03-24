@@ -56,9 +56,23 @@ class CapabilityFilter:
         return True
 
 
+try:
+    from argus_mcp.bridge._filter_rs import RUST_AVAILABLE as _FILTER_RUST
+    from argus_mcp.bridge._filter_rs import RustCapabilityFilter as _RustFilter
+except ImportError:
+    _FILTER_RUST = False
+    _RustFilter = None
+
+
 def build_filter(
     allow: Optional[List[str]] = None,
     deny: Optional[List[str]] = None,
 ) -> CapabilityFilter:
-    """Create a :class:`CapabilityFilter` from config values."""
+    """Create a :class:`CapabilityFilter` from config values.
+
+    Returns a Rust-accelerated filter when the compiled extension is
+    available, otherwise falls back to the pure-Python implementation.
+    """
+    if _FILTER_RUST and _RustFilter is not None:
+        return _RustFilter(allow=allow or [], deny=deny or [])  # type: ignore[return-value]
     return CapabilityFilter(allow=allow, deny=deny)

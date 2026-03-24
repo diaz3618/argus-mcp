@@ -195,10 +195,10 @@ def setup_logging(log_lvl_str: str, *, quiet: bool = False) -> Tuple[str, str]:
             handler.addFilter(secret_redaction_filter)
         if not quiet:
             print(f"Logging initialized. File log level: {log_lvl_valid}, log file: {log_fpath}")
-    except (ValueError, TypeError, AttributeError, OSError) as e_log_cfg:
+    except (ValueError, TypeError, AttributeError, OSError) as exc:
         if not quiet:
             print(
-                f"Error applying logging configuration: {e_log_cfg}",
+                f"Error applying logging configuration: {exc}",
                 file=sys.stderr,
             )
 

@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.tui.widgets.toolbar import ToolbarWidget
 
 
@@ -45,8 +46,6 @@ class ArgusScreen(Screen):
         selector = self.INITIAL_FOCUS
         if selector is None:
             return
-        try:
-            widget = self.query_one(selector)
+        widget = safe_query(self, selector)
+        if widget is not None:
             widget.focus()
-        except Exception:
-            pass

@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
+from argus_mcp.constants import SHORT_ID_LENGTH
+
 logger = logging.getLogger(__name__)
 
 # Callback type:  (request) -> Optional[Dict] response from user
@@ -75,7 +77,7 @@ class ElicitationRequest:
     Contains the form schema and metadata for user interaction.
     """
 
-    request_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    request_id: str = field(default_factory=lambda: uuid.uuid4().hex[:SHORT_ID_LENGTH])
     tool_name: str = ""
     message: str = ""
     schema: Dict[str, Any] = field(default_factory=dict)
@@ -95,7 +97,7 @@ class ElicitationRequest:
     def from_message(cls, data: Dict[str, Any]) -> ElicitationRequest:
         """Parse from an MCP elicitation/create message."""
         return cls(
-            request_id=data.get("requestId", uuid.uuid4().hex[:12]),
+            request_id=data.get("requestId", uuid.uuid4().hex[:SHORT_ID_LENGTH]),
             tool_name=data.get("toolName", ""),
             message=data.get("message", ""),
             schema=data.get("schema", {}),

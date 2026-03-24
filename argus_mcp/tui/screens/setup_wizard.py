@@ -498,7 +498,6 @@ class _BackendBuilderPanel(Static):
             editor_panel = self.screen.query_one(_ConfigEditorPanel)
             editor = editor_panel.query_one("#wizard-editor-area", TextArea)
             current = editor.text
-            # Append after backends: section
             if "backends:" in current:
                 # Find the backends line and append after it
                 lines = current.split("\n")

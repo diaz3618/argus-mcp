@@ -24,7 +24,7 @@ from argus_mcp.server.management.auth import (
 pytestmark = [pytest.mark.security]
 
 
-# Helpers ────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_scope(
@@ -54,7 +54,7 @@ def _make_middleware(token: str | None = "test-secret") -> tuple[BearerAuthMiddl
     return mw, inner
 
 
-# Token bypass attempts ──────────────────────────────────────────
+# Token bypass attempts
 
 
 class TestTokenBypass:
@@ -149,7 +149,7 @@ class TestTokenBypass:
         inner.assert_not_awaited()
 
 
-# Public path behaviour ──────────────────────────────────────────
+# Public path behaviour
 
 
 class TestPublicPathEnforcement:
@@ -193,7 +193,7 @@ class TestPublicPathEnforcement:
         inner.assert_not_awaited()
 
 
-# Non-HTTP scope passthrough ─────────────────────────────────────
+# Non-HTTP scope passthrough
 
 
 class TestNonHttpScope:
@@ -214,7 +214,7 @@ class TestNonHttpScope:
         inner.assert_awaited_once()
 
 
-# Exposed bind warnings ─────────────────────────────────────────
+# Exposed bind warnings
 
 
 class TestExposedBindWarnings:
@@ -267,7 +267,7 @@ class TestExposedBindWarnings:
             assert len(sec_warnings) == 0
 
 
-# resolve_token ──────────────────────────────────────────────────
+# resolve_token
 
 
 class TestResolveToken:
@@ -294,7 +294,7 @@ class TestResolveToken:
             assert resolve_token() == "tok"
 
 
-# Timing safety ──────────────────────────────────────────────────
+# Timing safety
 
 
 class TestTimingSafety:
@@ -325,7 +325,7 @@ class TestTimingSafety:
         assert hmac.compare_digest("\u00e9".encode(), "e\u0301".encode()) is False
 
 
-# 401 response format ───────────────────────────────────────────
+# 401 response format
 
 
 class TestUnauthorizedResponse:

@@ -234,13 +234,13 @@ class CapabilityRegistry:
             logger.error(
                 "[%s] %s() timed out (>%ss).", svr_name, list_method_name, CAP_FETCH_TIMEOUT
             )
-        except McpError as mcp_e:
+        except McpError as exc:
             logger.error(
                 "[%s] MCP error during %s(): Code=%s, Msg='%s'",
                 svr_name,
                 list_method_name,
-                mcp_e.error.code,
-                mcp_e.error.message,
+                exc.error.code,
+                exc.error.message,
                 exc_info=False,
             )
         except Exception:  # noqa: BLE001

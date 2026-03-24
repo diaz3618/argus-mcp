@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 from argus_mcp.config.diff import ConfigDiff, compute_diff, configs_differ
 from argus_mcp.config.watcher import ConfigWatcher
 
-# ConfigDiff tests ───────────────────────────────────────────────────
+# ConfigDiff tests
 
 
 class TestConfigsDiffer:
@@ -113,7 +113,7 @@ class TestComputeDiff:
         assert "-1" in diff.summary()
 
 
-# ConfigWatcher tests ────────────────────────────────────────────────
+# ConfigWatcher tests
 
 
 class TestConfigWatcher:

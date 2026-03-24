@@ -38,7 +38,9 @@ from argus_mcp.bridge.container.templates._generators import (
     compute_image_tag,
     generate_go_dockerfile,
     generate_npx_dockerfile,
+    generate_source_dockerfile,
     generate_uvx_dockerfile,
+    is_vcs_specifier,
     parse_go_args,
     parse_npx_args,
     parse_uvx_args,
@@ -84,6 +86,8 @@ __all__ = [
     "generate_uvx_dockerfile",
     "generate_npx_dockerfile",
     "generate_go_dockerfile",
+    "generate_source_dockerfile",
     "compute_image_tag",
+    "is_vcs_specifier",
     "IMAGE_PREFIX",
 ]

@@ -77,7 +77,7 @@ async def resolve_auth_headers(
         logger.info("[%s] Auth provider resolved: %s", svr_name, provider.redacted_repr())
         return headers
     except Exception as exc:  # noqa: BLE001
-        logger.error("[%s] Failed to resolve auth headers: %s", svr_name, exc)
+        logger.error("[%s] Failed to resolve auth headers: %s", svr_name, exc, exc_info=True)
         return None
 
 
@@ -104,7 +104,7 @@ async def resolve_auth_provider(
         logger.info("[%s] Auth provider created: %s", svr_name, provider.redacted_repr())
         return provider
     except Exception as exc:  # noqa: BLE001
-        logger.error("[%s] Failed to create auth provider: %s", svr_name, exc)
+        logger.error("[%s] Failed to create auth provider: %s", svr_name, exc, exc_info=True)
         return None
 
 

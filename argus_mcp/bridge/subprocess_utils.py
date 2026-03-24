@@ -52,12 +52,12 @@ async def log_subproc_stream(
         except asyncio.CancelledError:
             logger.debug("[%s-%s] Logging task was cancelled.", svr_name, stream_name)
             break
-        except Exception as e_stream:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             logger.error(
                 "[%s-%s] Error while reading stream: %s",
                 svr_name,
                 stream_name,
-                e_stream,
+                exc,
                 exc_info=True,
             )
             break
@@ -102,12 +102,12 @@ async def terminate_subproc(
         logger.warning(
             "[%s] Local process not found while terminating (PID: %s).", svr_name, process.pid
         )
-    except Exception as e_term:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         logger.error(
             "[%s] Error terminating local process (PID: %s): %s",
             svr_name,
             process.pid,
-            e_term,
+            exc,
             exc_info=True,
         )
 

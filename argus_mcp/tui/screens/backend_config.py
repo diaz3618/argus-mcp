@@ -15,6 +15,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select, Static, Switch
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
 
 logger = logging.getLogger(__name__)
@@ -267,19 +268,15 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
             "hint-env",
             "bcm-env",
         ):
-            try:
-                w = self.query_one(f"#{widget_id}")
+            w = safe_query(self, f"#{widget_id}")
+            if w is not None:
                 w.display = is_stdio
-            except Exception:  # noqa: BLE001
-                pass
 
         # URL fields
         for widget_id in ("lbl-url", "bcm-url", "lbl-headers", "bcm-headers"):
-            try:
-                w = self.query_one(f"#{widget_id}")
+            w = safe_query(self, f"#{widget_id}")
+            if w is not None:
                 w.display = is_url
-            except Exception:  # noqa: BLE001
-                pass
 
     def _update_preview(self) -> None:
         """Update the config preview text."""
@@ -294,69 +291,82 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
         else:
             preview_text = "[dim]Fill in required fields to see config preview[/dim]"
 
-        try:
-            self.query_one("#bcm-preview", Static).update(preview_text)
-        except Exception:  # noqa: BLE001
-            pass
+        preview = safe_query(self, "#bcm-preview", Static)
+        if preview is not None:
+            preview.update(preview_text)
 
     def _get_name(self) -> str:
         """Get the backend name from the input."""
-        try:
-            return self.query_one("#bcm-name", Input).value.strip()
-        except Exception:  # noqa: BLE001
-            return ""
+        name_input = safe_query(self, "#bcm-name", Input)
+        return name_input.value.strip() if name_input is not None else ""
 
-    def _build_config(self) -> Optional[Dict[str, Any]]:
-        """Build the backend config dict from current form values."""
-        try:
-            transport_sel = self.query_one("#bcm-transport", Select)
-            transport = transport_sel.value
-            if transport == Select.BLANK:
-                return None
-        except Exception:  # noqa: BLE001
+    @staticmethod
+    def _parse_kv_string(text: str, sep: str) -> Dict[str, str]:
+        """Parse comma-separated key/value pairs (e.g. ``k=v, k2=v2``)."""
+        result: Dict[str, str] = {}
+        for pair in text.split(","):
+            pair = pair.strip()
+            if sep in pair:
+                k, v = pair.split(sep, 1)
+                result[k.strip()] = v.strip()
+        return result
+
+    def _build_stdio_fields(self, config: Dict[str, Any]) -> bool:
+        """Populate *config* with stdio-specific fields. Returns *False* if required fields are missing."""
+        command = self.query_one("#bcm-command", Input).value.strip()
+        if not command:
+            return False
+        config["command"] = command
+
+        args = self.query_one("#bcm-args", Input).value.strip()
+        if args:
+            config["args"] = args.split()
+
+        env_str = self.query_one("#bcm-env", Input).value.strip()
+        if env_str:
+            env = self._parse_kv_string(env_str, "=")
+            if env:
+                config["env"] = env
+        return True
+
+    def _build_remote_fields(self, config: Dict[str, Any]) -> bool:
+        """Populate *config* with sse / streamable-http fields. Returns *False* if URL is missing."""
+        url = self.query_one("#bcm-url", Input).value.strip()
+        if not url:
+            return False
+        config["url"] = url
+
+        headers_str = self.query_one("#bcm-headers", Input).value.strip()
+        if headers_str:
+            headers = self._parse_kv_string(headers_str, ":")
+            if headers:
+                config["headers"] = headers
+        return True
+
+    @staticmethod
+    def _parse_filter_patterns(text: str) -> Optional[Dict[str, Any]]:
+        """Parse ``+include,-exclude`` filter text into a filters dict."""
+        include: list[str] = []
+        exclude: list[str] = []
+        for pat in text.split(","):
+            pat = pat.strip()
+            if pat.startswith("-"):
+                exclude.append(pat[1:])
+            elif pat.startswith("+"):
+                include.append(pat[1:])
+            else:
+                include.append(pat)
+        if not include and not exclude:
             return None
+        f: Dict[str, Any] = {}
+        if include:
+            f["include"] = include
+        if exclude:
+            f["exclude"] = exclude
+        return f
 
-        config: Dict[str, Any] = {"type": transport}
-
-        if transport == "stdio":
-            command = self.query_one("#bcm-command", Input).value.strip()
-            if not command:
-                return None
-            config["command"] = command
-
-            args = self.query_one("#bcm-args", Input).value.strip()
-            if args:
-                config["args"] = args.split()
-
-            env_str = self.query_one("#bcm-env", Input).value.strip()
-            if env_str:
-                env = {}
-                for pair in env_str.split(","):
-                    pair = pair.strip()
-                    if "=" in pair:
-                        k, v = pair.split("=", 1)
-                        env[k.strip()] = v.strip()
-                if env:
-                    config["env"] = env
-
-        elif transport in ("sse", "streamable-http"):
-            url = self.query_one("#bcm-url", Input).value.strip()
-            if not url:
-                return None
-            config["url"] = url
-
-            headers_str = self.query_one("#bcm-headers", Input).value.strip()
-            if headers_str:
-                headers = {}
-                for pair in headers_str.split(","):
-                    pair = pair.strip()
-                    if ":" in pair:
-                        k, v = pair.split(":", 1)
-                        headers[k.strip()] = v.strip()
-                if headers:
-                    config["headers"] = headers
-
-        # Common optional fields
+    def _apply_common_fields(self, config: Dict[str, Any]) -> None:
+        """Apply transport-independent optional fields to *config*."""
         timeout_str = self.query_one("#bcm-timeout", Input).value.strip()
         if timeout_str:
             try:
@@ -366,23 +376,9 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
 
         filters_str = self.query_one("#bcm-filters", Input).value.strip()
         if filters_str:
-            include = []
-            exclude = []
-            for pat in filters_str.split(","):
-                pat = pat.strip()
-                if pat.startswith("-"):
-                    exclude.append(pat[1:])
-                elif pat.startswith("+"):
-                    include.append(pat[1:])
-                else:
-                    include.append(pat)
-            if include or exclude:
-                f: Dict[str, Any] = {}
-                if include:
-                    f["include"] = include
-                if exclude:
-                    f["exclude"] = exclude
-                config["filters"] = f
+            parsed = self._parse_filter_patterns(filters_str)
+            if parsed:
+                config["filters"] = parsed
 
         enabled = self.query_one("#bcm-enabled", Switch).value
         if not enabled:
@@ -392,6 +388,25 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
         if group:
             config["group"] = group
 
+    def _build_config(self) -> Optional[Dict[str, Any]]:
+        """Build the backend config dict from current form values."""
+        transport_sel = safe_query(self, "#bcm-transport", Select)
+        if transport_sel is None:
+            return None
+        transport = transport_sel.value
+        if transport == Select.BLANK:
+            return None
+
+        config: Dict[str, Any] = {"type": transport}
+
+        if transport == "stdio":
+            if not self._build_stdio_fields(config):
+                return None
+        elif transport in ("sse", "streamable-http"):
+            if not self._build_remote_fields(config):
+                return None
+
+        self._apply_common_fields(config)
         return config
 
     def _validate(self) -> Optional[str]:

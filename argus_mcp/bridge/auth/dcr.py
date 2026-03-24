@@ -135,7 +135,6 @@ class DCRClient:
         if self._allowlist and metadata.issuer not in self._allowlist:
             raise ValueError(f"Issuer '{metadata.issuer}' is not in the allowed issuers list.")
 
-        # Check cache
         cached = _registration_cache.get(reg_endpoint)
         if cached:
             age = time.monotonic() - cached["cached_at"]
@@ -282,7 +281,6 @@ class DCRClient:
             raw=data,
         )
 
-        # Cache the registration
         _registration_cache[reg_endpoint] = {
             "registration": reg,
             "cached_at": time.monotonic(),

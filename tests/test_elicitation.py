@@ -22,7 +22,7 @@ from argus_mcp.bridge.elicitation import (
     ElicitationStatus,
 )
 
-# ElicitationField ───────────────────────────────────────────────────
+# ElicitationField
 
 
 class TestElicitationField:
@@ -58,7 +58,7 @@ class TestElicitationField:
         assert f.field_type == "string"
 
 
-# ElicitationRequest ─────────────────────────────────────────────────
+# ElicitationRequest
 
 
 class TestElicitationRequest:
@@ -112,7 +112,7 @@ class TestElicitationRequest:
         assert req.fields == []
 
 
-# ElicitationResponse ─────────────────────────────────────────────────
+# ElicitationResponse
 
 
 class TestElicitationResponse:
@@ -146,7 +146,7 @@ class TestElicitationResponse:
         assert resp.to_message()["status"] == "timeout"
 
 
-# ElicitationBridge ───────────────────────────────────────────────────
+# ElicitationBridge
 
 
 class TestElicitationBridge:

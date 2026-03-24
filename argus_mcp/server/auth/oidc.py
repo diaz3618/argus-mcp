@@ -74,7 +74,7 @@ class OIDCDiscovery:
                 resp = await client.get(url)  # nosemgrep: mcp-unverified-remote-content
                 resp.raise_for_status()
                 data: Dict[str, Any] = resp.json()
-        except Exception as exc:  # noqa: BLE001
+        except (httpx.HTTPError, ValueError) as exc:
             raise OIDCDiscoveryError(
                 f"Failed to fetch OIDC discovery document from {url}: {exc}"
             ) from exc

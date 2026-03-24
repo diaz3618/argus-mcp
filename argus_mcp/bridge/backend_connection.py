@@ -26,6 +26,7 @@ from argus_mcp.bridge.subprocess_utils import (
 from argus_mcp.constants import (
     MCP_INIT_TIMEOUT,
     SSE_LOCAL_START_DELAY,
+    STACK_CLOSE_TIMEOUT,
     STARTUP_TIMEOUT,
     STDIO_MCP_INIT_TIMEOUT,
 )
@@ -273,10 +274,17 @@ async def pre_build_container_image(
         extra_args=container_cfg.get("extra_args"),
         build_if_missing=build_if_missing,
         system_deps=container_cfg.get("system_deps"),
+        build_system_deps=container_cfg.get("build_system_deps"),
         builder_image=container_cfg.get("builder_image"),
         additional_packages=container_cfg.get("additional_packages"),
         transport_override=container_cfg.get("transport"),
         go_package=container_cfg.get("go_package"),
+        source_url=container_cfg.get("source_url"),
+        build_steps=container_cfg.get("build_steps"),
+        entrypoint=container_cfg.get("entrypoint"),
+        build_env=container_cfg.get("build_env"),
+        source_ref=container_cfg.get("source_ref"),
+        dockerfile=container_cfg.get("dockerfile"),
         line_callback=_build_line_cb,
     )
 
@@ -292,7 +300,7 @@ async def prepare_backend_stack(
     old_stack = backend_stacks.pop(svr_name, None)
     if old_stack is not None:
         try:
-            await asyncio.wait_for(old_stack.aclose(), timeout=5.0)
+            await asyncio.wait_for(old_stack.aclose(), timeout=STACK_CLOSE_TIMEOUT)
         except Exception:  # noqa: BLE001
             logger.debug(
                 "[%s] Error closing previous backend stack (benign).",
@@ -356,7 +364,6 @@ async def connect_backend(
         auth=auth,
     )
 
-    # Initialize MCP session with appropriate timeout
     if svr_type == "stdio":
         init_timeout = svr_conf.get("init_timeout", STDIO_MCP_INIT_TIMEOUT)
         suffix = " (post-build)"
@@ -484,12 +491,12 @@ async def start_backend_svr(
         )
         return False
 
-    except BaseException as e_start:  # noqa: BLE001
+    except BaseException as exc:  # noqa: BLE001
         reason = await handle_base_exception(
             svr_name,
             svr_conf,
             svr_type,
-            e_start,
+            exc,
             shutdown_requested,
             auth_discovery_tasks,
             discovered_auth,

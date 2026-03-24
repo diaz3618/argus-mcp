@@ -18,7 +18,7 @@ from argus_mcp.sessions import (
     validate_name,
 )
 
-# validate_name ────────────────────────────────────────────────────
+# validate_name
 
 
 class TestValidateName:
@@ -46,7 +46,7 @@ class TestValidateName:
         assert validate_name("  dev  ") == "dev"
 
 
-# auto_name ────────────────────────────────────────────────────────
+# auto_name
 
 
 class TestAutoName:
@@ -58,7 +58,7 @@ class TestAutoName:
         assert auto_name(3000, 9000) == "argus-3000"
 
 
-# SessionInfo.is_alive ────────────────────────────────────────────
+# SessionInfo.is_alive
 
 
 class TestSessionInfoIsAlive:
@@ -72,7 +72,7 @@ class TestSessionInfoIsAlive:
         assert info.is_alive() is False
 
 
-# save/load/remove session ────────────────────────────────────────
+# save/load/remove session
 
 
 class TestSessionPersistence:
@@ -124,7 +124,7 @@ class TestSessionPersistence:
             assert load_session("corrupt") is None
 
 
-# list_sessions ───────────────────────────────────────────────────
+# list_sessions
 
 
 class TestListSessions:
@@ -166,7 +166,7 @@ class TestListSessions:
             assert list_sessions() == []
 
 
-# find_session ────────────────────────────────────────────────────
+# find_session
 
 
 class TestFindSession:
@@ -211,7 +211,7 @@ class TestFindSession:
             assert find_session() is None
 
 
-# check_port_conflict ─────────────────────────────────────────────
+# check_port_conflict
 
 
 class TestCheckPortConflict:
@@ -251,7 +251,7 @@ class TestCheckPortConflict:
             assert check_port_conflict("127.0.0.1", 8080) is None
 
 
-# session_path ────────────────────────────────────────────────────
+# session_path
 
 
 class TestSessionPath:

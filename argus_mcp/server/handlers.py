@@ -75,7 +75,6 @@ def register_handlers(mcp_server: McpServer) -> None:
             raise BackendServerError("Registry is not initialized")
         tools = mcp_server.registry.get_aggregated_tools()
 
-        # Append composite workflow tools (if any are loaded)
         state = get_state(mcp_server)
         composite_tools = state.composite_tools
         for ct in composite_tools:
@@ -132,7 +131,6 @@ def register_handlers(mcp_server: McpServer) -> None:
     async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> mcp_types.CallToolResult:
         logger.debug("Handling callTool: name='%s'", name)
 
-        # Handle optimizer meta-tools
         state = get_state(mcp_server)
         optimizer = state.optimizer_index
         optimizer_enabled = state.optimizer_enabled
@@ -166,7 +164,6 @@ def register_handlers(mcp_server: McpServer) -> None:
                     f"Backend returned invalid type for tool call '{real_name}'."
                 )
 
-        # Handle composite workflow tools
         composite_tools = state.composite_tools
         for ct in composite_tools:
             if ct.name == name:

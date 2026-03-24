@@ -23,7 +23,7 @@ from argus_mcp.workflows.dsl import (
 from argus_mcp.workflows.executor import WorkflowExecutor
 from argus_mcp.workflows.steps import Step, StepResult, StepStatus
 
-# Step / StepResult ───────────────────────────────────────────────────
+# Step / StepResult
 
 
 class TestStep:
@@ -81,7 +81,7 @@ class TestStepStatus:
         }
 
 
-# WorkflowDefinition ─────────────────────────────────────────────────
+# WorkflowDefinition
 
 
 class TestWorkflowDefinition:
@@ -132,7 +132,7 @@ class TestWorkflowDefinition:
             wf.topological_order()
 
 
-# parse_workflow ──────────────────────────────────────────────────────
+# parse_workflow
 
 
 class TestParseWorkflow:
@@ -208,7 +208,7 @@ class TestParseWorkflow:
         assert wf.output == "${s1.output}"
 
 
-# WorkflowExecutor ───────────────────────────────────────────────────
+# WorkflowExecutor
 
 
 class TestWorkflowExecutor:
@@ -458,7 +458,7 @@ class TestWorkflowExecutor:
         assert all(r.status == StepStatus.COMPLETED for r in results.values())
 
 
-# CompositeTool ───────────────────────────────────────────────────────
+# CompositeTool
 
 
 class TestCompositeTool:
@@ -529,7 +529,7 @@ class TestCompositeTool:
         assert result == "result"
 
 
-# load_composite_tools ────────────────────────────────────────────────
+# load_composite_tools
 
 
 class TestLoadCompositeTools:

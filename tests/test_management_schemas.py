@@ -25,7 +25,7 @@ from argus_mcp.server.management.schemas import (
     ToolDetail,
 )
 
-# HealthResponse ──────────────────────────────────────────────────────
+# HealthResponse
 
 
 class TestHealthBackends:
@@ -69,7 +69,7 @@ class TestHealthResponse:
         assert hr2 == hr
 
 
-# StatusResponse ──────────────────────────────────────────────────────
+# StatusResponse
 
 
 class TestStatusService:
@@ -118,7 +118,7 @@ class TestStatusResponse:
         assert sr.feature_flags == {}
 
 
-# BackendsResponse ────────────────────────────────────────────────────
+# BackendsResponse
 
 
 class TestBackendDetail:
@@ -166,7 +166,7 @@ class TestBackendsResponse:
         assert len(br.backends) == 2
 
 
-# CapabilitiesResponse ────────────────────────────────────────────────
+# CapabilitiesResponse
 
 
 class TestToolDetail:
@@ -227,7 +227,7 @@ class TestCapabilitiesResponse:
         assert d["route_map"]["search"] == ["github", "search"]
 
 
-# EventsResponse ─────────────────────────────────────────────────────
+# EventsResponse
 
 
 class TestEventItem:
@@ -262,7 +262,7 @@ class TestEventsResponse:
         assert er.events == []
 
 
-# Error, Reload, Reconnect, Shutdown ──────────────────────────────────
+# Error, Reload, Reconnect, Shutdown
 
 
 class TestErrorResponse:
@@ -320,7 +320,7 @@ class TestShutdownResponse:
         assert sr.shutting_down is False
 
 
-# SessionsResponse ───────────────────────────────────────────────────
+# SessionsResponse
 
 
 class TestSessionDetail:

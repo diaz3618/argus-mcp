@@ -102,6 +102,7 @@ class CatalogBrowserScreen(ArgusScreen):
             path = find_config_file()
             return load_argus_config(path)
         except Exception as exc:
+            logger.debug("Config load failed", exc_info=True)
             self.app.notify(f"Cannot load config: {exc}", severity="error", timeout=5)
             return None
 
@@ -170,6 +171,7 @@ class CatalogBrowserScreen(ArgusScreen):
         try:
             entries: List[CatalogEntry] = parse_catalog(raw)
         except Exception as exc:
+            logger.debug("Catalog parse failed", exc_info=True)
             self.app.notify(f"Parse error: {exc}", severity="error", timeout=5)
             return
 

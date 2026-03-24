@@ -39,7 +39,7 @@ from argus_mcp.plugins.builtins.secrets_detection import SecretsDetectionPlugin
 from argus_mcp.plugins.models import ExecutionMode, PluginCondition, PluginConfig
 from argus_mcp.plugins.registry import _PLUGIN_CLASSES
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _cfg(

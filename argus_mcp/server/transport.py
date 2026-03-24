@@ -127,7 +127,10 @@ async def handle_sse(request: Request) -> Response | None:
         )
         return Response(status_code=503, content="Service not ready")
 
-    session_mgr = getattr(mcp_server, "session_manager", None)
+    from argus_mcp.server.state import get_state
+
+    _state = get_state(mcp_server)
+    session_mgr = _state.session_manager
     session = None
     if session_mgr is not None:
         route_map = mcp_server.registry.get_route_map()
@@ -161,10 +164,10 @@ async def handle_sse(request: Request) -> Response | None:
                     "mcp_server.registry is unset; SSE initialization will use empty capabilities."
                 )
             logger.debug("Server capabilities for SSE connection: %s", srv_caps)
-        except Exception as e_caps:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             logger.exception(
                 "Error getting mcp_server.get_capabilities for SSE connection: %s",
-                e_caps,
+                exc,
             )
             srv_caps = {}
 

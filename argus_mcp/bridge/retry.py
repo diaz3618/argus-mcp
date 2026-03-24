@@ -147,7 +147,6 @@ class RetryManager:
 
             status = response.status_code
 
-            # Success
             if 200 <= status < 300:
                 return response
 

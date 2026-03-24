@@ -19,8 +19,6 @@ _F = TypeVar("_F", bound=Callable[..., object])
 
 _logger = logging.getLogger(__name__)
 
-# TUI helpers
-
 
 @overload
 def safe_query(
@@ -54,9 +52,6 @@ def safe_query(
         return host.query_one(selector)
     except NoMatches:
         return None
-
-
-# General helpers
 
 
 def log_on_exception(

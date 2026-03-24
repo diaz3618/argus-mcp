@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -96,6 +97,68 @@ class SecretsPanel(Widget):
             used_by = s.get("used_by", "—")
             last_set = s.get("last_set", "—")
             table.add_row(name, source, used_by, str(last_set))
+
+    def _get_selected_secret(self) -> Optional[Dict[str, Any]]:
+        """Return the secret dict for the currently selected table row."""
+        table = safe_query(self, "#secrets-table", DataTable)
+        if table is None or table.cursor_row is None:
+            return None
+        try:
+            idx = table.cursor_row
+            if 0 <= idx < len(self._secrets):
+                return self._secrets[idx]
+        except (IndexError, TypeError):
+            pass
+        return None
+
+    @on(Button.Pressed, "#btn-secret-new")
+    def _handle_new(self, event: Button.Pressed) -> None:
+        def _on_result(result: Optional[Dict[str, str]]) -> None:
+            if result:
+                self._secrets.append(result)
+                self.update_secrets(self._secrets)
+                self.notify(f"Added secret '{result['name']}'")
+
+        self.app.push_screen(SecretEditorModal(), _on_result)
+
+    @on(Button.Pressed, "#btn-secret-edit")
+    def _handle_edit(self, event: Button.Pressed) -> None:
+        secret = self._get_selected_secret()
+        if secret is None:
+            self.notify("Select a secret to edit", severity="warning")
+            return
+
+        def _on_result(result: Optional[Dict[str, str]]) -> None:
+            if result:
+                idx = self._secrets.index(secret)
+                self._secrets[idx] = result
+                self.update_secrets(self._secrets)
+                self.notify(f"Updated secret '{result['name']}'")
+
+        self.app.push_screen(SecretEditorModal(existing=secret), _on_result)
+
+    @on(Button.Pressed, "#btn-secret-delete")
+    def _handle_delete(self, event: Button.Pressed) -> None:
+        secret = self._get_selected_secret()
+        if secret is None:
+            self.notify("Select a secret to delete", severity="warning")
+            return
+        name = secret.get("name", "?")
+        self._secrets.remove(secret)
+        self.update_secrets(self._secrets)
+        self.notify(f"Deleted secret '{name}'")
+
+    @on(Button.Pressed, "#btn-secret-rotate")
+    def _handle_rotate(self, event: Button.Pressed) -> None:
+        secret = self._get_selected_secret()
+        if secret is None:
+            self.notify("Select a secret to rotate", severity="warning")
+            return
+        self.notify(
+            f"Rotation for '{secret.get('name', '?')}' — "
+            f"update the secret value and re-save to rotate",
+            severity="information",
+        )
 
 
 class SecretEditorModal(ModalScreen[Optional[Dict[str, str]]]):

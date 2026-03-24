@@ -14,7 +14,18 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional
 
 from argus_mcp._task_utils import _log_task_exception
-from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker, CircuitState
+from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
+
+try:
+    from argus_mcp.bridge.health._circuit_breaker_rs import (
+        RUST_AVAILABLE as _CB_RUST,
+    )
+    from argus_mcp.bridge.health._circuit_breaker_rs import (
+        CircuitBreaker as _RustCB,
+    )
+except ImportError:
+    _CB_RUST = False
+    _RustCB = None
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +182,8 @@ class HealthChecker:
         """Probe a single backend and update state."""
         health = self._health.get(name)
         if health is None:
-            cb = CircuitBreaker(
+            _CB = _RustCB if _CB_RUST and _RustCB is not None else CircuitBreaker
+            cb = _CB(
                 name,
                 failure_threshold=self._failure_threshold,
                 cooldown_seconds=self._cooldown,
@@ -209,9 +221,10 @@ class HealthChecker:
                 health.state = HealthState.HEALTHY
 
         except Exception as exc:  # noqa: BLE001
+            logger.debug("Health check failed for '%s'", name, exc_info=True)
             health.last_error = f"{type(exc).__name__}: {exc}"
             health.circuit.record_failure()
-            if health.circuit.state == CircuitState.OPEN:
+            if not health.circuit.allows_request:
                 health.state = HealthState.UNHEALTHY
             else:
                 # Still accumulating failures
@@ -241,7 +254,6 @@ class HealthChecker:
 
         from argus_mcp.runtime.models import BackendPhase
 
-        # Map HealthState → BackendPhase
         phase_map = {
             HealthState.HEALTHY: BackendPhase.READY,
             HealthState.DEGRADED: BackendPhase.DEGRADED,
@@ -251,7 +263,6 @@ class HealthChecker:
         if target_phase is None or target_phase == record.phase:
             return
 
-        # Build a descriptive message
         if health.state == HealthState.DEGRADED:
             msg = f"High latency: {health.last_latency_ms:.0f}ms"
         elif health.state == HealthState.UNHEALTHY:

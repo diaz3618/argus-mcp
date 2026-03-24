@@ -76,47 +76,84 @@ async def build_and_connect_stdio(
     start_one: Callable[..., Awaitable[bool]],
     pending_tasks: Dict[str, "asyncio.Task[Any]"],
     shutdown_requested: bool,
+    parallel: bool = False,
 ) -> Dict[str, bool]:
-    """Sequential loop: pre-build image, then connect for each stdio backend."""
+    """Pre-build image then connect for each stdio backend.
+
+    When *parallel* is ``True`` all build+connect tasks run concurrently;
+    otherwise they execute one-by-one (the default).
+    """
     stdio_results: Dict[str, bool] = {}
-    for svr_name, svr_conf in stdio_items:
-        if shutdown_requested:
-            stdio_results[svr_name] = False
-            break
 
-        async def _stdio_build_and_connect(
-            name: str = svr_name,
-            conf: Dict[str, Any] = svr_conf,
-        ) -> bool:
-            try:
-                await pre_build(name, conf)
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "[%s] Sequential pre-build failed: %s",
-                    name,
-                    exc,
-                    exc_info=True,
-                )
-            return await start_one(name, conf)
-
-        task = asyncio.create_task(
-            _stdio_build_and_connect(),
-            name=f"start_{svr_name}",
-        )
-        pending_tasks[svr_name] = task
+    async def _stdio_build_and_connect(
+        name: str,
+        conf: Dict[str, Any],
+    ) -> bool:
         try:
-            ok = await task
-            stdio_results[svr_name] = ok
-        except asyncio.CancelledError:
-            logger.info("[%s] Stdio startup cancelled.", svr_name)
-            stdio_results[svr_name] = False
+            await pre_build(name, conf)
         except Exception as exc:  # noqa: BLE001
             logger.error(
-                "[%s] Startup task failed with exception '%s'.",
-                svr_name,
-                type(exc).__name__,
+                "[%s] Pre-build failed: %s",
+                name,
+                exc,
+                exc_info=True,
             )
-            stdio_results[svr_name] = False
+        return await start_one(name, conf)
+
+    if parallel and len(stdio_items) > 1:
+        logger.info("Parallel stdio build enabled — launching %d tasks.", len(stdio_items))
+        tasks: Dict[str, asyncio.Task[bool]] = {}
+        for svr_name, svr_conf in stdio_items:
+            if shutdown_requested:
+                stdio_results[svr_name] = False
+                continue
+            task = asyncio.create_task(
+                _stdio_build_and_connect(svr_name, svr_conf),
+                name=f"start_{svr_name}",
+            )
+            pending_tasks[svr_name] = task
+            tasks[svr_name] = task
+
+        results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        for svr_name, result in zip(tasks.keys(), results):
+            if isinstance(result, asyncio.CancelledError):
+                logger.info("[%s] Stdio startup cancelled.", svr_name)
+                stdio_results[svr_name] = False
+            elif isinstance(result, Exception):
+                logger.error(
+                    "[%s] Startup task failed with exception '%s'.",
+                    svr_name,
+                    type(result).__name__,
+                )
+                stdio_results[svr_name] = False
+            else:
+                stdio_results[svr_name] = result
+    else:
+        for svr_name, svr_conf in stdio_items:
+            if shutdown_requested:
+                stdio_results[svr_name] = False
+                break
+
+            task = asyncio.create_task(
+                _stdio_build_and_connect(svr_name, svr_conf),
+                name=f"start_{svr_name}",
+            )
+            pending_tasks[svr_name] = task
+            try:
+                ok = await task
+                stdio_results[svr_name] = ok
+            except asyncio.CancelledError:
+                logger.info("[%s] Stdio startup cancelled.", svr_name)
+                stdio_results[svr_name] = False
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "[%s] Startup task failed with exception '%s'.",
+                    svr_name,
+                    type(exc).__name__,
+                    exc_info=True,
+                )
+                stdio_results[svr_name] = False
+
     return stdio_results
 
 
@@ -193,7 +230,7 @@ async def await_auth_discoveries(
                                 "Authentication incomplete — retrying\u2026",
                             )
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Auth discovery failed for '%s': %s", n, exc)
+                    logger.warning("Auth discovery failed for '%s': %s", n, exc, exc_info=True)
                     if progress_cb is not None:
                         progress_cb(
                             n,
@@ -201,7 +238,7 @@ async def await_auth_discoveries(
                             f"Auth discovery error: {exc}",
                         )
     except Exception as exc:  # noqa: BLE001
-        logger.debug("Error while waiting for auth discovery tasks: %s", exc)
+        logger.debug("Error while waiting for auth discovery tasks: %s", exc, exc_info=True)
 
 
 def signal_retry_phase(
@@ -317,7 +354,6 @@ async def retry_failed_backends(
             failed_names, config_data, attempt, sem, stagger, concurrency, start_one
         )
 
-        # Refresh the failed list for next iteration
         failed_names = [n for n, ok in {n: n in sessions for n in failed_names}.items() if not ok]
         failed_names = [n for n in failed_names if n not in sessions]
 
@@ -333,6 +369,7 @@ async def start_all(
     progress_cb_holder: Any,
     progress_callback: Optional[Callable[..., None]],
     shutdown_requested_fn: Callable[[], bool],
+    parallel: bool = False,
 ) -> None:
     """Start all backend server connections, retrying failures.
 
@@ -360,12 +397,16 @@ async def start_all(
         await asyncio.sleep(0)
 
     stdio_results = await build_and_connect_stdio(
-        stdio_items, pre_build, start_one, pending_tasks, shutdown_requested_fn()
+        stdio_items,
+        pre_build,
+        start_one,
+        pending_tasks,
+        shutdown_requested_fn(),
+        parallel=parallel,
     )
 
     remote_results = await gather_remote_results(remote_tasks)
 
-    # Merge all first-pass results
     first_pass = {**remote_results, **stdio_results}
     pending_tasks.clear()
 

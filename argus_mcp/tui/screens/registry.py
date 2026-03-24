@@ -15,17 +15,15 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-import yaml  # type: ignore[import-untyped]
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
-from argus_mcp.config.loader import find_config_file
 from argus_mcp.registry.cache import RegistryCache
 from argus_mcp.registry.client import RegistryClient
 from argus_mcp.registry.models import ServerEntry
-from argus_mcp.tui.api_client import ApiClientError
+from argus_mcp.tui._config_ops import resolve_config_path, trigger_reload, write_backend_to_config
 from argus_mcp.tui.screens.backend_config import BackendConfigModal
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.screens.server_detail import (
@@ -240,70 +238,19 @@ class RegistryScreen(ArgusScreen):
         self._trigger_reload()
 
     def _resolve_config_path(self) -> Optional[str]:
-        """Find the config file path from server status or defaults."""
-        app = self.app
-        status = getattr(app, "_last_status", None)
-        if status is not None:
-            path = getattr(status.config, "file_path", None)
-            if path and os.path.isfile(path):
-                return path
-
-        # Fallback: use central config discovery
-        path = find_config_file()
-        return path if os.path.isfile(path) else None
+        return resolve_config_path(self.app)
 
     def _write_backend_to_config(
         self, config_path: str, backend_name: str, backend_config: Dict[str, Any]
     ) -> bool:
-        """Append a backend entry to the YAML config file."""
-        try:
-            with open(config_path, "r", encoding="utf-8") as fh:
-                data = yaml.safe_load(fh) or {}
-
-            backends: Dict[str, Any] = data.setdefault("backends", {})
-            if backend_name in backends:
-                self.notify(
-                    f"Backend '{backend_name}' already exists in config",
-                    severity="warning",
-                )
-                return False
-
-            backends[backend_name] = backend_config
-
-            with open(config_path, "w", encoding="utf-8") as fh:
-                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
-
-            logger.info("Wrote backend '%s' to %s", backend_name, config_path)
-            return True
-
-        except (OSError, yaml.YAMLError) as exc:
-            logger.error("Failed to write config: %s", exc)
-            self.notify(f"Failed to write config: {exc}", severity="error")
-            return False
+        return write_backend_to_config(
+            config_path, backend_name, backend_config, notify=self.notify
+        )
 
     def _trigger_reload(self) -> None:
-        """Post a config reload request to the server."""
-        mgr = getattr(self.app, "_server_manager", None)
-        if mgr is None:
-            return
-        client = getattr(mgr, "active_client", None)
-        if client is None:
-            self._set_status("Cannot reload — not connected to server")
-            return
-
-        async def _do_reload() -> None:
-            try:
-                result = await client.post_reload()
-                if result.reloaded:
-                    added = ", ".join(result.backends_added) or "none"
-                    self._set_status(f"Reload complete — added: {added}")
-                    self.notify("Config reloaded successfully", title="Reload")
-                else:
-                    errors = "; ".join(result.errors) if result.errors else "unknown"
-                    self._set_status(f"Reload failed: {errors}")
-                    self.notify(f"Reload errors: {errors}", severity="warning")
-            except (OSError, ConnectionError, ApiClientError) as exc:
-                logger.warning("Reload request failed: %s", exc)
-                self._set_status(f"Reload failed: {exc}")
-
-        self.app.run_worker(_do_reload(), exclusive=True, name="registry-reload")
+        trigger_reload(
+            self.app,
+            status_callback=self._set_status,
+            notify=self.notify,
+            worker_name="registry-reload",
+        )

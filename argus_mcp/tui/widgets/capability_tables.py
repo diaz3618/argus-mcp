@@ -54,7 +54,6 @@ class CapabilitySection(Widget):
                 yield DataTable(id="dt-prompts")
 
     def on_mount(self) -> None:
-        # Set up columns for each table
         dt_tools = self.query_one("#dt-tools", DataTable)
         dt_tools.add_columns("Name", "Original", "Server", "Description")
         dt_tools.cursor_type = "row"

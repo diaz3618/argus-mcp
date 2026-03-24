@@ -14,6 +14,13 @@ from typing import ClassVar, Dict, List, Pattern
 from argus_mcp.plugins.base import PluginBase, PluginContext
 from argus_mcp.plugins.models import PluginConfig
 
+try:
+    from argus_mcp.plugins.builtins_rust import RUST_AVAILABLE as _PII_RUST
+    from argus_mcp.plugins.builtins_rust import RustPiiFilter as _RustPii
+except ImportError:
+    _PII_RUST = False
+    _RustPii = None
+
 logger = logging.getLogger(__name__)
 
 _PII_PATTERNS: List[tuple[str, Pattern[str], str]] = [
@@ -58,6 +65,10 @@ class PiiFilterPlugin(PluginBase):
             self._active_patterns = [(n, p, m) for n, p, m in self._patterns if n in active]
         else:
             self._active_patterns = list(self._patterns)
+        # Use Rust engine when available for faster string scanning
+        self._rust_engine = (
+            _RustPii(categories=active or None) if _PII_RUST and _RustPii is not None else None
+        )
 
     async def tool_pre_invoke(self, ctx: PluginContext) -> PluginContext:
         counts = self._mask_dict(ctx.arguments)
@@ -89,6 +100,8 @@ class PiiFilterPlugin(PluginBase):
 
     def _mask_string(self, text: str) -> tuple[str, Dict[str, int]]:
         """Return ``(masked_text, {category: count})``."""
+        if self._rust_engine is not None:
+            return self._rust_engine.mask_string(text)
         counts: Dict[str, int] = {}
         for name, pattern, replacement in self._active_patterns:
             new_text, n = pattern.subn(replacement, text)

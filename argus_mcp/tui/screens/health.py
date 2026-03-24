@@ -44,12 +44,12 @@ class HealthScreen(ArgusScreen):
     def _refresh_from_app(self) -> None:
         """Pull latest backend data from the app cache into widgets."""
         app = self.app
-        last_status = getattr(app, "_last_status", None)
+        last_status = app.last_status
         if last_status is None:
             return
 
         # Feed backends into health panel + server groups
-        mgr = getattr(app, "_server_manager", None)
+        mgr = app.server_manager
         if mgr is None:
             return
         client = getattr(mgr, "active_client", None)
@@ -68,11 +68,26 @@ class HealthScreen(ArgusScreen):
                     self.query_one(ServerGroupsWidget).update_groups(details)
                 except NoMatches:
                     pass
+
+                # Feed version info into VersionDriftPanel
+                version_servers = []
+                for d in details:
+                    version_servers.append(
+                        {
+                            "name": d.get("name", "?"),
+                            "current_version": d.get("labels", {}).get("version", "—"),
+                            "registry_version": "—",
+                        }
+                    )
+                try:
+                    self.query_one(VersionDriftPanel).update_versions(version_servers)
+                except NoMatches:
+                    pass
             except (OSError, ConnectionError, ApiClientError):
                 pass
 
             # Feed sessions into SessionsPanel
-            sessions_resp = getattr(app, "_last_sessions", None)
+            sessions_resp = app.last_sessions
             if sessions_resp is not None:
                 sessions_list = []
                 for s in getattr(sessions_resp, "sessions", []):
@@ -93,7 +108,7 @@ class HealthScreen(ArgusScreen):
                     pass
 
             # Feed groups into ServerGroupsWidget from cached groups data
-            groups_resp = getattr(app, "_last_groups", None)
+            groups_resp = app.last_groups
             if groups_resp is not None:
                 try:
                     inner = groups_resp.get("groups", {}) if isinstance(groups_resp, dict) else {}
@@ -113,7 +128,7 @@ class HealthScreen(ArgusScreen):
 
     def _get_api_client(self):
         """Return the active :class:`ApiClient` or *None*."""
-        mgr = getattr(self.app, "_server_manager", None)
+        mgr = self.app.server_manager
         if mgr is None:
             return None
         return getattr(mgr, "active_client", None)
@@ -249,6 +264,7 @@ class HealthScreen(ArgusScreen):
             with open(config_path) as fh:
                 data = yaml.safe_load(fh) or {}
         except Exception as exc:
+            logger.debug("Config read failed", exc_info=True)
             self.app.notify(f"Config read error: {exc}", severity="error")
             return
 
@@ -262,6 +278,7 @@ class HealthScreen(ArgusScreen):
             with open(config_path, "w") as fh:
                 yaml.safe_dump(data, fh, default_flow_style=False, sort_keys=False)
         except Exception as exc:
+            logger.debug("Config write failed", exc_info=True)
             self.app.notify(f"Config write error: {exc}", severity="error")
             return
 
@@ -310,7 +327,6 @@ class HealthScreen(ArgusScreen):
         async def _restart() -> None:
             import asyncio
 
-            # Send shutdown
             try:
                 await client.post_shutdown(timeout_seconds=5.0)
             except (OSError, ConnectionError, ApiClientError):

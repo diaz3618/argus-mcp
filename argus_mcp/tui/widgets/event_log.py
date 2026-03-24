@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from rich.text import Text
@@ -76,7 +77,7 @@ class EventLogWidget(Widget):
             try:
                 self.log_widget.begin_capture_print()
             except Exception:  # noqa: BLE001
-                pass
+                logging.getLogger(__name__).debug("begin_capture_print failed", exc_info=True)
 
         self.call_after_refresh(_begin)
 
@@ -85,7 +86,7 @@ class EventLogWidget(Widget):
         try:
             self.log_widget.end_capture_print()
         except Exception:  # noqa: BLE001
-            pass
+            logging.getLogger(__name__).debug("end_capture_print failed", exc_info=True)
 
     def add_event(
         self,

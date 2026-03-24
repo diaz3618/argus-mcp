@@ -33,7 +33,7 @@ from argus_mcp.cli import (
 )
 from argus_mcp.constants import DEFAULT_HOST, DEFAULT_PORT
 
-# _build_parser ───────────────────────────────────────────────────
+# _build_parser
 
 
 class TestBuildParser:
@@ -176,7 +176,7 @@ class TestBuildParser:
         assert args.command is None
 
 
-# _write_pid_file / _remove_pid_file ───────────────────────────────
+# _write_pid_file / _remove_pid_file
 
 
 class TestWritePidFile:
@@ -185,11 +185,11 @@ class TestWritePidFile:
     def test_write_creates_session(self) -> None:
         _mock_info_cls = MagicMock()
         with (
-            patch("argus_mcp.cli.save_session", create=True) as _save,
+            patch("argus_mcp.cli._server.save_session", create=True) as _save,
             patch("argus_mcp.sessions.save_session") as _mock_save,
             patch("argus_mcp.sessions.SessionInfo") as _mock_cls,
             patch("builtins.open", mock_open()),
-            patch("argus_mcp.cli.os.getpid", return_value=12345),
+            patch("argus_mcp.cli._server.os.getpid", return_value=12345),
         ):
             # Patch at the import point inside the function
             with patch.dict("sys.modules", {}):
@@ -218,7 +218,7 @@ class TestWritePidFile:
         with (
             patch("argus_mcp.sessions.SessionInfo"),
             patch("argus_mcp.sessions.save_session"),
-            patch("argus_mcp.cli._PID_FILE", str(pid_file)),
+            patch("argus_mcp.cli._server._PID_FILE", str(pid_file)),
         ):
             _write_pid_file()
             assert pid_file.read_text().strip() == str(os.getpid())
@@ -237,7 +237,7 @@ class TestRemovePidFile:
         with (
             patch("argus_mcp.sessions.load_session", return_value=mock_info),
             patch("argus_mcp.sessions.remove_session") as mock_rm,
-            patch("argus_mcp.cli._PID_FILE", str(pid_file)),
+            patch("argus_mcp.cli._server._PID_FILE", str(pid_file)),
         ):
             _remove_pid_file("test-sess")
             mock_rm.assert_called_once_with("test-sess")
@@ -250,7 +250,7 @@ class TestRemovePidFile:
         with (
             patch("argus_mcp.sessions.load_session", return_value=mock_info),
             patch("argus_mcp.sessions.remove_session") as mock_rm,
-            patch("argus_mcp.cli._PID_FILE", "/nonexistent"),
+            patch("argus_mcp.cli._server._PID_FILE", "/nonexistent"),
         ):
             _remove_pid_file("test-sess")
             mock_rm.assert_not_called()
@@ -259,7 +259,7 @@ class TestRemovePidFile:
         with (
             patch("argus_mcp.sessions.load_session", return_value=None),
             patch("argus_mcp.sessions.remove_session") as mock_rm,
-            patch("argus_mcp.cli._PID_FILE", "/nonexistent"),
+            patch("argus_mcp.cli._server._PID_FILE", "/nonexistent"),
         ):
             _remove_pid_file("ghost")
             mock_rm.assert_not_called()
@@ -272,12 +272,12 @@ class TestRemovePidFile:
         with (
             patch("argus_mcp.sessions.load_session", return_value=mock_info),
             patch("argus_mcp.sessions.remove_session"),
-            patch("argus_mcp.cli._PID_FILE", missing_file),
+            patch("argus_mcp.cli._server._PID_FILE", missing_file),
         ):
             _remove_pid_file("test-sess")  # Should not raise
 
 
-# _cleanup_pid_file ───────────────────────────────────────────────
+# _cleanup_pid_file
 
 
 class TestCleanupPidFile:
@@ -286,16 +286,16 @@ class TestCleanupPidFile:
     def test_removes_existing_file(self, tmp_path: Path) -> None:
         pid_file = tmp_path / "argus-mcp.pid"
         pid_file.write_text("12345")
-        with patch("argus_mcp.cli._PID_FILE", str(pid_file)):
+        with patch("argus_mcp.cli._stop._PID_FILE", str(pid_file)):
             _cleanup_pid_file()
             assert not pid_file.exists()
 
     def test_ignores_missing_file(self) -> None:
-        with patch("argus_mcp.cli._PID_FILE", "/nonexistent/path.pid"):
+        with patch("argus_mcp.cli._stop._PID_FILE", "/nonexistent/path.pid"):
             _cleanup_pid_file()  # Should not raise
 
 
-# _restore_terminal ────────────────────────────────────────────────
+# _restore_terminal
 
 
 class TestRestoreTerminal:
@@ -332,7 +332,7 @@ class TestRestoreTerminal:
             _restore_terminal(None)  # Should not raise
 
 
-# _load_client_config ─────────────────────────────────────────────
+# _load_client_config
 
 
 class TestLoadClientConfig:
@@ -342,7 +342,7 @@ class TestLoadClientConfig:
         args = argparse.Namespace(config=None)
         with (
             patch.dict(os.environ, {}, clear=False),
-            patch("argus_mcp.cli._find_config_file", return_value=None),
+            patch("argus_mcp.cli._tui._find_config_file", return_value=None),
         ):
             # Remove ARGUS_CONFIG from env if present
             env = os.environ.copy()
@@ -384,7 +384,7 @@ class TestLoadClientConfig:
         assert cfg is not None
 
 
-# _resolve_tui_server_url ──────────────────────────────────────────
+# _resolve_tui_server_url
 
 
 class TestResolveTuiServerUrl:
@@ -427,14 +427,17 @@ class TestResolveTuiServerUrl:
         assert result == "http://cfg:7777"
 
 
-# _cmd_status ─────────────────────────────────────────────────────
+# _cmd_status
 
 
 class TestCmdStatus:
     """Tests for ``argus-mcp status`` command handler."""
 
     def test_no_sessions(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with patch("argus_mcp.sessions.list_sessions", return_value=[]):
+        with (
+            patch("argus_mcp.sessions.list_sessions", return_value=[]),
+            patch("argus_mcp.sessions.discover_server_processes", return_value=[]),
+        ):
             _cmd_status(argparse.Namespace())
         out = capsys.readouterr().out
         assert "No running" in out
@@ -448,13 +451,16 @@ class TestCmdStatus:
         mock_sess.config = "/path/to/config.yaml"
         mock_sess.started_at = "2025-01-01T12:00:00Z"
 
-        with patch("argus_mcp.sessions.list_sessions", return_value=[mock_sess]):
+        with (
+            patch("argus_mcp.sessions.list_sessions", return_value=[mock_sess]),
+            patch("argus_mcp.sessions.discover_server_processes", return_value=[]),
+        ):
             _cmd_status(argparse.Namespace())
         out = capsys.readouterr().out
         assert "default" in out
         assert "42" in out
         assert "9000" in out
-        assert "1 session(s) running" in out
+        assert "1 registered session(s)" in out
 
     def test_shows_multiple_sessions(self, capsys: pytest.CaptureFixture[str]) -> None:
         sessions = []
@@ -468,13 +474,16 @@ class TestCmdStatus:
             s.started_at = f"2025-01-0{i + 1}T00:00:00"
             sessions.append(s)
 
-        with patch("argus_mcp.sessions.list_sessions", return_value=sessions):
+        with (
+            patch("argus_mcp.sessions.list_sessions", return_value=sessions),
+            patch("argus_mcp.sessions.discover_server_processes", return_value=[]),
+        ):
             _cmd_status(argparse.Namespace())
         out = capsys.readouterr().out
-        assert "3 session(s) running" in out
+        assert "3 registered session(s)" in out
 
 
-# _cmd_stop ───────────────────────────────────────────────────────
+# _cmd_stop
 
 
 class TestCmdStop:
@@ -486,19 +495,19 @@ class TestCmdStop:
         mock_info.pid = 42
         mock_info.is_alive.return_value = True
 
-        args = argparse.Namespace(session_name="my-session")
+        args = argparse.Namespace(session_name="my-session", all=False, force=False)
         with (
             patch("argus_mcp.sessions.load_session", return_value=mock_info),
             patch("argus_mcp.sessions.stop_session", return_value=True),
             patch("argus_mcp.sessions.remove_session"),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             _cmd_stop(args)
         out = capsys.readouterr().out
         assert "stopped" in out
 
     def test_stop_named_missing(self) -> None:
-        args = argparse.Namespace(session_name="nonexistent")
+        args = argparse.Namespace(session_name="nonexistent", all=False, force=False)
         with (
             patch("argus_mcp.sessions.load_session", return_value=None),
             pytest.raises(SystemExit),
@@ -510,12 +519,12 @@ class TestCmdStop:
         mock_info.name = "auto"
         mock_info.pid = 55
 
-        args = argparse.Namespace(session_name=None)
+        args = argparse.Namespace(session_name=None, all=False, force=False)
         with (
             patch("argus_mcp.sessions.find_session", return_value=mock_info),
             patch("argus_mcp.sessions.stop_session", return_value=True),
             patch("argus_mcp.sessions.list_sessions", return_value=[]),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             _cmd_stop(args)
         out = capsys.readouterr().out
@@ -527,17 +536,18 @@ class TestCmdStop:
         s2 = MagicMock(name="s2", pid=2, port=9001)
         s2.name = "s2"
 
-        args = argparse.Namespace(session_name=None)
+        args = argparse.Namespace(session_name=None, all=False, force=False)
         with (
             patch("argus_mcp.sessions.find_session", return_value=None),
             patch("argus_mcp.sessions.list_sessions", return_value=[s1, s2]),
+            patch("argus_mcp.sessions.discover_server_processes", return_value=[]),
             patch("argus_mcp.sessions.stop_session"),
             pytest.raises(SystemExit),
         ):
             _cmd_stop(args)
 
 
-# main ────────────────────────────────────────────────────────────
+# main
 
 
 class TestMain:
@@ -565,7 +575,7 @@ class TestMain:
             mock_func.assert_called_once_with(mock_args)
 
 
-# _run_server ─────────────────────────────────────────────────────
+# _run_server
 
 
 class TestRunServer:
@@ -582,8 +592,8 @@ class TestRunServer:
         _, occupied_port = sock.getsockname()
         try:
             with (
-                patch("argus_mcp.cli.setup_logging", return_value=("/dev/null", "INFO")),
-                patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
+                patch("argus_mcp.cli._server.setup_logging", return_value=("/dev/null", "INFO")),
+                patch("argus_mcp.cli._server._find_config_file", return_value="config.yaml"),
                 patch("argus_mcp.server.app.app") as mock_app,
             ):
                 mock_app.state = MagicMock()
@@ -600,11 +610,11 @@ class TestRunServer:
         mock_server.serve = AsyncMock()
 
         with (
-            patch("argus_mcp.cli.setup_logging", return_value=("/dev/null", "INFO")),
-            patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
+            patch("argus_mcp.cli._server.setup_logging", return_value=("/dev/null", "INFO")),
+            patch("argus_mcp.cli._server._find_config_file", return_value="config.yaml"),
             patch("argus_mcp.server.app.app") as mock_app,
-            patch("argus_mcp.cli.uvicorn.Config"),
-            patch("argus_mcp.cli.uvicorn.Server", return_value=mock_server),
+            patch("argus_mcp.cli._server.uvicorn.Config"),
+            patch("argus_mcp.cli._server.uvicorn.Server", return_value=mock_server),
             patch("socket.socket") as mock_sock_cls,
         ):
             mock_app.state = MagicMock()
@@ -614,7 +624,7 @@ class TestRunServer:
             mock_server.serve.assert_called_once()
 
 
-# _detach_server ──────────────────────────────────────────────────
+# _detach_server
 
 
 class TestDetachServer:
@@ -634,9 +644,9 @@ class TestDetachServer:
         with (
             patch("argus_mcp.sessions.check_port_conflict", return_value=None),
             patch("argus_mcp.sessions.auto_name", return_value="default"),
-            patch("argus_mcp.cli.os.makedirs"),
+            patch("argus_mcp.cli._server.os.makedirs"),
             patch("builtins.open", mock_open()),
-            patch("argus_mcp.cli.subprocess.Popen", return_value=mock_proc),
+            patch("argus_mcp.cli._server.subprocess.Popen", return_value=mock_proc),
             patch("argus_mcp.sessions.SessionInfo"),
             patch("argus_mcp.sessions.save_session"),
         ):
@@ -677,9 +687,9 @@ class TestDetachServer:
         with (
             patch("argus_mcp.sessions.validate_name", return_value="my-server"),
             patch("argus_mcp.sessions.check_port_conflict", return_value=None),
-            patch("argus_mcp.cli.os.makedirs"),
+            patch("argus_mcp.cli._server.os.makedirs"),
             patch("builtins.open", mock_open()),
-            patch("argus_mcp.cli.subprocess.Popen", return_value=mock_proc),
+            patch("argus_mcp.cli._server.subprocess.Popen", return_value=mock_proc),
             patch("argus_mcp.sessions.SessionInfo"),
             patch("argus_mcp.sessions.save_session"),
         ):
@@ -688,7 +698,7 @@ class TestDetachServer:
         assert "my-server" in out
 
 
-# _stop_named_session ─────────────────────────────────────────────
+# _stop_named_session
 
 
 class TestStopNamedSession:
@@ -723,7 +733,7 @@ class TestStopNamedSession:
         with (
             patch("argus_mcp.sessions.load_session", return_value=info),
             patch("argus_mcp.sessions.stop_session", return_value=True),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             _stop_named_session("running")
         out = capsys.readouterr().out
@@ -742,7 +752,7 @@ class TestStopNamedSession:
             _stop_named_session("stuck")
 
 
-# _stop_legacy_pid ────────────────────────────────────────────────
+# _stop_legacy_pid
 
 
 class TestStopLegacyPid:
@@ -750,7 +760,7 @@ class TestStopLegacyPid:
 
     def test_no_pid_file(self) -> None:
         with (
-            patch("argus_mcp.cli._PID_FILE", "/no/such/file.pid"),
+            patch("argus_mcp.cli._stop._PID_FILE", "/no/such/file.pid"),
             pytest.raises(SystemExit),
         ):
             _stop_legacy_pid()
@@ -759,9 +769,9 @@ class TestStopLegacyPid:
         pid_file = tmp_path / "argus.pid"
         pid_file.write_text("99999999")
         with (
-            patch("argus_mcp.cli._PID_FILE", str(pid_file)),
+            patch("argus_mcp.cli._stop._PID_FILE", str(pid_file)),
             patch("os.kill", side_effect=ProcessLookupError),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             _stop_legacy_pid()
         out = capsys.readouterr().out
@@ -783,9 +793,9 @@ class TestStopLegacyPid:
             # SIGTERM: do nothing
 
         with (
-            patch("argus_mcp.cli._PID_FILE", str(pid_file)),
+            patch("argus_mcp.cli._stop._PID_FILE", str(pid_file)),
             patch("os.kill", side_effect=fake_kill),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
             patch("time.sleep"),
         ):
             _stop_legacy_pid()
@@ -796,13 +806,13 @@ class TestStopLegacyPid:
         pid_file = tmp_path / "argus.pid"
         pid_file.write_text("not-a-number")
         with (
-            patch("argus_mcp.cli._PID_FILE", str(pid_file)),
+            patch("argus_mcp.cli._stop._PID_FILE", str(pid_file)),
             pytest.raises(SystemExit),
         ):
             _stop_legacy_pid()
 
 
-# _cmd_server ─────────────────────────────────────────────────────
+# _cmd_server
 
 
 class TestCmdServer:
@@ -817,7 +827,7 @@ class TestCmdServer:
             config=None,
             name=None,
         )
-        with patch("argus_mcp.cli._detach_server") as mock_detach:
+        with patch("argus_mcp.cli._server._detach_server") as mock_detach:
             from argus_mcp.cli import _cmd_server
 
             _cmd_server(args)
@@ -835,9 +845,9 @@ class TestCmdServer:
         )
         with (
             patch("argus_mcp.sessions.auto_name", return_value="default"),
-            patch("argus_mcp.cli._write_pid_file"),
-            patch("argus_mcp.cli._remove_pid_file"),
-            patch("argus_mcp.cli.signal.signal"),
+            patch("argus_mcp.cli._server._write_pid_file"),
+            patch("argus_mcp.cli._server._remove_pid_file"),
+            patch("argus_mcp.cli._server.signal.signal"),
             patch("asyncio.run", side_effect=KeyboardInterrupt),
         ):
             from argus_mcp.cli import _cmd_server
@@ -856,9 +866,9 @@ class TestCmdServer:
         )
         with (
             patch("argus_mcp.sessions.auto_name", return_value="default"),
-            patch("argus_mcp.cli._write_pid_file"),
-            patch("argus_mcp.cli._remove_pid_file"),
-            patch("argus_mcp.cli.signal.signal"),
+            patch("argus_mcp.cli._server._write_pid_file"),
+            patch("argus_mcp.cli._server._remove_pid_file"),
+            patch("argus_mcp.cli._server.signal.signal"),
             patch("asyncio.run", side_effect=SystemExit(0)),
         ):
             from argus_mcp.cli import _cmd_server
@@ -877,9 +887,9 @@ class TestCmdServer:
         )
         with (
             patch("argus_mcp.sessions.auto_name", return_value="default"),
-            patch("argus_mcp.cli._write_pid_file"),
-            patch("argus_mcp.cli._remove_pid_file"),
-            patch("argus_mcp.cli.signal.signal"),
+            patch("argus_mcp.cli._server._write_pid_file"),
+            patch("argus_mcp.cli._server._remove_pid_file"),
+            patch("argus_mcp.cli._server.signal.signal"),
             patch("asyncio.run", side_effect=RuntimeError("boom")),
             pytest.raises(SystemExit),
         ):
@@ -888,7 +898,7 @@ class TestCmdServer:
             _cmd_server(args)
 
 
-# _cmd_secret ─────────────────────────────────────────────────────
+# _cmd_secret
 
 
 class TestCmdSecret:
@@ -993,7 +1003,7 @@ class TestCmdSecret:
         assert "deleted" in capsys.readouterr().out
 
 
-# _run_server extended coverage ───────────────────────────────────
+# _run_server extended coverage
 
 
 class TestRunServerExtended:
@@ -1006,15 +1016,15 @@ class TestRunServerExtended:
         mock_server.serve = AsyncMock()
 
         with (
-            patch("argus_mcp.cli.setup_logging", return_value=("/dev/null", "INFO")),
-            patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
+            patch("argus_mcp.cli._server.setup_logging", return_value=("/dev/null", "INFO")),
+            patch("argus_mcp.cli._server._find_config_file", return_value="config.yaml"),
             patch("argus_mcp.server.app.app") as mock_app,
             patch(
                 "argus_mcp.config.loader.load_argus_config",
                 side_effect=OSError("no file"),
             ),
-            patch("argus_mcp.cli.uvicorn.Config"),
-            patch("argus_mcp.cli.uvicorn.Server", return_value=mock_server),
+            patch("argus_mcp.cli._server.uvicorn.Config"),
+            patch("argus_mcp.cli._server.uvicorn.Server", return_value=mock_server),
             patch("socket.socket") as mock_sock_cls,
         ):
             mock_app.state = MagicMock()
@@ -1029,12 +1039,12 @@ class TestRunServerExtended:
         mock_server.serve = AsyncMock(side_effect=KeyboardInterrupt)
 
         with (
-            patch("argus_mcp.cli.setup_logging", return_value=("/dev/null", "INFO")),
-            patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
+            patch("argus_mcp.cli._server.setup_logging", return_value=("/dev/null", "INFO")),
+            patch("argus_mcp.cli._server._find_config_file", return_value="config.yaml"),
             patch("argus_mcp.server.app.app") as mock_app,
             patch("argus_mcp.config.loader.load_argus_config", side_effect=ValueError),
-            patch("argus_mcp.cli.uvicorn.Config"),
-            patch("argus_mcp.cli.uvicorn.Server", return_value=mock_server),
+            patch("argus_mcp.cli._server.uvicorn.Config"),
+            patch("argus_mcp.cli._server.uvicorn.Server", return_value=mock_server),
             patch("socket.socket") as mock_sock_cls,
         ):
             mock_app.state = MagicMock()
@@ -1048,12 +1058,12 @@ class TestRunServerExtended:
         mock_server.serve = AsyncMock(side_effect=RuntimeError("boom"))
 
         with (
-            patch("argus_mcp.cli.setup_logging", return_value=("/dev/null", "INFO")),
-            patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
+            patch("argus_mcp.cli._server.setup_logging", return_value=("/dev/null", "INFO")),
+            patch("argus_mcp.cli._server._find_config_file", return_value="config.yaml"),
             patch("argus_mcp.server.app.app") as mock_app,
             patch("argus_mcp.config.loader.load_argus_config", side_effect=ValueError),
-            patch("argus_mcp.cli.uvicorn.Config"),
-            patch("argus_mcp.cli.uvicorn.Server", return_value=mock_server),
+            patch("argus_mcp.cli._server.uvicorn.Config"),
+            patch("argus_mcp.cli._server.uvicorn.Server", return_value=mock_server),
             patch("socket.socket") as mock_sock_cls,
         ):
             mock_app.state = MagicMock()
@@ -1062,7 +1072,7 @@ class TestRunServerExtended:
                 await _run_server("127.0.0.1", 9992, "info")
 
 
-# _cmd_server extended coverage ───────────────────────────────────
+# _cmd_server extended coverage
 
 
 class TestCmdServerExtended:
@@ -1080,8 +1090,8 @@ class TestCmdServerExtended:
             verbose=0,
         )
         with (
-            patch("argus_mcp.cli._write_pid_file"),
-            patch("argus_mcp.cli._remove_pid_file"),
+            patch("argus_mcp.cli._server._write_pid_file"),
+            patch("argus_mcp.cli._server._remove_pid_file"),
             patch("argus_mcp.cli._restore_terminal"),
             patch("argus_mcp.sessions.auto_name", return_value="auto-9000"),
             patch("asyncio.run", side_effect=SystemExit(42)),
@@ -1090,7 +1100,7 @@ class TestCmdServerExtended:
             _cmd_server(args)  # should not raise — exits handled gracefully
 
 
-# _stop_legacy_pid extended coverage ──────────────────────────────
+# _stop_legacy_pid extended coverage
 
 
 class TestStopLegacyPidExtended:
@@ -1101,7 +1111,7 @@ class TestStopLegacyPidExtended:
         with (
             patch("builtins.open", mock_open(read_data="1234")),
             patch("os.kill") as mock_kill,
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
             patch("time.sleep"),
         ):
             # kill(pid, 0) → PermissionError (process owned by another user)
@@ -1143,7 +1153,7 @@ class TestStopLegacyPidExtended:
         with (
             patch("builtins.open", mock_open(read_data="1234")),
             patch("os.kill") as mock_kill,
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
             patch("time.sleep"),
         ):
 
@@ -1171,7 +1181,7 @@ class TestStopLegacyPidExtended:
                 _stop_legacy_pid()
 
 
-# _cmd_stop extended (find_session path) ──────────────────────────
+# _cmd_stop extended (find_session path)
 
 
 class TestCmdStopExtended:
@@ -1185,11 +1195,11 @@ class TestCmdStopExtended:
         mock_info = MagicMock()
         mock_info.name = "auto-9000"
         mock_info.pid = 1234
-        args = argparse.Namespace(session_name=None)
+        args = argparse.Namespace(session_name=None, all=False, force=False)
         with (
             patch("argus_mcp.sessions.find_session", return_value=mock_info),
             patch("argus_mcp.sessions.stop_session", return_value=True),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             _cmd_stop(args)
         assert "stopped" in capsys.readouterr().out.lower()
@@ -1199,28 +1209,29 @@ class TestCmdStopExtended:
         mock_info = MagicMock()
         mock_info.name = "auto-9000"
         mock_info.pid = 1234
-        args = argparse.Namespace(session_name=None)
+        args = argparse.Namespace(session_name=None, all=False, force=False)
         with (
             patch("argus_mcp.sessions.find_session", return_value=mock_info),
             patch("argus_mcp.sessions.stop_session", return_value=False),
-            patch("argus_mcp.cli._cleanup_pid_file"),
+            patch("argus_mcp.cli._stop._cleanup_pid_file"),
         ):
             with pytest.raises(SystemExit):
                 _cmd_stop(args)
 
     def test_no_sessions_falls_back_to_legacy(self) -> None:
         """When no session found and none alive, falls to _stop_legacy_pid."""
-        args = argparse.Namespace(session_name=None)
+        args = argparse.Namespace(session_name=None, all=False, force=False)
         with (
             patch("argus_mcp.sessions.find_session", return_value=None),
             patch("argus_mcp.sessions.list_sessions", return_value=[]),
-            patch("argus_mcp.cli._stop_legacy_pid") as mock_legacy,
+            patch("argus_mcp.sessions.discover_server_processes", return_value=[]),
+            patch("argus_mcp.cli._stop._stop_legacy_pid") as mock_legacy,
         ):
             _cmd_stop(args)
             mock_legacy.assert_called_once()
 
 
-# _build_tui_server_manager ───────────────────────────────────────
+# _build_tui_server_manager
 
 
 class TestBuildTuiServerManager:
@@ -1274,7 +1285,7 @@ class TestBuildTuiServerManager:
             mock_mgr.add.assert_not_called()
 
 
-# _cmd_tui ────────────────────────────────────────────────────────
+# _cmd_tui
 
 
 class TestCmdTui:
@@ -1294,12 +1305,14 @@ class TestCmdTui:
         mock_cfg.token = None
         mock_cfg.servers_config = None
         with (
-            patch("argus_mcp.cli._load_client_config", return_value=(mock_cfg, None)),
-            patch("argus_mcp.cli._resolve_tui_server_url", return_value="http://localhost:9000"),
-            patch("argus_mcp.cli._build_tui_server_manager") as mock_mgr_fn,
+            patch("argus_mcp.cli._tui._load_client_config", return_value=(mock_cfg, None)),
+            patch(
+                "argus_mcp.cli._tui._resolve_tui_server_url", return_value="http://localhost:9000"
+            ),
+            patch("argus_mcp.cli._tui._build_tui_server_manager") as mock_mgr_fn,
             patch("argus_mcp.tui.app.ArgusApp", return_value=mock_app),
-            patch("argus_mcp.cli._restore_terminal"),
-            patch("argus_mcp.cli.termios", create=True),
+            patch("argus_mcp.cli._tui._restore_terminal"),
+            patch("argus_mcp.cli._tui.termios", create=True),
         ):
             mock_mgr = MagicMock()
             mock_mgr.count = 1
@@ -1319,10 +1332,12 @@ class TestCmdTui:
         mock_cfg = MagicMock()
         mock_cfg.token = None
         with (
-            patch("argus_mcp.cli._load_client_config", return_value=(mock_cfg, None)),
-            patch("argus_mcp.cli._resolve_tui_server_url", return_value="http://localhost:9000"),
+            patch("argus_mcp.cli._tui._load_client_config", return_value=(mock_cfg, None)),
+            patch(
+                "argus_mcp.cli._tui._resolve_tui_server_url", return_value="http://localhost:9000"
+            ),
             patch("argus_mcp.tui.app.ArgusApp", side_effect=ImportError("No module textual")),
-            patch("argus_mcp.cli._restore_terminal"),
+            patch("argus_mcp.cli._tui._restore_terminal"),
         ):
             with pytest.raises(SystemExit):
                 _cmd_tui(args)
@@ -1343,11 +1358,13 @@ class TestCmdTui:
         mock_app = MagicMock()
         mock_app.run.side_effect = KeyboardInterrupt
         with (
-            patch("argus_mcp.cli._load_client_config", return_value=(mock_cfg, None)),
-            patch("argus_mcp.cli._resolve_tui_server_url", return_value="http://localhost:9000"),
-            patch("argus_mcp.cli._build_tui_server_manager") as mock_mgr_fn,
+            patch("argus_mcp.cli._tui._load_client_config", return_value=(mock_cfg, None)),
+            patch(
+                "argus_mcp.cli._tui._resolve_tui_server_url", return_value="http://localhost:9000"
+            ),
+            patch("argus_mcp.cli._tui._build_tui_server_manager") as mock_mgr_fn,
             patch("argus_mcp.tui.app.ArgusApp", return_value=mock_app),
-            patch("argus_mcp.cli._restore_terminal"),
+            patch("argus_mcp.cli._tui._restore_terminal"),
         ):
             mock_mgr_fn.return_value = MagicMock(count=1)
             _cmd_tui(args)  # should not raise
@@ -1367,11 +1384,13 @@ class TestCmdTui:
         mock_app = MagicMock()
         mock_app.run.side_effect = RuntimeError("TUI crash")
         with (
-            patch("argus_mcp.cli._load_client_config", return_value=(mock_cfg, None)),
-            patch("argus_mcp.cli._resolve_tui_server_url", return_value="http://localhost:9000"),
-            patch("argus_mcp.cli._build_tui_server_manager") as mock_mgr_fn,
+            patch("argus_mcp.cli._tui._load_client_config", return_value=(mock_cfg, None)),
+            patch(
+                "argus_mcp.cli._tui._resolve_tui_server_url", return_value="http://localhost:9000"
+            ),
+            patch("argus_mcp.cli._tui._build_tui_server_manager") as mock_mgr_fn,
             patch("argus_mcp.tui.app.ArgusApp", return_value=mock_app),
-            patch("argus_mcp.cli._restore_terminal"),
+            patch("argus_mcp.cli._tui._restore_terminal"),
         ):
             mock_mgr_fn.return_value = MagicMock(count=1)
             with pytest.raises(SystemExit):
@@ -1391,11 +1410,13 @@ class TestCmdTui:
         mock_cfg.servers_config = None
         mock_app = MagicMock()
         with (
-            patch("argus_mcp.cli._load_client_config", return_value=(mock_cfg, None)),
-            patch("argus_mcp.cli._resolve_tui_server_url", return_value="http://localhost:9000"),
-            patch("argus_mcp.cli._build_tui_server_manager") as mock_mgr_fn,
+            patch("argus_mcp.cli._tui._load_client_config", return_value=(mock_cfg, None)),
+            patch(
+                "argus_mcp.cli._tui._resolve_tui_server_url", return_value="http://localhost:9000"
+            ),
+            patch("argus_mcp.cli._tui._build_tui_server_manager") as mock_mgr_fn,
             patch("argus_mcp.tui.app.ArgusApp", return_value=mock_app) as mock_app_cls,
-            patch("argus_mcp.cli._restore_terminal"),
+            patch("argus_mcp.cli._tui._restore_terminal"),
             patch.dict(os.environ, {"ARGUS_MGMT_TOKEN": "env-token-123"}),
         ):
             mock_mgr_fn.return_value = MagicMock(count=1)
@@ -1403,7 +1424,7 @@ class TestCmdTui:
             assert mock_app_cls.call_args[1]["token"] == "env-token-123"
 
 
-# _cmd_build ──────────────────────────────────────────────────────
+# _cmd_build
 
 
 class TestCmdBuild:
@@ -1413,8 +1434,8 @@ class TestCmdBuild:
         """When no stdio backends found, prints message and returns."""
         args = argparse.Namespace(config=None)
         with (
-            patch("argus_mcp.cli._find_config_file", return_value="config.yaml"),
-            patch("argus_mcp.cli.setup_logging"),
+            patch("argus_mcp.cli._build._find_config_file", return_value="config.yaml"),
+            patch("argus_mcp.cli._build.setup_logging"),
             patch(
                 "argus_mcp.config.loader.load_and_validate_config",
                 return_value={"web": {"type": "sse", "params": MagicMock()}},
@@ -1427,7 +1448,7 @@ class TestCmdBuild:
         """Backend with non-StdioServerParameters params is skipped."""
         args = argparse.Namespace(config="my.yaml")
         with (
-            patch("argus_mcp.cli.setup_logging"),
+            patch("argus_mcp.cli._build.setup_logging"),
             patch(
                 "argus_mcp.config.loader.load_and_validate_config",
                 return_value={"bad": {"type": "stdio", "params": "not-a-params-obj"}},
@@ -1443,7 +1464,7 @@ class TestCmdBuild:
         mock_params = MagicMock()
         mock_params.command = "test-server"
         with (
-            patch("argus_mcp.cli.setup_logging"),
+            patch("argus_mcp.cli._build.setup_logging"),
             patch(
                 "argus_mcp.config.loader.load_and_validate_config",
                 return_value={
@@ -1470,7 +1491,7 @@ class TestCmdBuild:
         mock_params = MagicMock()
         mock_params.command = "test-server"
         with (
-            patch("argus_mcp.cli.setup_logging"),
+            patch("argus_mcp.cli._build.setup_logging"),
             patch(
                 "argus_mcp.config.loader.load_and_validate_config",
                 return_value={

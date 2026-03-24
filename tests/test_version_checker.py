@@ -22,7 +22,7 @@ from argus_mcp.bridge.version_checker import (
     parse_semver,
 )
 
-# parse_semver ────────────────────────────────────────────────────────
+# parse_semver
 
 
 class TestParseSemver:
@@ -61,7 +61,7 @@ class TestParseSemver:
         assert parse_semver("-1.0.0") is None
 
 
-# classify_drift ──────────────────────────────────────────────────────
+# classify_drift
 
 
 class TestClassifyDrift:
@@ -96,7 +96,7 @@ class TestClassifyDrift:
         assert classify_drift("1.2.3", "3.0.0") == DriftSeverity.MAJOR
 
 
-# DriftResult ─────────────────────────────────────────────────────────
+# DriftResult
 
 
 class TestDriftResult:
@@ -130,7 +130,7 @@ class TestDriftResult:
         assert r.backend == "srv1"
 
 
-# VersionChecker ──────────────────────────────────────────────────────
+# VersionChecker
 
 
 class TestVersionChecker:

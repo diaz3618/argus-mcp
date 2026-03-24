@@ -19,6 +19,7 @@ every stdio backend.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -26,6 +27,12 @@ from typing import AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from mcp import StdioServerParameters
 
+from argus_mcp.bridge.container.go_docker_adapter import (
+    GoDockerAdapter,
+)
+from argus_mcp.bridge.container.go_docker_adapter import (
+    is_available as _go_adapter_available,
+)
 from argus_mcp.bridge.container.image_builder import (
     classify_command,
     ensure_image,
@@ -34,6 +41,7 @@ from argus_mcp.bridge.container.image_builder import (
 from argus_mcp.bridge.container.network import effective_network
 from argus_mcp.bridge.container.runtime import RuntimeFactory
 from argus_mcp.bridge.container.templates.models import CONTAINER_HOME
+from argus_mcp.constants import EXIT_STACK_CLOSE_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +51,53 @@ _DEFAULT_CPUS = "1"
 
 #: Maps ``svr_name`` → ``(container_runtime, container_id)`` for cleanup.
 _active_containers: Dict[str, Tuple[str, str]] = {}
+
+_MEM_SUFFIXES = {"k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
+
+_PATH_TRAVERSAL_PATTERN = ".."
+
+
+def _validate_volume_sources(svr_name: str, volumes: Optional[List[str]]) -> Optional[List[str]]:
+    """Validate volume mount source paths exist on the host.
+
+    Returns the validated list (unchanged) or ``None`` if the input was
+    ``None``.  Logs a warning for each source path that is missing so
+    operators can diagnose "Connection closed" errors caused by bind
+    mounts to non-existent directories.
+    """
+    if not volumes:
+        return volumes
+    for vol in volumes:
+        parts = vol.split(":")
+        if len(parts) >= 2:
+            src = parts[0]
+            if _PATH_TRAVERSAL_PATTERN in src:
+                logger.warning(
+                    "[%s] Volume source path contains '..': '%s' — "
+                    "use absolute paths to avoid path traversal.",
+                    svr_name,
+                    src,
+                )
+            elif not os.path.exists(src):
+                logger.warning(
+                    "[%s] Volume source path does not exist: '%s'. "
+                    "The backend may fail to start. Create the directory "
+                    "before starting the server.",
+                    svr_name,
+                    src,
+                )
+    return volumes
+
+
+def _parse_memory_string(mem: str) -> int:
+    """Parse a Docker-style memory string (e.g. ``512m``) to bytes."""
+    mem = mem.strip().lower()
+    if not mem:
+        return 0
+    suffix = mem[-1]
+    if suffix in _MEM_SUFFIXES:
+        return int(mem[:-1]) * _MEM_SUFFIXES[suffix]
+    return int(mem)
 
 
 async def wrap_backend(
@@ -58,10 +113,17 @@ async def wrap_backend(
     extra_args: Optional[List[str]] = None,
     build_if_missing: bool = True,
     system_deps: Optional[List[str]] = None,
+    build_system_deps: Optional[List[str]] = None,
     builder_image: Optional[str] = None,
     additional_packages: Optional[List[str]] = None,
     transport_override: Optional[str] = None,
     go_package: Optional[str] = None,
+    source_url: Optional[str] = None,
+    build_steps: Optional[List[str]] = None,
+    entrypoint: Optional[List[str]] = None,
+    build_env: Optional[Dict[str, str]] = None,
+    source_ref: Optional[str] = None,
+    dockerfile: Optional[str] = None,
     create_timeout: float = 120.0,
     line_callback: Optional[Callable[[str], None]] = None,
 ) -> Tuple[StdioServerParameters, bool]:
@@ -159,19 +221,21 @@ async def wrap_backend(
         )
         return params, False
 
-    transport = transport_override or classify_command(params.command)
-    if transport is None:
-        logger.warning(
-            "[%s] Unknown command '%s' — no container image mapping. Running as bare subprocess.",
-            svr_name,
-            params.command,
-        )
-        return params, False
+    # Source-build and custom dockerfile skip normal transport classification.
+    if not (source_url or dockerfile):
+        transport = transport_override or classify_command(params.command)
+        if transport is None:
+            logger.warning(
+                "[%s] Unknown command '%s' — no container image mapping. Running as bare subprocess.",
+                svr_name,
+                params.command,
+            )
+            return params, False
 
-    if transport == "docker":
-        # Should have been caught by is_already_containerised above,
-        # but handle edge cases (e.g. docker without run subcommand)
-        return params, False
+        if transport == "docker":
+            # Should have been caught by is_already_containerised above,
+            # but handle edge cases (e.g. docker without run subcommand)
+            return params, False
 
     image_tag, _binary, runtime_args = await ensure_image(
         svr_name,
@@ -181,10 +245,17 @@ async def wrap_backend(
         container_runtime,
         build_if_missing=build_if_missing,
         system_deps=system_deps,
+        build_system_deps=build_system_deps,
         builder_image=builder_image,
         additional_packages=additional_packages,
         transport_override=transport_override,
         go_package=go_package,
+        source_url=source_url,
+        build_steps=build_steps,
+        entrypoint=entrypoint,
+        build_env=build_env,
+        source_ref=source_ref,
+        dockerfile=dockerfile,
         line_callback=line_callback,
     )
 
@@ -202,21 +273,45 @@ async def wrap_backend(
     if svr_name in _active_containers:
         await cleanup_container(svr_name)
 
+    # Also remove any leftover Docker container with the same --name from a
+    # previous server session (not tracked in _active_containers).
+    await _remove_stale_named_container(container_runtime, svr_name)
+
     net_mode = effective_network(network)
     mem = memory or _DEFAULT_MEMORY
     cpu = cpus or _DEFAULT_CPUS
-    create_args = _build_create_args(
-        image_tag=image_tag,
-        runtime_args=runtime_args,
-        env=params.env,
-        network=net_mode,
-        memory=mem,
-        cpus=cpu,
-        volumes=volumes,
-        extra_args=extra_args,
-    )
 
-    container_id = await _create_container(container_runtime, create_args, timeout=create_timeout)
+    # Validate volume mount source paths exist on the host.
+    volumes = _validate_volume_sources(svr_name, volumes)
+
+    # Try Go adapter first for container creation, fall back to subprocess.
+    container_id: Optional[str] = None
+    if _go_adapter_available():
+        container_id = await _go_adapter_create(
+            image_tag=image_tag,
+            svr_name=svr_name,
+            runtime_args=runtime_args,
+            env=params.env,
+            network=net_mode,
+            memory=mem,
+            cpus=cpu,
+            volumes=volumes,
+        )
+
+    if container_id is None:
+        create_args = _build_create_args(
+            image_tag=image_tag,
+            runtime_args=runtime_args,
+            env=params.env,
+            network=net_mode,
+            memory=mem,
+            cpus=cpu,
+            volumes=volumes,
+            extra_args=extra_args,
+        )
+        container_id = await _create_container(
+            container_runtime, create_args, timeout=create_timeout
+        )
     if container_id is None:
         logger.warning(
             "[%s] Container pre-creation failed. Running '%s' as bare subprocess.",
@@ -246,6 +341,65 @@ async def wrap_backend(
         env=None,  # env vars baked in via -e at create time
     )
     return wrapped, True
+
+
+async def _go_adapter_create(
+    *,
+    image_tag: str,
+    svr_name: str,
+    runtime_args: List[str],
+    env: Optional[Dict[str, str]],
+    network: str,
+    memory: str,
+    cpus: str,
+    volumes: Optional[List[str]] = None,
+) -> Optional[str]:
+    """Try creating a container via the Go adapter.
+
+    Returns the container ID on success, ``None`` on any failure so
+    the caller can fall back to the subprocess path.
+    """
+    # Merge writable-dir env vars with user env
+    full_env: Dict[str, str] = {
+        "HOME": CONTAINER_HOME,
+        "TMPDIR": "/tmp",  # noqa: S108 — container-internal tmpfs, not host /tmp
+    }
+    if env:
+        full_env.update(env)
+
+    # Prepend tmpfs-style writable volume mounts
+    all_volumes = [
+        "/tmp:/tmp:rw",  # noqa: S108 — container-internal tmpfs mount
+        f"{CONTAINER_HOME}:{CONTAINER_HOME}:rw",
+    ]
+    if volumes:
+        all_volumes.extend(volumes)
+
+    adapter = GoDockerAdapter()
+    try:
+        await adapter.start()
+        cid = await adapter.create(
+            image=image_tag,
+            name=svr_name,
+            cmd=runtime_args or None,
+            env=full_env,
+            network=network,
+            memory=_parse_memory_string(memory),
+            cpus=float(cpus),
+            volumes=all_volumes,
+            read_only=True,
+            cap_drop=_DEFAULT_CAP_DROP,
+        )
+        return cid
+    except Exception:  # noqa: BLE001
+        logger.debug(
+            "[%s] Go adapter create failed, will fall back to subprocess.",
+            svr_name,
+            exc_info=True,
+        )
+        return None
+    finally:
+        await adapter.stop()
 
 
 def _build_create_args(
@@ -392,6 +546,49 @@ async def _create_container(
     return container_id
 
 
+async def _remove_stale_named_container(runtime: str, name: str) -> None:
+    """Remove a leftover Docker container by *name* if it exists.
+
+    This handles containers left behind from a previous server session
+    that are not tracked in ``_active_containers``.  Safe to call even
+    when no container with the given name exists.
+
+    Uses ``docker rm -f`` with a generous timeout.  If the first attempt
+    times out (can happen under Docker daemon load), a second attempt is
+    made after a short backoff.
+    """
+    for attempt in range(2):
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                runtime,
+                "rm",
+                "-f",
+                name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(proc.wait(), timeout=30.0)
+            return  # success (or container didn't exist — both fine)
+        except asyncio.TimeoutError:
+            # Kill the hung process before retrying.
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()  # type: ignore[union-attr]
+            if attempt == 0:
+                logger.debug(
+                    "[%s] docker rm -f timed out, retrying after 2 s…",
+                    name,
+                )
+                await asyncio.sleep(2)
+        except Exception:  # noqa: BLE001
+            logger.debug(
+                "[%s] Failed to remove stale container (attempt %d).",
+                name,
+                attempt + 1,
+                exc_info=True,
+            )
+            return  # non-timeout error — no point retrying
+
+
 async def cleanup_container(svr_name: str) -> None:
     """Remove a pre-created container for the given backend.
 
@@ -412,7 +609,7 @@ async def cleanup_container(svr_name: str) -> None:
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        await asyncio.wait_for(proc.wait(), timeout=10.0)
+        await asyncio.wait_for(proc.wait(), timeout=EXIT_STACK_CLOSE_TIMEOUT)
     except Exception:  # noqa: BLE001
         logger.debug(
             "[%s] Failed to cleanup container %s (may already be removed)",

@@ -7,6 +7,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from argus_mcp._task_utils import _log_task_exception
+from argus_mcp.constants import SESSION_DEFAULT_TTL
 from argus_mcp.server.session.models import MCPSession
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class SessionManager:
 
     def __init__(
         self,
-        default_ttl: float = 1800.0,
+        default_ttl: float = SESSION_DEFAULT_TTL,
         cleanup_interval: float = _DEFAULT_CLEANUP_INTERVAL,
     ) -> None:
         self._sessions: Dict[str, MCPSession] = {}

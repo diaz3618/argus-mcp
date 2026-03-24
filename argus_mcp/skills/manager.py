@@ -107,12 +107,10 @@ class SkillManager:
 
         manifest = SkillManifest.from_file(manifest_path)
 
-        # Validate
         errors = manifest.validate()
         if errors:
             raise SkillManifestError(f"Invalid manifest for '{manifest.name}': {'; '.join(errors)}")
 
-        # Check dependencies
         for dep in manifest.dependencies:
             if dep not in self._skills:
                 logger.warning(
@@ -121,7 +119,6 @@ class SkillManager:
                     dep,
                 )
 
-        # Copy to skills directory
         dest = os.path.join(  # nosemgrep: injection-path-traversal-join
             self._skills_dir, manifest.name
         )
@@ -200,7 +197,6 @@ class SkillManager:
         tools: List[Dict[str, Any]] = []
         for skill in self.list_enabled():
             for tool in skill.manifest.tools:
-                # Namespace the tool name
                 tool_copy = dict(tool)
                 if "name" in tool_copy:
                     tool_copy["_skill"] = skill.name

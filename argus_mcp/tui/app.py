@@ -15,6 +15,7 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
+from argus_mcp._error_utils import safe_query
 from argus_mcp.constants import (
     SERVER_NAME,
     SERVER_VERSION,
@@ -158,6 +159,30 @@ class ArgusApp(App):
         self._last_caps: Optional[Any] = None
         self._last_sessions: Optional[Any] = None
         self._last_groups: Optional[Any] = None
+
+    @property
+    def server_manager(self) -> Optional[object]:
+        return self._server_manager
+
+    @property
+    def last_status(self) -> Optional[Any]:
+        return self._last_status
+
+    @property
+    def last_caps(self) -> Optional[Any]:
+        return self._last_caps
+
+    @property
+    def last_sessions(self) -> Optional[Any]:
+        return self._last_sessions
+
+    @property
+    def last_groups(self) -> Optional[Any]:
+        return self._last_groups
+
+    @property
+    def last_events(self) -> Optional[list]:
+        return getattr(self, "_last_events", None)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -314,7 +339,6 @@ class ArgusApp(App):
 
     def on_mount(self) -> None:
         """Called after the TUI is fully mounted."""
-        # Load saved theme preference
         from argus_mcp.tui.settings import load_settings
 
         settings = load_settings()
@@ -322,7 +346,6 @@ class ArgusApp(App):
         if saved_theme in self.available_themes:
             self.theme = saved_theme
 
-        # Ensure we have a ServerManager
         self._ensure_server_manager()
 
         # DEFAULT_MODE already switches to dashboard; initialize
@@ -392,7 +415,6 @@ class ArgusApp(App):
         else:
             info.status_text = "No servers configured"
 
-        # Update the server selector widget
         self._refresh_server_selector()
 
         # Kick off the initial connection + polling
@@ -404,18 +426,24 @@ class ArgusApp(App):
         if self._poll_timer is not None:
             self._poll_timer.stop()
 
-        # Close API clients via server manager
+        # Close API clients via server manager.
+        # During Textual shutdown the async event loop is being torn down,
+        # so we use the synchronous fallback to close httpx transports.
         if self._server_manager is not None:
             from argus_mcp.tui.server_manager import ServerManager
 
             if isinstance(self._server_manager, ServerManager):
-                self.run_worker(self._server_manager.close_all(), exclusive=True)
+                self._server_manager.close_all_sync()
 
-        # Stop capturing print()
+        # Stop capturing print() — guard against empty screen stack
+        # during Textual shutdown.
         try:
-            self.screen.query_one(EventLogWidget).stop_capture()
-        except Exception:  # NoMatches, ScreenStackError, etc.
-            pass
+            screen = self.screen
+        except Exception:  # noqa: BLE001
+            return
+        ew = safe_query(screen, "EventLogWidget", EventLogWidget)
+        if ew is not None:
+            ew.stop_capture()
 
     def _start_polling(self) -> None:
         """Begin the initial connection and periodic polling."""
@@ -709,12 +737,10 @@ class ArgusApp(App):
         mgr.set_active(name)
         mgr.save()
 
-        # Reset state for the new server
         self._connected = False
         self._caps_loaded = False
         self._seen_event_ids.clear()
 
-        # Update the info panel
         entry = mgr.active_entry
         if entry:
             try:
@@ -736,7 +762,6 @@ class ArgusApp(App):
         # Force an immediate poll
         self.run_worker(self._poll_once(), exclusive=True, name="poll-switch")
 
-        # Refresh selector display
         self._refresh_server_selector()
 
     def on_capabilities_ready(self, event: CapabilitiesReady) -> None:
@@ -809,9 +834,9 @@ class ArgusApp(App):
                 )
             elif result == "disconnect":
                 self.notify(
-                    f"Disconnect '{backend_name}' — not yet supported by the management API",
+                    f"Disconnect '{backend_name}' — use Reconnect to cycle the connection",
                     title="Disconnect",
-                    severity="warning",
+                    severity="information",
                     timeout=4,
                 )
 
@@ -998,7 +1023,7 @@ class ArgusApp(App):
         """Open the client configuration export modal."""
         # Determine the server URL for the snippet
         sse_url = self._server_url or ""
-        status = getattr(self, "_last_status", None)
+        status = self.last_status
         if status is not None:
             url = getattr(status.transport, "sse_url", None)
             if url:

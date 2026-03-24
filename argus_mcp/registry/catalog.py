@@ -27,6 +27,7 @@ from argus_mcp.config.schema_backends import (
     StdioBackendConfig,
     StreamableHttpBackendConfig,
 )
+from argus_mcp.constants import SHORT_ID_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class CatalogItemResult(BaseModel):
 class CatalogResult(BaseModel):
     """Aggregate result from a catalog operation (stage or commit)."""
 
-    catalog_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    catalog_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:SHORT_ID_LENGTH])
     processed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     dry_run: bool = False
     total_entries: int = 0
@@ -279,7 +280,7 @@ def stage_catalog(
     Returns a CatalogResult with each entry marked STAGED or SKIPPED/FAILED.
     No mutations are applied to *config*.
     """
-    cid = catalog_id or uuid.uuid4().hex[:12]
+    cid = catalog_id or uuid.uuid4().hex[:SHORT_ID_LENGTH]
     result = CatalogResult(
         catalog_id=cid,
         dry_run=True,
@@ -366,7 +367,7 @@ def commit_catalog(
     -------
     CatalogResult with per-item statuses.
     """
-    cid = catalog_id or uuid.uuid4().hex[:12]
+    cid = catalog_id or uuid.uuid4().hex[:SHORT_ID_LENGTH]
     result = CatalogResult(
         catalog_id=cid,
         dry_run=False,
@@ -420,7 +421,7 @@ def commit_catalog(
             try:
                 healthy = health_check(entry.name, backend)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Health check error for '%s': %s", entry.name, exc)
+                logger.warning("Health check error for '%s': %s", entry.name, exc, exc_info=True)
                 healthy = False
 
             if not healthy:

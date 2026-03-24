@@ -18,6 +18,20 @@ from argus_mcp.constants import AUDIT_BACKUP_COUNT, AUDIT_MAX_BYTES
 
 logger = logging.getLogger(__name__)
 
+# Rust-accelerated serialization (optional)
+try:
+    from audit_rs import serialize_audit_dict as _rust_serialize_dict
+    from audit_rs import serialize_audit_event as _rust_serialize_event
+
+    _USE_RUST = True
+    logger.debug("Rust audit serializer loaded")
+except ImportError:
+    _USE_RUST = False
+    _rust_serialize_event = None  # type: ignore[assignment]
+    _rust_serialize_dict = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
+
 # Custom log level — always enabled (NIST requirement: audit cannot be silenced)
 AUDIT_LEVEL = 35  # between WARNING (30) and ERROR (40)
 logging.addLevelName(AUDIT_LEVEL, "AUDIT")
@@ -86,7 +100,26 @@ class AuditLogger:
         if not self._enabled:
             return
         try:
-            line = event.model_dump_json()
+            if _USE_RUST:
+                line = _rust_serialize_event(
+                    timestamp=event.timestamp,
+                    event_type=event.event_type,
+                    event_id=event.event_id,
+                    method=event.target.method,
+                    capability_name=event.target.capability_name,
+                    status=event.outcome.status,
+                    latency_ms=event.outcome.latency_ms,
+                    session_id=event.source.session_id,
+                    client_ip=event.source.client_ip,
+                    user_id=event.source.user_id,
+                    backend=event.target.backend,
+                    original_name=event.target.original_name,
+                    error=event.outcome.error,
+                    error_type=event.outcome.error_type,
+                    metadata=event.metadata if event.metadata else None,
+                )
+            else:
+                line = event.model_dump_json()
             self._audit_logger.log(AUDIT_LEVEL, line)
         except Exception:  # noqa: BLE001
             logger.exception("Failed to emit audit event")
@@ -96,7 +129,10 @@ class AuditLogger:
         if not self._enabled:
             return
         try:
-            line = json.dumps(data, default=str, separators=(",", ":"))
+            if _USE_RUST:
+                line = _rust_serialize_dict(data)
+            else:
+                line = json.dumps(data, default=str, separators=(",", ":"))
             self._audit_logger.log(AUDIT_LEVEL, line)
         except Exception:  # noqa: BLE001
             logger.exception("Failed to emit audit dict")

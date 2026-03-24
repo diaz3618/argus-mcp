@@ -218,6 +218,7 @@ class DockerRuntime(ContainerRuntime):
         line_callback: Optional[Callable[[str], None]] = None,
     ) -> bool:
         logger.info("Building image '%s' from '%s'…", image_tag, context_dir)
+        build_env = {**os.environ, "DOCKER_BUILDKIT": "1"}
         try:
             proc = await asyncio.create_subprocess_exec(
                 self._binary,
@@ -228,15 +229,16 @@ class DockerRuntime(ContainerRuntime):
                 "-f",
                 dockerfile,
                 context_dir,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=build_env,
             )
-            # Stream stderr line-by-line so callers can display build
+            # Stream output line-by-line so callers can display build
             # progress live.  Falls back to communicate() if no callback.
-            if line_callback and proc.stderr:
+            if line_callback and proc.stdout:
                 err_lines: list[str] = []
                 while True:
-                    raw = await proc.stderr.readline()
+                    raw = await proc.stdout.readline()
                     if not raw:
                         break
                     line = raw.decode(errors="replace").rstrip()
@@ -252,9 +254,9 @@ class DockerRuntime(ContainerRuntime):
                     )
                     return False
             else:
-                _, stderr = await proc.communicate()
+                stdout, _ = await proc.communicate()
                 if proc.returncode != 0:
-                    err_text = stderr.decode(errors="replace").strip() if stderr else ""
+                    err_text = stdout.decode(errors="replace").strip() if stdout else ""
                     logger.error(
                         "Image build failed for '%s': %s",
                         image_tag,
@@ -310,7 +312,6 @@ class DockerRuntime(ContainerRuntime):
         *,
         internal: bool = False,
     ) -> bool:
-        # Check existence first
         try:
             proc = await asyncio.create_subprocess_exec(
                 self._binary,

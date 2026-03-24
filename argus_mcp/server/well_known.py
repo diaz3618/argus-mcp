@@ -18,20 +18,16 @@ from starlette.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 
-def _get_incoming_auth_config() -> Any | None:
-    """Load the current IncomingAuthConfig from the running app's config.
+def _is_auth_enabled() -> bool:
+    """Check whether incoming authentication is active.
 
-    Returns ``None`` when config is unavailable or auth is anonymous.
+    Reads the already-initialized module-level state in ``transport``
+    rather than re-loading the config file (which requires a file path
+    not available at request time).
     """
-    try:
-        from argus_mcp.config.loader import load_argus_config
+    from argus_mcp.server.transport import _incoming_auth_provider
 
-        cfg = load_argus_config()
-        if cfg is not None and cfg.incoming_auth.type != "anonymous":
-            return cfg.incoming_auth
-    except Exception:  # noqa: BLE001
-        logger.debug("Could not load incoming auth config for well-known endpoint.", exc_info=True)
-    return None
+    return _incoming_auth_provider is not None
 
 
 async def handle_well_known_oauth_resource(request: Request) -> JSONResponse:
@@ -49,8 +45,7 @@ async def handle_well_known_oauth_resource(request: Request) -> JSONResponse:
 
     Returns 404 when incoming auth is not configured (anonymous mode).
     """
-    auth_cfg = _get_incoming_auth_config()
-    if auth_cfg is None:
+    if not _is_auth_enabled():
         return JSONResponse(
             {
                 "error": "no_auth_configured",
@@ -59,23 +54,33 @@ async def handle_well_known_oauth_resource(request: Request) -> JSONResponse:
             status_code=404,
         )
 
+    from argus_mcp.server.transport import _auth_issuer
+
+    # For local/static bearer-token auth there is no OAuth authorization
+    # server to advertise.  Returning an empty ``authorization_servers``
+    # list causes VS Code's MCP client to attempt Dynamic Client
+    # Registration, which always fails.  Return 404 so the client skips
+    # OAuth discovery entirely and uses the static ``Authorization``
+    # header from its configuration.
+    if not _auth_issuer:
+        return JSONResponse(
+            {
+                "error": "no_oauth_server",
+                "error_description": (
+                    "This server uses static bearer-token authentication. "
+                    "No OAuth authorization server is configured."
+                ),
+            },
+            status_code=404,
+        )
+
     # Build the resource identifier from the request URL (scheme + host)
     resource = f"{request.url.scheme}://{request.url.netloc}"
 
-    # Authorization servers: use the configured issuer
-    authorization_servers: list[str] = []
-    if auth_cfg.issuer:
-        authorization_servers.append(auth_cfg.issuer)
-
     metadata: dict[str, Any] = {
         "resource": resource,
-        "authorization_servers": authorization_servers,
+        "authorization_servers": [_auth_issuer],
         "bearer_methods_supported": ["header"],
     }
-
-    # Include audience if configured
-    if auth_cfg.audience:
-        metadata["resource_documentation"] = None  # reserved field
-        metadata["scopes_supported"] = []
 
     return JSONResponse(metadata, status_code=200)

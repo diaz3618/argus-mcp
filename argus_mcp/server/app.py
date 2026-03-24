@@ -61,7 +61,6 @@ logger.debug("Underlying MCP server instance '%s' created.", mcp_server.name)
 # called per HTTP request (see transport.py).
 streamable_session_manager: Optional[StreamableHTTPSessionManager] = None
 
-# Register all MCP handlers
 register_handlers(mcp_server)
 
 

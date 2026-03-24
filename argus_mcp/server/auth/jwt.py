@@ -98,7 +98,6 @@ class JWTValidator:
                 "Install with: pip install PyJWT cryptography"
             ) from exc
 
-        # Ensure we have keys
         if self._keys is None or self._keys_expired():
             self._keys = PyJWKClient(self._config.jwks_uri)
             self._keys_fetched_at = time.monotonic()

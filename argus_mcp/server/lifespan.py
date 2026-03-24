@@ -44,7 +44,7 @@ from typing import Any, AsyncIterator, Optional
 import yaml
 from starlette.applications import Starlette
 
-from argus_mcp.constants import SERVER_NAME, SERVER_VERSION
+from argus_mcp.constants import EXIT_STACK_CLOSE_TIMEOUT, SERVER_NAME, SERVER_VERSION
 from argus_mcp.display.console import (
     disp_console_status,
     gen_status_info,
@@ -129,18 +129,77 @@ def _load_composite_workflows(mcp_svr_instance: Any, chain: Any) -> None:
     )
 
 
-async def _attach_to_mcp_server(
-    mcp_svr_instance: Any,
-    service: ArgusService,
-    app_state: Any = None,
-) -> None:
-    """Attach bridge components from the service to the MCP server instance.
+def _setup_incoming_auth(full_cfg: Any) -> tuple[Any, str]:
+    """Configure incoming authentication from full config.
 
-    This preserves the existing monkey-patch pattern (mcp_server.manager /
-    mcp_server.registry) until it is properly replaced in a later phase.
-    Also builds and attaches the middleware chain and optimizer index.
+    Returns ``(auth_registry, auth_mode)``.
     """
-    from argus_mcp.audit import AuditLogger
+    from argus_mcp.server.auth.providers import AuthProviderRegistry
+
+    auth_registry: AuthProviderRegistry | None = None
+    auth_mode: str = "strict"
+    if full_cfg is None:
+        logger.debug("No full config loaded; incoming auth defaults to anonymous.")
+        return auth_registry, auth_mode
+
+    incoming_auth_type = full_cfg.incoming_auth.type
+    auth_mode = full_cfg.incoming_auth.auth_mode
+    if incoming_auth_type != "anonymous":
+        auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
+        import argus_mcp.server.transport as _transport_mod
+
+        _transport_mod._incoming_auth_provider = auth_registry
+        _transport_mod._auth_mode = auth_mode
+        _transport_mod._auth_issuer = full_cfg.incoming_auth.issuer
+        logger.info(
+            "Incoming auth enabled: type=%s, mode=%s (ASGI gate active on transports).",
+            incoming_auth_type,
+            auth_mode,
+        )
+    elif auth_mode == "permissive":
+        auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
+        import argus_mcp.server.transport as _transport_mod
+
+        _transport_mod._auth_mode = auth_mode
+        logger.info("Incoming auth: anonymous with permissive mode (tracking enabled).")
+    else:
+        logger.info("Incoming auth: anonymous (no ASGI gate).")
+    return auth_registry, auth_mode
+
+
+def _setup_telemetry(full_cfg: Any) -> bool:
+    """Initialize OpenTelemetry if enabled in config. Returns *True* if active."""
+    if full_cfg is None or not full_cfg.telemetry.enabled:
+        return False
+    try:
+        from argus_mcp.telemetry.config import TelemetryConfig
+
+        tel_config = TelemetryConfig(
+            enabled=True,
+            otlp_endpoint=full_cfg.telemetry.otlp_endpoint,
+            service_name=full_cfg.telemetry.service_name,
+        )
+        tel_config.initialize()
+        logger.info(
+            "Telemetry initialized: endpoint=%s, service=%s",
+            full_cfg.telemetry.otlp_endpoint,
+            full_cfg.telemetry.service_name,
+        )
+        return True
+    except Exception:  # noqa: BLE001
+        logger.debug("Telemetry init failed; continuing without OTel.", exc_info=True)
+        return False
+
+
+async def _build_middleware_stack(
+    service: ArgusService,
+    audit_logger: Any,
+    auth_registry: Any,
+    auth_mode: str,
+    full_cfg: Any,
+    telemetry_enabled: bool,
+) -> tuple[Any, Any]:
+    """Build the middleware chain. Returns ``(chain, plugin_manager)``."""
     from argus_mcp.bridge.middleware import (
         AuditMiddleware,
         RecoveryMiddleware,
@@ -148,92 +207,6 @@ async def _attach_to_mcp_server(
         build_chain,
     )
     from argus_mcp.bridge.middleware.telemetry import TelemetryMiddleware
-    from argus_mcp.bridge.optimizer import ToolIndex
-    from argus_mcp.config.loader import load_argus_config
-    from argus_mcp.config.schema import ArgusConfig
-    from argus_mcp.server.auth.providers import AuthProviderRegistry
-
-    mcp_svr_instance.manager = service.manager
-    mcp_svr_instance.registry = service.registry
-
-    config_path = getattr(service, "_config_path", None)
-    full_cfg: ArgusConfig | None = None
-    if config_path:
-        try:
-            full_cfg = load_argus_config(config_path)
-        except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
-            logger.debug(
-                "Could not load full config; sub-features will use defaults.", exc_info=True
-            )
-
-    audit_logger = AuditLogger()
-    mcp_svr_instance.audit_logger = audit_logger
-
-    # At app-factory time only the env var is checked.  Now that the
-    # full config is loaded, apply the config-file token if the env var
-    # was unset.
-    if full_cfg is not None and app_state is not None:
-        mgmt_app = getattr(app_state, "mgmt_app", None)
-        if mgmt_app is not None and hasattr(mgmt_app, "set_token"):
-            mgmt_cfg = getattr(getattr(full_cfg, "server", None), "management", None)
-            cfg_token = getattr(mgmt_cfg, "token", None)
-            if not mgmt_app.auth_enabled and cfg_token:
-                mgmt_app.set_token(cfg_token)
-
-    # Create an AuthProviderRegistry from config and set it on the
-    # transport module so the ASGI-level auth gate validates requests
-    # before they reach the MCP SDK.
-    auth_registry: AuthProviderRegistry | None = None
-    auth_mode: str = "strict"
-    if full_cfg is not None:
-        incoming_auth_type = full_cfg.incoming_auth.type
-        auth_mode = full_cfg.incoming_auth.auth_mode
-        if incoming_auth_type != "anonymous":
-            auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
-            import argus_mcp.server.transport as _transport_mod
-
-            _transport_mod._incoming_auth_provider = auth_registry
-            _transport_mod._auth_mode = auth_mode
-            _transport_mod._auth_issuer = full_cfg.incoming_auth.issuer
-            logger.info(
-                "Incoming auth enabled: type=%s, mode=%s (ASGI gate active on transports).",
-                incoming_auth_type,
-                auth_mode,
-            )
-        elif auth_mode == "permissive":
-            # Anonymous + permissive: still create a registry so the auth
-            # middleware can inject anonymous identities consistently.
-            auth_registry = AuthProviderRegistry.from_config(full_cfg.incoming_auth.model_dump())
-            import argus_mcp.server.transport as _transport_mod
-
-            _transport_mod._auth_mode = auth_mode
-            logger.info("Incoming auth: anonymous with permissive mode (tracking enabled).")
-        else:
-            logger.info("Incoming auth: anonymous (no ASGI gate).")
-    else:
-        logger.debug("No full config loaded; incoming auth defaults to anonymous.")
-
-    telemetry_enabled = False
-    if full_cfg is not None and full_cfg.telemetry.enabled:
-        try:
-            from argus_mcp.telemetry.config import TelemetryConfig
-
-            tel_config = TelemetryConfig(
-                enabled=True,
-                otlp_endpoint=full_cfg.telemetry.otlp_endpoint,
-                service_name=full_cfg.telemetry.service_name,
-            )
-            tel_config.initialize()
-            telemetry_enabled = True
-            logger.info(
-                "Telemetry initialized: endpoint=%s, service=%s",
-                full_cfg.telemetry.otlp_endpoint,
-                full_cfg.telemetry.service_name,
-            )
-        except Exception:  # noqa: BLE001
-            logger.debug("Telemetry init failed; continuing without OTel.", exc_info=True)
-
-    mcp_svr_instance.telemetry_enabled = telemetry_enabled
 
     middlewares: list = []
     if auth_registry is not None:
@@ -267,43 +240,113 @@ async def _attach_to_mcp_server(
 
     routing = RoutingMiddleware(service.registry, service.manager)
     chain = build_chain(middlewares=middlewares, handler=routing)
-    mcp_svr_instance.middleware_chain = chain
     logger.info(
         "Middleware chain attached (telemetry=%s).",
         "enabled" if telemetry_enabled else "disabled",
     )
+    return chain, plugin_manager
+
+
+async def _setup_optimizer(
+    service: ArgusService,
+    full_cfg: Any,
+) -> tuple[Any, bool, list[str]]:
+    """Initialize the ToolIndex optimizer.
+
+    Returns ``(index_or_None, enabled, keep_list)``.
+    """
+    from argus_mcp.bridge.optimizer import ToolIndex
 
     optimizer_enabled = full_cfg.optimizer.enabled if full_cfg else False
     keep_list: list[str] = list(full_cfg.optimizer.keep_tools) if full_cfg else []
 
+    if not optimizer_enabled:
+        logger.debug("Optimizer disabled.")
+        return None, False, keep_list
+
+    tool_index = ToolIndex()
+    tools = service.registry.get_aggregated_tools()
+    route_map = service.registry.get_route_map()
+    await tool_index.store(tools, route_map)
+
+    if keep_list:
+        known = set(tool_index.tool_names)
+        missing = [t for t in keep_list if t not in known]
+        if missing:
+            logger.warning(
+                "Optimizer keep_tools references unknown tool(s): %s. "
+                "These may be misspelled or not yet registered.",
+                missing,
+            )
+
+    logger.info(
+        "Optimizer enabled: indexed %d tool(s), keep-list=%s.",
+        tool_index.tool_count,
+        keep_list or "(none)",
+    )
+    return tool_index, True, keep_list
+
+
+async def _attach_to_mcp_server(
+    mcp_svr_instance: Any,
+    service: ArgusService,
+    app_state: Any = None,
+) -> None:
+    """Attach bridge components from the service to the MCP server instance.
+
+    This preserves the existing monkey-patch pattern (mcp_server.manager /
+    mcp_server.registry) until it is properly replaced in a later phase.
+    Also builds and attaches the middleware chain and optimizer index.
+    """
+    from argus_mcp.audit import AuditLogger
+    from argus_mcp.config.loader import load_argus_config
+    from argus_mcp.config.schema import ArgusConfig
+
+    mcp_svr_instance.manager = service.manager
+    mcp_svr_instance.registry = service.registry
+
+    config_path = getattr(service, "_config_path", None)
+    full_cfg: ArgusConfig | None = None
+    if config_path:
+        try:
+            full_cfg = load_argus_config(config_path)
+        except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
+            logger.debug(
+                "Could not load full config; sub-features will use defaults.", exc_info=True
+            )
+
+    audit_logger = AuditLogger()
+    mcp_svr_instance.audit_logger = audit_logger
+
+    # At app-factory time only the env var is checked.  Now that the
+    # full config is loaded, apply the config-file token if the env var
+    # was unset.
+    if full_cfg is not None and app_state is not None:
+        mgmt_app = getattr(app_state, "mgmt_app", None)
+        if mgmt_app is not None and hasattr(mgmt_app, "set_token"):
+            mgmt_cfg = getattr(getattr(full_cfg, "server", None), "management", None)
+            cfg_token = getattr(mgmt_cfg, "token", None)
+            if not mgmt_app.auth_enabled and cfg_token:
+                mgmt_app.set_token(cfg_token)
+
+    auth_registry, auth_mode = _setup_incoming_auth(full_cfg)
+    telemetry_enabled = _setup_telemetry(full_cfg)
+    mcp_svr_instance.telemetry_enabled = telemetry_enabled
+
+    chain, plugin_manager = await _build_middleware_stack(
+        service,
+        audit_logger,
+        auth_registry,
+        auth_mode,
+        full_cfg,
+        telemetry_enabled,
+    )
+    mcp_svr_instance.middleware_chain = chain
+
+    optimizer_index, optimizer_enabled, keep_list = await _setup_optimizer(service, full_cfg)
     mcp_svr_instance.optimizer_enabled = optimizer_enabled
     mcp_svr_instance.optimizer_keep_list = keep_list
-
-    if optimizer_enabled:
-        tool_index = ToolIndex()
-        tools = service.registry.get_aggregated_tools()
-        route_map = service.registry.get_route_map()
-        await tool_index.store(tools, route_map)
-        mcp_svr_instance.optimizer_index = tool_index
-
-        if keep_list:
-            known = set(tool_index.tool_names)
-            missing = [t for t in keep_list if t not in known]
-            if missing:
-                logger.warning(
-                    "Optimizer keep_tools references unknown tool(s): %s. "
-                    "These may be misspelled or not yet registered.",
-                    missing,
-                )
-
-        logger.info(
-            "Optimizer enabled: indexed %d tool(s), keep-list=%s.",
-            tool_index.tool_count,
-            keep_list or "(none)",
-        )
-    else:
-        mcp_svr_instance.optimizer_index = None
-        logger.debug("Optimizer disabled.")
+    mcp_svr_instance.optimizer_index = optimizer_index
 
     from argus_mcp.server.session import SessionManager
 
@@ -362,7 +405,7 @@ async def _attach_to_mcp_server(
         feature_flags=mcp_svr_instance.feature_flags,
         skill_manager=skill_manager,
         version_checker=mcp_svr_instance.version_checker,
-        optimizer_index=getattr(mcp_svr_instance, "optimizer_index", None),
+        optimizer_index=optimizer_index,
         optimizer_enabled=optimizer_enabled,
         optimizer_keep_list=keep_list,
         telemetry_enabled=telemetry_enabled,
@@ -501,16 +544,18 @@ def _restore_signal_handlers(
 
 
 def _setup_installer_display(
-    config_path: str, verbosity: int
+    config_path: str, verbosity: int, *, parallel: bool = False
 ) -> tuple["InstallerDisplay | None", "Any"]:
     """Create the verbose installer display if conditions are met."""
-    if verbosity < 1 or not config_path:
+    # In parallel mode the display is useful even at default verbosity (0).
+    min_verbosity = 0 if parallel else 1
+    if verbosity < min_verbosity or not config_path:
         return None, None
     try:
         from argus_mcp.config.loader import load_and_validate_config
 
         raw_config = load_and_validate_config(config_path)
-        installer_display = InstallerDisplay(raw_config, verbose=True)
+        installer_display = InstallerDisplay(raw_config, parallel=parallel, verbosity=verbosity)
         installer_display.render_initial()
         return installer_display, installer_display.make_callback()
     except (OSError, yaml.YAMLError, AttributeError, KeyError, ValueError):
@@ -538,14 +583,17 @@ async def _shutdown_streamable_http(_exit_stack: "AsyncExitStack | None", mcp_se
     """Shut down the StreamableHTTPSessionManager and Argus session manager."""
     if _exit_stack is not None:
         try:
-            await asyncio.wait_for(_exit_stack.aclose(), timeout=10.0)
+            await asyncio.wait_for(_exit_stack.aclose(), timeout=EXIT_STACK_CLOSE_TIMEOUT)
             logger.info("SDK StreamableHTTPSessionManager stopped.")
         except asyncio.TimeoutError:
-            logger.warning("StreamableHTTPSessionManager aclose() timed out after 10s.")
-        except RuntimeError as e_rt:
+            logger.warning(
+                "StreamableHTTPSessionManager aclose() timed out after %ss.",
+                EXIT_STACK_CLOSE_TIMEOUT,
+            )
+        except RuntimeError as exc:
             logger.debug(
                 "Cancel scope error during session manager shutdown: %s",
-                e_rt,
+                exc,
             )
         except Exception:  # noqa: BLE001
             logger.debug(
@@ -559,7 +607,9 @@ async def _shutdown_streamable_http(_exit_stack: "AsyncExitStack | None", mcp_se
         except Exception:  # noqa: BLE001
             logger.debug("Module reference cleanup failed", exc_info=True)
 
-    sm = getattr(mcp_server, "session_manager", None)
+    from argus_mcp.server.state import get_state
+
+    sm = get_state(mcp_server).session_manager
     if sm is not None:
         await sm.stop()
 
@@ -605,6 +655,8 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     service = ArgusService()
     # Propagate CLI --auto-reauth flag to the runtime service.
     service._auto_reauth = getattr(app_state, "auto_reauth", False)
+    # Propagate CLI --parallel flag for concurrent container builds.
+    service._parallel = getattr(app_state, "parallel", False)
     # Store service on app.state so management API can access it later (0.2).
     app_state.argus_service = service  # type: ignore[attr-defined]
 
@@ -621,7 +673,10 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         log_file_status(status_info_init)
 
         verbosity: int = getattr(app_state, "verbosity", 0)
-        installer_display, progress_callback = _setup_installer_display(config_path, verbosity)
+        parallel: bool = getattr(app_state, "parallel", False)
+        installer_display, progress_callback = _setup_installer_display(
+            config_path, verbosity, parallel=parallel
+        )
 
         # Install a temporary signal override so Ctrl+C works during
         # the (potentially very long) backend-connection phase.
@@ -693,9 +748,9 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         log_file_status(status_info_ready)
         yield
 
-    except ConfigurationError as e_cfg:
-        logger.exception("Configuration error: %s", e_cfg)
-        err_detail_msg = f"Configuration error: {e_cfg}"
+    except ConfigurationError as exc:
+        logger.exception("Configuration error: %s", exc)
+        err_detail_msg = f"Configuration error: {exc}"
         status_info_fail = gen_status_info(
             app_state,
             "Server startup failed.",
@@ -705,9 +760,9 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         disp_console_status("❌ Startup Failed", status_info_fail)
         log_file_status(status_info_fail, log_lvl=logging.ERROR)
         raise
-    except BackendServerError as e_backend:
-        logger.exception("Backend error: %s", e_backend)
-        err_detail_msg = f"Backend error: {e_backend}"
+    except BackendServerError as exc:
+        logger.exception("Backend error: %s", exc)
+        err_detail_msg = f"Backend error: {exc}"
         status_info_fail = gen_status_info(
             app_state,
             "Server startup failed.",
@@ -718,12 +773,12 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
         disp_console_status("❌ Startup Failed", status_info_fail)
         log_file_status(status_info_fail, log_lvl=logging.ERROR)
         raise
-    except Exception as e_exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         logger.exception(
             "Unexpected error during lifespan startup: %s",
-            e_exc,
+            exc,
         )
-        err_detail_msg = f"Unexpected error: {type(e_exc).__name__} - {e_exc}"
+        err_detail_msg = f"Unexpected error: {type(exc).__name__} - {exc}"
         status_info_fail = gen_status_info(
             app_state,
             "Server startup failed.",

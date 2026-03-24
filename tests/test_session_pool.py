@@ -16,7 +16,7 @@ from argus_mcp.bridge.session_pool import (
     SessionPool,
 )
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _key(url: str = "http://backend:8080", identity: str = "abc", transport: str = "sse"):
@@ -33,7 +33,7 @@ def _mock_stack() -> AsyncExitStack:
     return stack
 
 
-# SessionKey ──────────────────────────────────────────────────────────
+# SessionKey
 
 
 class TestSessionKey:
@@ -55,7 +55,7 @@ class TestSessionKey:
         assert a != b
 
 
-# PoolEntry ───────────────────────────────────────────────────────────
+# PoolEntry
 
 
 class TestPoolEntry:
@@ -66,7 +66,7 @@ class TestPoolEntry:
         assert entry.idle_time >= 0
 
 
-# SessionPool lifecycle ───────────────────────────────────────────────
+# SessionPool lifecycle
 
 
 class TestSessionPoolLifecycle:
@@ -100,7 +100,7 @@ class TestSessionPoolLifecycle:
         assert pool.total_sessions == 0
 
 
-# Acquire / release ──────────────────────────────────────────────────
+# Acquire / release
 
 
 class TestAcquireRelease:
@@ -166,7 +166,7 @@ class TestAcquireRelease:
         assert result is None
 
 
-# Capacity / eviction ────────────────────────────────────────────────
+# Capacity / eviction
 
 
 class TestCapacityEviction:
@@ -189,7 +189,7 @@ class TestCapacityEviction:
         await pool.stop()
 
 
-# Circuit breaker integration ─────────────────────────────────────────
+# Circuit breaker integration
 
 
 class TestCircuitBreakerIntegration:
@@ -240,7 +240,7 @@ class TestCircuitBreakerIntegration:
         await pool.stop()
 
 
-# remove_all ──────────────────────────────────────────────────────────
+# remove_all
 
 
 class TestRemoveAll:
@@ -270,7 +270,7 @@ class TestRemoveAll:
         await pool.stop()
 
 
-# TTL reaping ─────────────────────────────────────────────────────────
+# TTL reaping
 
 
 class TestReaping:
@@ -318,7 +318,7 @@ class TestReaping:
         await pool.stop()
 
 
-# Stats ───────────────────────────────────────────────────────────────
+# Stats
 
 
 class TestStats:
@@ -349,7 +349,7 @@ class TestStats:
         await pool.stop()
 
 
-# Config model ────────────────────────────────────────────────────────
+# Config model
 
 
 class TestSessionPoolConfig:

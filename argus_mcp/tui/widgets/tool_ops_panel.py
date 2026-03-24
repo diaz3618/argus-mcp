@@ -59,8 +59,8 @@ class ToolOpsPanel(Static):
             self._refresh_data()
 
     def _get_tools(self) -> List[Dict[str, Any]]:
-        """Extract tool dicts from app._last_caps."""
-        caps = getattr(self.app, "_last_caps", None)
+        """Extract tool dicts from cached capabilities."""
+        caps = self.app.last_caps
         if caps is None:
             return []
         try:
@@ -69,8 +69,8 @@ class ToolOpsPanel(Static):
             return []
 
     def _get_route_map(self) -> Dict[str, str]:
-        """Extract route_map from app._last_caps."""
-        caps = getattr(self.app, "_last_caps", None)
+        """Extract route_map from cached capabilities."""
+        caps = self.app.last_caps
         if caps is None:
             return {}
         return getattr(caps, "route_map", {}) or {}

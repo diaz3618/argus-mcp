@@ -151,7 +151,7 @@ class SecurityScreen(ArgusScreen):
 
     def _refresh_security(self) -> None:
         """Populate selectors from cached app state."""
-        caps = getattr(self.app, "_last_caps", None)
+        caps = self.app.last_caps
         if caps is None:
             return
         route_map = getattr(caps, "route_map", {})
@@ -161,18 +161,58 @@ class SecurityScreen(ArgusScreen):
         except NoMatches:
             pass
 
+        # Populate auth mode from feature flags / status
+        status = self.app.last_status
+        if status is not None:
+            ff = getattr(status, "feature_flags", {}) or {}
+            outgoing_auth = ff.get("outgoing_auth", False)
+            # If the TUI is connected with a token, the server uses bearer auth
+            mgr = self.app.server_manager
+            if mgr and mgr.active_entry and mgr.active_entry.token:
+                try:
+                    self.query_one("#sec-auth-mode-select", Select).value = "bearer"
+                except NoMatches:
+                    pass
+            # Show outgoing auth status in the hint
+            outgoing_label = "enabled" if outgoing_auth else "disabled"
+            try:
+                self.query_one("#sec-outgoing-hint", Static).update(
+                    f"[dim]Outgoing auth: {outgoing_label}. "
+                    f"Configure authentication for each backend server connection.[/dim]"
+                )
+            except NoMatches:
+                pass
+
+            # Populate network isolation panel with feature flag info
+            container_isolation = ff.get("container_isolation", False)
+            try:
+                from argus_mcp.tui.widgets.network_panel import NetworkIsolationPanel
+
+                net_panel = self.query_one(NetworkIsolationPanel)
+                net_panel.load_config(
+                    {
+                        "network_mode": "bridge" if container_isolation else "host",
+                    }
+                )
+            except NoMatches:
+                pass
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
         if btn_id == "btn-apply-policies":
             self._do_apply_policies()
 
     def _do_apply_policies(self) -> None:
-        """Validate and apply authorization policies."""
+        """Validate authorization policies YAML.
+
+        The management API does not support remote policy writes.
+        Policies must be configured in the server config file.
+        """
         try:
             editor = self.query_one("#sec-authz-policies-editor", TextArea)
             text = editor.text.strip()
             if not text or text.startswith("#"):
-                self.notify("No policies to apply", severity="warning")
+                self.notify("No policies to validate", severity="warning")
                 return
             try:
                 import yaml
@@ -180,9 +220,10 @@ class SecurityScreen(ArgusScreen):
                 data = yaml.safe_load(text)
                 policies = data.get("policies", []) if isinstance(data, dict) else []
                 self.notify(
-                    f"Parsed {len(policies)} policy rules (save pending)",
+                    f"Validated {len(policies)} policy rules. "
+                    f"Copy to server config and reload to apply.",
                     title="Policies",
-                    timeout=4,
+                    timeout=5,
                 )
             except ImportError:
                 self.notify(

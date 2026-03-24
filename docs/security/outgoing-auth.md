@@ -143,6 +143,37 @@ register itself automatically — set `client_id` to `dynamic`:
 4. **Persistence** — the new token set is written to disk with `0600`
    permissions and cached in memory.
 
+### Headless Environments
+
+When Argus detects a headless environment (SSH session, missing `DISPLAY`
+on Linux, Docker container), it cannot open a browser automatically.
+Instead, the authorization URL is printed to stderr so the user can
+copy-paste it into a browser on another machine:
+
+```
+============================================================
+  OAUTH AUTHORIZATION REQUIRED
+============================================================
+  Open this URL in a browser:
+
+    https://auth.example.com/authorize?client_id=...&...
+
+  Callback listening on: http://127.0.0.1:54321/callback
+============================================================
+```
+
+Detection heuristics:
+- `SSH_CONNECTION` or `SSH_TTY` environment variable is set
+- Linux system without `DISPLAY` or `WAYLAND_DISPLAY`
+
+The callback server still listens on localhost, so the browser must be
+able to reach `127.0.0.1` on the callback port. In fully remote
+environments use SSH port forwarding:
+
+```bash
+ssh -L 54321:127.0.0.1:54321 user@remote-host
+```
+
 ### Security
 
 - PKCE S256 challenge protects against authorization code interception

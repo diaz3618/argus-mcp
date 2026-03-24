@@ -135,8 +135,8 @@ class VirusTotalPlugin(PluginBase):
             detections = int(stats.get("malicious", 0))
             self._cache[url] = (time.monotonic(), detections)
             return detections
-        except Exception:
-            logger.warning("VirusTotal API request failed for URL scan.")
+        except Exception:  # noqa: BLE001
+            logger.warning("VirusTotal API request failed for URL scan.", exc_info=True)
             return None
 
     @staticmethod
@@ -145,7 +145,8 @@ class VirusTotalPlugin(PluginBase):
             from urllib.parse import urlparse
 
             return urlparse(url).netloc.lower()
-        except Exception:
+        except Exception:  # noqa: BLE001
+            logger.debug("Failed to extract domain from URL", exc_info=True)
             return ""
 
     def _get_cached_urls(self) -> List[str]:

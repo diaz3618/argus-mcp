@@ -105,7 +105,6 @@ class OriginValidationMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Extract Origin header.
         origin: Optional[str] = None
         for key, value in scope.get("headers", []):
             if key == b"origin":

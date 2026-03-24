@@ -83,7 +83,6 @@ class MiddlewarePipelineWidget(Widget):
             table.add_columns("#", "Layer", "Status", "Note")
             table.cursor_type = "row"
             table.zebra_stripes = True
-        # Load defaults if no data provided
         if not self._layers:
             self.update_pipeline(_DEFAULT_LAYERS)
 

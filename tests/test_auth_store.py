@@ -12,7 +12,7 @@ import pytest
 from argus_mcp.bridge.auth.pkce import TokenSet
 from argus_mcp.bridge.auth.store import TokenStore
 
-# Fixtures ────────────────────────────────────────────────────────────
+# Fixtures
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def sample_tokens() -> TokenSet:
     )
 
 
-# TokenStore.__init__ ────────────────────────────────────────────────
+# TokenStore.__init__
 
 
 class TestTokenStoreInit:
@@ -70,7 +70,7 @@ class TestTokenStoreInit:
         assert "tokens" in str(store._dir)
 
 
-# TokenStore.save ─────────────────────────────────────────────────────
+# TokenStore.save
 
 
 class TestTokenStoreSave:
@@ -135,7 +135,7 @@ class TestTokenStoreSave:
             await store.save("fail-backend", sample_tokens)
 
 
-# TokenStore.load ─────────────────────────────────────────────────────
+# TokenStore.load
 
 
 class TestTokenStoreLoad:
@@ -246,7 +246,7 @@ class TestTokenStoreLoad:
         assert result.scope == ""
 
 
-# TokenStore.delete ───────────────────────────────────────────────────
+# TokenStore.delete
 
 
 class TestTokenStoreDelete:
@@ -267,7 +267,7 @@ class TestTokenStoreDelete:
         assert result is False
 
 
-# TokenStore.list_backends ────────────────────────────────────────────
+# TokenStore.list_backends
 
 
 class TestTokenStoreListBackends:
@@ -302,7 +302,7 @@ class TestTokenStoreListBackends:
         assert store.list_backends() == []
 
 
-# TokenStore._path_for ────────────────────────────────────────────────
+# TokenStore._path_for
 
 
 class TestPathSanitisation:

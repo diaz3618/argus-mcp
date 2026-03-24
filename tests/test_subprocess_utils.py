@@ -16,7 +16,7 @@ from argus_mcp.bridge.subprocess_utils import (
 )
 from argus_mcp.errors import ConfigurationError
 
-# log_subproc_stream ──────────────────────────────────────────────────
+# log_subproc_stream
 
 
 class TestLogSubprocStream:
@@ -36,7 +36,7 @@ class TestLogSubprocStream:
         assert reader.readline.call_count == 3
 
 
-# cancel_stream_loggers ──────────────────────────────────────────────
+# cancel_stream_loggers
 
 
 class TestCancelStreamLoggers:
@@ -59,7 +59,7 @@ class TestCancelStreamLoggers:
             err_task.cancel.assert_called_once()
 
 
-# terminate_subproc ───────────────────────────────────────────────────
+# terminate_subproc
 
 
 class TestTerminateSubproc:
@@ -105,7 +105,7 @@ class TestTerminateSubproc:
         # Should not raise
 
 
-# log_backend_fail ────────────────────────────────────────────────────
+# log_backend_fail
 
 
 class TestLogBackendFail:
@@ -124,7 +124,7 @@ class TestLogBackendFail:
         log_backend_fail("srv", "sse", ConnectionRefusedError(), "startup")
 
 
-# manage_subproc ──────────────────────────────────────────────────────
+# manage_subproc
 
 
 class TestManageSubproc:

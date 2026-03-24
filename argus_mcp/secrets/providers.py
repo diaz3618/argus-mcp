@@ -208,7 +208,9 @@ class KeyringProvider(SecretProvider):
         try:
             kr.delete_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to delete secret '%s' from keyring: %s", name, exc)
+            logger.warning(
+                "Failed to delete secret '%s' from keyring: %s", name, exc, exc_info=True
+            )
         names = set(self.list_names())
         names.discard(name)
         kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))  # type: ignore[attr-defined]

@@ -21,6 +21,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from argus_mcp.constants import STACK_CLOSE_TIMEOUT
+
 logger = logging.getLogger(__name__)
 
 # Cached binary path (resolved once).
@@ -106,7 +108,7 @@ class GoDockerAdapter:
         if self._proc and self._proc.returncode is None:
             self._proc.stdin.close()  # type: ignore[union-attr]
             try:
-                await asyncio.wait_for(self._proc.wait(), timeout=5.0)
+                await asyncio.wait_for(self._proc.wait(), timeout=STACK_CLOSE_TIMEOUT)
             except asyncio.TimeoutError:
                 self._proc.kill()
                 await self._proc.wait()
@@ -173,3 +175,61 @@ class GoDockerAdapter:
         if not resp.get("ok"):
             return []
         return resp.get("data", []) or []
+
+    async def build(
+        self,
+        dockerfile_content: str,
+        image_tag: str,
+        build_args: Optional[Dict[str, str]] = None,
+    ) -> bool:
+        """Build an image from a Dockerfile string."""
+        args: Dict[str, str] = {
+            "dockerfile_content": dockerfile_content,
+            "image_tag": image_tag,
+        }
+        if build_args:
+            args["build_args"] = json.dumps(build_args)
+        resp = await self._call("build", args)
+        return resp.get("ok", False)
+
+    async def create(
+        self,
+        image: str,
+        name: str,
+        *,
+        cmd: Optional[List[str]] = None,
+        entrypoint: Optional[List[str]] = None,
+        env: Optional[Dict[str, str]] = None,
+        network: Optional[str] = None,
+        memory: int = 0,
+        cpus: float = 0.0,
+        volumes: Optional[List[str]] = None,
+        read_only: bool = False,
+        cap_drop: Optional[List[str]] = None,
+    ) -> Optional[str]:
+        """Create a container and return its ID (or None on failure)."""
+        args: Dict[str, str] = {"image": image, "name": name}
+        if cmd:
+            args["cmd"] = json.dumps(cmd)
+        if entrypoint:
+            args["entrypoint"] = json.dumps(entrypoint)
+        if env:
+            args["env"] = json.dumps(env)
+        if network:
+            args["network"] = network
+        if memory:
+            args["memory"] = str(memory)
+        if cpus:
+            args["cpus"] = str(cpus)
+        if volumes:
+            args["volumes"] = json.dumps(volumes)
+        if read_only:
+            args["read_only"] = "true"
+        if cap_drop:
+            args["cap_drop"] = json.dumps(cap_drop)
+        resp = await self._call("create", args)
+        if not resp.get("ok"):
+            logger.error("Go adapter create failed: %s", resp.get("error", "unknown"))
+            return None
+        data = resp.get("data", {})
+        return data.get("container_id") if isinstance(data, dict) else None

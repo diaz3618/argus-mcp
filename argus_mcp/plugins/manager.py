@@ -104,12 +104,12 @@ class PluginManager:
                     hook_name,
                     type(exc).__name__,
                     exc,
+                    exc_info=True,
                 )
                 if mode == ExecutionMode.enforce:
                     raise PluginError(plugin.name, hook_name, exc)
                 # enforce_ignore_error / permissive: log and continue
 
-        # Apply aggregated metadata
         accumulated.metadata.update(aggregated_metadata)
         return accumulated
 

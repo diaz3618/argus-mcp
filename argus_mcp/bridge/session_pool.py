@@ -34,6 +34,18 @@ from typing import Dict, List, NamedTuple, Optional
 from mcp import ClientSession
 
 from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
+from argus_mcp.constants import STACK_CLOSE_TIMEOUT
+
+try:
+    from argus_mcp.bridge.health._circuit_breaker_rs import (
+        RUST_AVAILABLE as _CB_RUST,
+    )
+    from argus_mcp.bridge.health._circuit_breaker_rs import (
+        CircuitBreaker as _RustCB,
+    )
+except ImportError:
+    _CB_RUST = False
+    _RustCB = None
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +275,8 @@ class SessionPool:
     def _get_circuit_breaker(self, key: SessionKey) -> CircuitBreaker:
         cb = self._circuit_breakers.get(key)
         if cb is None:
-            cb = CircuitBreaker(
+            _CB = _RustCB if _CB_RUST and _RustCB is not None else CircuitBreaker
+            cb = _CB(
                 name=f"pool:{key.url}",
                 failure_threshold=self._cb_threshold,
             )
@@ -273,7 +286,7 @@ class SessionPool:
     async def _close_entry(self, key: SessionKey, entry: PoolEntry) -> None:
         """Close a single pool entry safely."""
         try:
-            await asyncio.wait_for(entry.stack.aclose(), timeout=5.0)
+            await asyncio.wait_for(entry.stack.aclose(), timeout=STACK_CLOSE_TIMEOUT)
         except asyncio.TimeoutError:
             logger.warning("SessionPool: timeout closing session for %s.", key)
         except Exception:  # noqa: BLE001

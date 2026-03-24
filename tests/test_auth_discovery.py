@@ -17,7 +17,7 @@ from argus_mcp.bridge.auth_discovery import (
     try_auth_discovery,
 )
 
-# looks_like_auth_failure ─────────────────────────────────────────────
+# looks_like_auth_failure
 
 
 class TestLooksLikeAuthFailure:
@@ -61,7 +61,7 @@ class TestLooksLikeAuthFailure:
         assert not looks_like_auth_failure(group)
 
 
-# resolve_auth_headers ────────────────────────────────────────────────
+# resolve_auth_headers
 
 
 class TestResolveAuthHeaders:
@@ -112,7 +112,7 @@ class TestResolveAuthHeaders:
             assert result is None
 
 
-# attempt_auth_discovery ──────────────────────────────────────────────
+# attempt_auth_discovery
 
 
 class TestAttemptAuthDiscovery:
@@ -164,7 +164,7 @@ class TestAttemptAuthDiscovery:
             assert "s" in tasks  # task was still registered
 
 
-# try_auth_discovery ──────────────────────────────────────────────────
+# try_auth_discovery
 
 
 class TestTryAuthDiscovery:
@@ -194,7 +194,7 @@ class TestTryAuthDiscovery:
             assert not await try_auth_discovery("s", {"url": "http://x"}, {})
 
 
-# dynamic_register ───────────────────────────────────────────────────
+# dynamic_register
 
 
 class TestDynamicRegister:

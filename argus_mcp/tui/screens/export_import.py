@@ -131,6 +131,7 @@ class _ExportPanel(Static):
             path = find_config_file()
             return load_argus_config(path)
         except Exception as exc:
+            logger.debug("Config load failed", exc_info=True)
             self.app.notify(f"Cannot load config: {exc}", severity="error", timeout=5)
             return None
 
@@ -274,6 +275,7 @@ class _ImportPanel(Static):
             path = find_config_file()
             return load_argus_config(path)
         except Exception as exc:
+            logger.debug("Config load failed", exc_info=True)
             self.app.notify(f"Cannot load config: {exc}", severity="error", timeout=5)
             return None
 
@@ -318,6 +320,7 @@ class _ImportPanel(Static):
         try:
             payload = parse_import_payload(raw)
         except Exception as exc:
+            logger.debug("YAML parse failed", exc_info=True)
             self.app.notify(f"YAML parse error: {exc}", severity="error", timeout=5)
             return
 
@@ -343,6 +346,7 @@ class _ImportPanel(Static):
         try:
             payload = parse_import_payload(raw)
         except Exception as exc:
+            logger.debug("YAML parse failed", exc_info=True)
             self.app.notify(f"YAML parse error: {exc}", severity="error", timeout=5)
             return
 

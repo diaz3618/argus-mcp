@@ -185,6 +185,23 @@ class ServerManager:
         for name in list(self._servers):
             await self.disconnect(name)
 
+    def close_all_sync(self) -> None:
+        """Best-effort synchronous cleanup of httpx clients.
+
+        Used during Textual shutdown when the async event loop is being
+        torn down and ``run_worker`` can no longer schedule coroutines.
+        """
+        for entry in self._servers.values():
+            if entry.client is not None and hasattr(entry.client, "_client"):
+                client = entry.client._client  # noqa: SLF001
+                if client is not None and not client.is_closed:
+                    try:
+                        client.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+            entry.client = None
+            entry.connected = False
+
     def mark_disconnected(self, name: str) -> None:
         """Mark a server as disconnected without closing the client.
 

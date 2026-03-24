@@ -21,7 +21,7 @@ from argus_mcp.display.logging_config import (
     setup_logging,
 )
 
-# SecretRedactionFilter ───────────────────────────────────────────────
+# SecretRedactionFilter
 
 
 class TestSecretRedactionFilter:
@@ -100,7 +100,7 @@ class TestSecretRedactionFilter:
         assert isinstance(secret_redaction_filter, SecretRedactionFilter)
 
 
-# BASE_LOG_CFG ────────────────────────────────────────────────────────
+# BASE_LOG_CFG
 
 
 class TestBaseLogCfg:
@@ -134,7 +134,7 @@ class TestBaseLogCfg:
         assert "level" in BASE_LOG_CFG["root"]
 
 
-# setup_logging ───────────────────────────────────────────────────────
+# setup_logging
 
 
 class TestSetupLogging:

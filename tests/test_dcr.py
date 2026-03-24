@@ -17,7 +17,7 @@ from argus_mcp.bridge.auth.dcr import (
 )
 from argus_mcp.bridge.auth.discovery import OAuthMetadata
 
-# Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _make_metadata(
@@ -69,7 +69,7 @@ def _mock_httpx_response(
     return resp
 
 
-# Fixtures ────────────────────────────────────────────────────────────
+# Fixtures
 
 
 @pytest.fixture(autouse=True)
@@ -80,7 +80,7 @@ def _clear_cache():
     _registration_cache.clear()
 
 
-# ClientRegistration dataclass ────────────────────────────────────────
+# ClientRegistration dataclass
 
 
 class TestClientRegistration:
@@ -110,7 +110,7 @@ class TestClientRegistration:
             reg.client_id = "new"  # type: ignore[misc]
 
 
-# DCRClient construction ──────────────────────────────────────────────
+# DCRClient construction
 
 
 class TestDCRClientInit:
@@ -138,7 +138,7 @@ class TestDCRClientInit:
         assert dcr._cache_ttl == 0.0
 
 
-# Grant type negotiation ──────────────────────────────────────────────
+# Grant type negotiation
 
 
 class TestGrantTypeNegotiation:
@@ -169,7 +169,7 @@ class TestGrantTypeNegotiation:
         assert set(result) == _GATEWAY_GRANT_TYPES
 
 
-# Registration body ───────────────────────────────────────────────────
+# Registration body
 
 
 class TestRegistrationBody:
@@ -193,7 +193,7 @@ class TestRegistrationBody:
         assert "redirect_uris" not in body
 
 
-# register() — success path ───────────────────────────────────────────
+# register() — success path
 
 
 class TestRegisterSuccess:
@@ -231,7 +231,7 @@ class TestRegisterSuccess:
         assert reg.client_id == "ok"
 
 
-# register() — caching ───────────────────────────────────────────────
+# register() — caching
 
 
 class TestRegisterCaching:
@@ -317,7 +317,7 @@ class TestRegisterCaching:
         assert len(_registration_cache) == 0
 
 
-# register() — failure paths ──────────────────────────────────────────
+# register() — failure paths
 
 
 class TestRegisterFailures:
@@ -419,7 +419,7 @@ class TestRegisterFailures:
         assert reg.client_id == "fallback"
 
 
-# Issuer allowlist ────────────────────────────────────────────────────
+# Issuer allowlist
 
 
 class TestIssuerAllowlist:
