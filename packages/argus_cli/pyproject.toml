@@ -53,6 +53,7 @@ dev = [
 
 [project.scripts]
 argus = "argus_cli.main:app"
+argus-tui = "argus_cli.tui:launch"
 
 [project.urls]
 Repository = "https://github.com/diaz3618/argus-mcp"
