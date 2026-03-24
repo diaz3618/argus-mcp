@@ -1,7 +1,15 @@
 """HTTP API client for the Argus MCP Management API.
 
-Provides both sync (``ArgusClient``) and async (``AsyncArgusClient``)
-clients for one-shot commands and REPL mode respectively.
+Thin adapter around :mod:`argus_mcp.api.client` that provides:
+
+- **Sync** (``ArgusClient``) and **async** (``AsyncArgusClient``) wrappers
+  that return raw ``dict`` results for CLI output rendering.
+- Retry with exponential back-off for transient transport errors.
+- SSE streaming via ``httpx-sse``.
+- ``CliConfig``-based initialisation so callers don't construct URLs manually.
+
+The underlying HTTP contract (schemas, error model, endpoint paths) is shared
+with the TUI client via ``argus_mcp.api``.
 """
 
 from __future__ import annotations
@@ -20,6 +28,7 @@ else:
     from typing_extensions import Self
 
 import httpx
+from argus_mcp.api.client import ApiClientError
 
 from argus_cli.config import CliConfig
 
@@ -34,14 +43,14 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 0.5  # seconds; doubles each attempt
 
 
-class ArgusClientError(Exception):
-    """Raised when the API returns an error response."""
+class ArgusClientError(ApiClientError):
+    """CLI-specific API error with structured status_code / error / message."""
 
     def __init__(self, status_code: int, error: str, message: str) -> None:
         self.status_code = status_code
         self.error = error
         self.message = message
-        super().__init__(f"[{status_code}] {error}: {message}")
+        super().__init__(f"[{status_code}] {error}: {message}", status_code=status_code or None)
 
 
 def _build_headers(config: CliConfig) -> dict[str, str]:
