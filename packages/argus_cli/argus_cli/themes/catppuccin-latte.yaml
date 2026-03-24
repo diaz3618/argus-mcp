@@ -1,0 +1,18 @@
+# Catppuccin Latte — warm light theme
+# https://github.com/catppuccin/catppuccin
+name: Catppuccin Latte
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#40a02b"
+  error: "#d20f39"
+  warning: "#df8e1d"
+  highlight: "#1e66f5"
+  info: "#179299"
+  accent: "#8839ef"
+  secondary: "#8839ef"
+  surface: "#ccd0da"
+  text: "#4c4f69"
+  subtext: "#6c6f85"
+  overlay: "#9ca0b0"

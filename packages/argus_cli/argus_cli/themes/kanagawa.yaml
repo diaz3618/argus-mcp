@@ -1,0 +1,18 @@
+# Kanagawa — dark theme inspired by The Great Wave off Kanagawa
+# https://github.com/rebelot/kanagawa.nvim
+name: Kanagawa
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#76946a"
+  error: "#c34043"
+  warning: "#c0a36e"
+  highlight: "#7e9cd8"
+  info: "#6a9589"
+  accent: "#957fb8"
+  secondary: "#938aa9"
+  surface: "#2a2a37"
+  text: "#dcd7ba"
+  subtext: "#a6a69c"
+  overlay: "#54546d"

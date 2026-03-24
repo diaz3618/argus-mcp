@@ -1,0 +1,18 @@
+# Tokyo Night — dark theme inspired by Tokyo city lights
+# https://github.com/enkia/tokyo-night-vscode-theme
+name: Tokyo Night
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#9ece6a"
+  error: "#f7768e"
+  warning: "#e0af68"
+  highlight: "#7aa2f7"
+  info: "#7dcfff"
+  accent: "#bb9af7"
+  secondary: "#bb9af7"
+  surface: "#1a1b26"
+  text: "#c0caf5"
+  subtext: "#a9b1d6"
+  overlay: "#414868"

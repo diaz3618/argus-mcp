@@ -1,0 +1,18 @@
+# Everforest — comfortable green-toned dark theme
+# https://github.com/sainnhe/everforest
+name: Everforest
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#a7c080"
+  error: "#e67e80"
+  warning: "#dbbc7f"
+  highlight: "#7fbbb3"
+  info: "#83c092"
+  accent: "#d699b6"
+  secondary: "#d699b6"
+  surface: "#2d353b"
+  text: "#d3c6aa"
+  subtext: "#9da9a0"
+  overlay: "#859289"
