@@ -29,6 +29,14 @@ tui = [
 [tool.setuptools.packages.find]
 include = ["argus_mcp*"]
 
+# ── uv Workspace ────────────────────────────────────────────────────────
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+argus-mcp = { workspace = true }
+
 [project.scripts]
 argus-mcp = "argus_mcp.cli:main"
 
