@@ -37,8 +37,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
-      - name: Build distribution packages
-        run: python -m build
+      - name: Build server distribution
+        run: python -m build .
+
+      - name: Build CLI distribution
+        run: python -m build packages/argus_cli
+
+      - name: Collect all artifacts
+        run: |
+          mkdir -p all-dist
+          cp dist/* all-dist/ 2>/dev/null || true
+          cp packages/argus_cli/dist/* all-dist/ 2>/dev/null || true
 
       - name: Generate release notes
         id: release_notes
@@ -63,16 +72,22 @@ jobs:
 
           echo "" >> release_notes.md
           echo "" >> release_notes.md
-          echo "## Installation" >> release_notes.md
+          echo "## Packages" >> release_notes.md
           echo "" >> release_notes.md
+          echo "### argus-mcp (Server)" >> release_notes.md
           echo "\`\`\`bash" >> release_notes.md
           echo "pip install argus-mcp==$VERSION" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### argus-cli (Client)" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "pip install argus-cli" >> release_notes.md
           echo "\`\`\`" >> release_notes.md
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/*"
+          artifacts: "all-dist/*"
           bodyFile: "release_notes.md"
           generateReleaseNotes: true
           makeLatest: true

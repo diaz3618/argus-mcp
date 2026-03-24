@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - 'argus_mcp/**'
+      - 'packages/**'
       - 'mods/**'
       - 'pyproject.toml'
       - 'Dockerfile'
@@ -19,6 +20,7 @@ on:
   pull_request:
     paths:
       - 'argus_mcp/**'
+      - 'packages/**'
       - 'mods/**'
       - 'pyproject.toml'
       - 'Dockerfile'
@@ -62,6 +64,9 @@ jobs:
       - name: Run ruff check
         run: uv run ruff check argus_mcp/
 
+      - name: Run ruff check (argus_cli)
+        run: uv run ruff check packages/argus_cli/argus_cli/
+
       - name: Run ruff check (mods/)
         run: uv run ruff check mods/
 
@@ -85,7 +90,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff format --check
-        run: uv run ruff format --check argus_mcp/ mods/
+        run: uv run ruff format --check argus_mcp/ packages/argus_cli/argus_cli/ mods/
 
   # ──────────────────────────────────────────────
   # Mypy — static type checking
