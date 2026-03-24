@@ -15,8 +15,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select, Static, Switch
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 

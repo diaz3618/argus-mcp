@@ -15,11 +15,11 @@ from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.constants import (
     SERVER_NAME,
     SERVER_VERSION,
 )
+from argus_mcp.tui._error_utils import safe_query
 from argus_mcp.tui.api_client import ApiClientError
 from argus_mcp.tui.events import (
     CapabilitiesReady,

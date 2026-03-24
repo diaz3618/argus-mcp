@@ -18,8 +18,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Static
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.tui._config_ops import resolve_config_path, trigger_reload
+from argus_mcp.tui._error_utils import safe_query
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.param_editor import ParamEditorWidget
 from argus_mcp.tui.widgets.tool_preview import ToolPreviewWidget

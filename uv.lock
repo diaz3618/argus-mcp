@@ -192,8 +192,12 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "starlette" },
-    { name = "textual" },
     { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+tui = [
+    { name = "textual" },
 ]
 
 [package.dev-dependencies]
@@ -223,9 +227,10 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "starlette", specifier = ">=0.47.2" },
-    { name = "textual", specifier = ">=1.0.0" },
+    { name = "textual", marker = "extra == 'tui'", specifier = ">=1.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.23.0" },
 ]
+provides-extras = ["tui"]
 
 [package.metadata.requires-dev]
 dev = [
