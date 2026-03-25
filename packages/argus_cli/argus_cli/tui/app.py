@@ -173,6 +173,7 @@ class ArgusApp(App):
         self._caps_loaded = False
         self._seen_event_ids: set[str] = set()
         self._poll_timer: object | None = None
+        self._sse_worker: object | None = None
 
         # Cached data for cross-screen access
         self._last_status: Any | None = None
@@ -457,6 +458,9 @@ class ArgusApp(App):
         if self._poll_timer is not None:
             self._poll_timer.stop()
 
+        # Stop SSE stream
+        self._stop_sse_stream()
+
         # Close API clients via server manager.
         # During Textual shutdown the async event loop is being torn down,
         # so we use the synchronous fallback to close httpx transports.
@@ -530,6 +534,77 @@ class ArgusApp(App):
 
         # Start periodic polling regardless — it will retry on failure
         self._poll_timer = self.set_interval(_POLL_INTERVAL, self._poll_tick, name="status-poll")
+
+        # Start SSE event stream if connected
+        if self._connected:
+            self._start_sse_stream()
+
+    def _start_sse_stream(self) -> None:
+        """Launch a background worker for the SSE event stream."""
+        if self._sse_worker is not None:
+            return  # Already running
+        self._sse_worker = self.run_worker(
+            self._sse_event_loop(), exclusive=False, name="sse-events"
+        )
+
+    def _stop_sse_stream(self) -> None:
+        """Cancel the SSE background worker."""
+        if self._sse_worker is not None:
+            self._sse_worker.cancel()
+            self._sse_worker = None
+
+    async def _sse_event_loop(self) -> None:
+        """Background worker: consume SSE events and feed EventLogWidget."""
+        mgr: ServerManager = self._server_manager  # type: ignore[assignment]
+        client = mgr.active_client
+        if client is None:
+            return
+
+        try:
+            async for event_data in client.stream_events():
+                event_id = event_data.get("id", "")
+                if event_id and event_id in self._seen_event_ids:
+                    continue
+                if event_id:
+                    self._seen_event_ids.add(event_id)
+
+                stage = event_data.get("stage", "event")
+                message = event_data.get("message", "")
+                details = event_data.get("details")
+                timestamp = event_data.get("timestamp")
+
+                extra: list[str] = []
+                if details and isinstance(details, dict):
+                    for k, v in details.items():
+                        extra.append(f"{k}: {v}")
+
+                try:
+                    event_log = self.screen.query_one(EventLogWidget)
+                    event_log.add_event(
+                        stage,
+                        message,
+                        timestamp=timestamp,
+                        extra_lines=extra if extra else None,
+                    )
+                except NoMatches:
+                    pass
+
+                # Bridge config_sync events
+                if stage == "config_sync" and details:
+                    d = details if isinstance(details, dict) else {}
+                    self.post_message(
+                        ConfigSyncUpdate(
+                            config_file=d.get("config_file", ""),
+                            config_hash=d.get("config_hash", ""),
+                            sync_type=d.get("type", "changed"),
+                            details=message,
+                            timestamp=timestamp or "",
+                        )
+                    )
+        except (OSError, ConnectionError, ApiClientError, asyncio.CancelledError):
+            logger.debug("SSE event stream ended")
+        finally:
+            self._sse_worker = None
 
     def _poll_tick(self) -> None:
         """Timer callback: dispatch async poll worker."""
@@ -782,6 +857,7 @@ class ArgusApp(App):
         self._connected = False
         self._caps_loaded = False
         self._seen_event_ids.clear()
+        self._stop_sse_stream()
 
         entry = mgr.active_entry
         if entry:
@@ -821,6 +897,7 @@ class ArgusApp(App):
 
     def on_connection_lost(self, event: ConnectionLost) -> None:
         """Handle loss of HTTP connection to the remote server."""
+        self._stop_sse_stream()
         try:
             srv_widget = self.screen.query_one(ServerInfoWidget)
             srv_widget.status_text = "Disconnected"
@@ -858,6 +935,9 @@ class ArgusApp(App):
             )
         except NoMatches:
             pass  # Widget not in active screen
+
+        # Restart SSE event stream on reconnection
+        self._start_sse_stream()
 
     def on_backend_status_widget_backend_selected(
         self, event: BackendStatusWidget.BackendSelected

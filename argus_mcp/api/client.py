@@ -6,7 +6,9 @@ be shared by TUI, REPL, and any future client code.
 
 from __future__ import annotations
 
+import json as _json
 import logging
+from collections.abc import AsyncIterator
 from typing import Any, Optional, Type, TypeVar
 
 import httpx
@@ -160,6 +162,36 @@ class ApiClient:
             params["group"] = group
         resp = await self._request("get", "groups", params=params)
         return resp.json()
+
+    # ── SSE streaming ──────────────────────────────────────────────────
+
+    async def stream_events(self) -> AsyncIterator[dict[str, Any]]:
+        """``GET /manage/v1/events/stream`` — SSE event stream.
+
+        Yields parsed event dicts as they arrive.  Heartbeat events
+        (``event: heartbeat``) are silently skipped.
+        """
+        client = self._ensure_client()
+        async with client.stream("GET", "events/stream", timeout=None) as resp:
+            resp.raise_for_status()
+            event_type: str = ""
+            data_buf: list[str] = []
+            async for raw_line in resp.aiter_lines():
+                line = raw_line.rstrip("\n")
+                if line.startswith("event:"):
+                    event_type = line[len("event:") :].strip()
+                elif line.startswith("data:"):
+                    data_buf.append(line[len("data:") :].strip())
+                elif line == "":
+                    # Blank line = end of SSE message
+                    if data_buf and event_type != "heartbeat":
+                        try:
+                            payload = _json.loads("\n".join(data_buf))
+                            yield payload
+                        except _json.JSONDecodeError:
+                            logger.debug("Malformed SSE data: %s", data_buf)
+                    event_type = ""
+                    data_buf = []
 
     # ── POST endpoints ─────────────────────────────────────────────────
 
