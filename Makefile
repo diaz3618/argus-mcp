@@ -38,27 +38,27 @@ help:
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: rust-build
-rust-build: ## Build all Rust PyO3 extensions (maturin)
+rust-build:
 	python scripts/build_rust.py
 
 .PHONY: rust-check
-rust-check: ## Check Rust toolchain availability
+rust-check:
 	@python scripts/build_rust.py --check
 
 .PHONY: go-build
-go-build: ## Build argusd Go daemon
+go-build:
 	python scripts/build_go.py
 
 .PHONY: go-check
-go-check: ## Check Go toolchain availability
+go-check:
 	@python scripts/build_go.py --check
 
 .PHONY: go-build-all
-go-build-all: ## Cross-compile argusd for all platforms
+go-build-all:
 	python scripts/build_go.py --all
 
 .PHONY: build-extensions
-build-extensions: ## Build all native extensions (Rust + Go)
+build-extensions:
 	@echo "══ Building Rust extensions ══"
 	@python scripts/build_rust.py
 	@echo ""
@@ -108,7 +108,7 @@ quality: lint typecheck test security
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: docker-build
-docker-build: ## Build Docker image (local, current arch)
+docker-build:
 	docker build -t $(IMAGE_DOCKERHUB):$(VERSION) -t $(IMAGE_DOCKERHUB):latest .
 	@echo "Built $(IMAGE_DOCKERHUB):$(VERSION)"
 
@@ -117,7 +117,7 @@ docker-build: ## Build Docker image (local, current arch)
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: dev-install
-dev-install: ## Install project + dev dependencies via uv, then build native extensions
+dev-install:
 	uv sync --group dev
 	@echo ""
 	@echo "══ Building native extensions (optional) ══"
@@ -125,7 +125,7 @@ dev-install: ## Install project + dev dependencies via uv, then build native ext
 	@python scripts/build_go.py || echo "  Skipping Go daemon (toolchain not available)"
 
 .PHONY: clean
-clean: ## Remove build artifacts and caches
+clean:
 	rm -rf build/ dist/ *.egg-info argus_mcp.egg-info/
 	find . -type d -name __pycache__ -not -path './.venv/*' -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .mypy_cache -not -path './.venv/*' -exec rm -rf {} + 2>/dev/null || true

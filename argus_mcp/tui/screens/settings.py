@@ -200,7 +200,6 @@ class SettingsScreen(ArgusScreen):
         app = self.app
         status = app.last_status
         if status is not None:
-            # Feature flags
             flags = getattr(status, "feature_flags", {}) or {}
             if flags:
                 lines = [f"  {k}: {'✓' if v else '✗'}" for k, v in flags.items()]
@@ -231,13 +230,11 @@ class SettingsScreen(ArgusScreen):
         app = self.app
         status = app.last_status
 
-        # Config file path
         if status is not None:
             config_path = getattr(status.config, "file_path", None)
             if config_path:
                 self._set_text("#config-path-display", config_path)
 
-        # Build config JSON
         try:
             viewer = self.query_one("#config-viewer", TextArea)
 

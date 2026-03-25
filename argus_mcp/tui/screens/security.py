@@ -161,7 +161,6 @@ class SecurityScreen(ArgusScreen):
         except NoMatches:
             pass
 
-        # Populate auth mode from feature flags / status
         status = self.app.last_status
         if status is not None:
             ff = getattr(status, "feature_flags", {}) or {}
@@ -173,7 +172,6 @@ class SecurityScreen(ArgusScreen):
                     self.query_one("#sec-auth-mode-select", Select).value = "bearer"
                 except NoMatches:
                     pass
-            # Show outgoing auth status in the hint
             outgoing_label = "enabled" if outgoing_auth else "disabled"
             try:
                 self.query_one("#sec-outgoing-hint", Static).update(
@@ -183,7 +181,6 @@ class SecurityScreen(ArgusScreen):
             except NoMatches:
                 pass
 
-            # Populate network isolation panel with feature flag info
             container_isolation = ff.get("container_isolation", False)
             try:
                 from argus_mcp.tui.widgets.network_panel import NetworkIsolationPanel

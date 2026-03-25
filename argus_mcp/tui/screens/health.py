@@ -160,7 +160,6 @@ class HealthScreen(ArgusScreen):
             except (OSError, ConnectionError, ApiClientError) as exc:
                 panel.set_action_status(f"[red]✕[/red] Reconnect error: {exc}")
                 self.app.notify(f"Reconnect error: {exc}", severity="error")
-            # Refresh the health table
             self._refresh_from_app()
 
         self.app.run_worker(_reconnect(), name=f"reconnect-{name}", exclusive=False)
@@ -289,7 +288,6 @@ class HealthScreen(ArgusScreen):
             title="Backend Added",
         )
 
-        # Trigger hot-reload
         client = self._get_api_client()
         if client is None:
             return

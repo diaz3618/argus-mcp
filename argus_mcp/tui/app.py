@@ -397,7 +397,6 @@ class ArgusApp(App):
         mgr: ServerManager = self._server_manager  # type: ignore[assignment]
 
         if mgr.count == 0:
-            # No servers configured — add a default
             from argus_mcp.constants import DEFAULT_HOST, DEFAULT_PORT
 
             default_url = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
@@ -416,13 +415,10 @@ class ArgusApp(App):
             info.status_text = "No servers configured"
 
         self._refresh_server_selector()
-
-        # Kick off the initial connection + polling
         self._start_polling()
 
     def on_unmount(self) -> None:
         """Clean up on app exit."""
-        # Stop polling timer
         if self._poll_timer is not None:
             self._poll_timer.stop()
 
@@ -466,7 +462,6 @@ class ArgusApp(App):
             else:
                 logger.warning("Failed to connect to '%s': %s", name, err)
 
-        # Update selector after connect attempts
         self._refresh_server_selector()
 
         # Fetch state from the active server
@@ -517,7 +512,6 @@ class ArgusApp(App):
         name = entry.name
         client = entry.client
 
-        # Try to connect if not yet connected
         if client is None or not client.is_connected:
             try:
                 await mgr.connect(name)
@@ -577,7 +571,6 @@ class ArgusApp(App):
             if not was_connected:
                 logger.debug("Poll failed (still disconnected): %s", exc)
 
-        # Refresh selector to reflect connection status changes
         self._refresh_server_selector()
 
     def _apply_status_response(self, status: Any) -> None:
@@ -759,7 +752,6 @@ class ArgusApp(App):
             except NoMatches:
                 pass
 
-        # Force an immediate poll
         self.run_worker(self._poll_once(), exclusive=True, name="poll-switch")
 
         self._refresh_server_selector()
@@ -948,10 +940,8 @@ class ArgusApp(App):
                 pass
 
             if result == "stop-and-exit":
-                # Request server shutdown before exiting
                 self.run_worker(self._shutdown_then_exit(), name="shutdown-exit")
             else:
-                # save-and-exit: just save settings and exit
                 from argus_mcp.tui.settings import load_settings, save_settings
 
                 settings = load_settings()
@@ -987,7 +977,6 @@ class ArgusApp(App):
 
         settings = load_settings()
         enabled = settings.get("enabled_themes", ["textual-dark"])
-        # Filter to themes actually registered
         enabled = [t for t in enabled if t in self.available_themes]
         if not enabled:
             enabled = ["textual-dark"]
@@ -1021,7 +1010,6 @@ class ArgusApp(App):
 
     def action_export_client_config(self) -> None:
         """Open the client configuration export modal."""
-        # Determine the server URL for the snippet
         sse_url = self._server_url or ""
         status = self.last_status
         if status is not None:

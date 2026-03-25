@@ -200,7 +200,6 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                         id="bcm-headers",
                     )
 
-                # Advanced
                 yield Label("Advanced", classes="bcm-section")
 
                 yield Label("Timeout (seconds)", classes="bcm-field-label")
@@ -227,7 +226,6 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                 # Preview
                 yield Static("", id="bcm-preview")
 
-            # Actions
             with Horizontal(id="bcm-actions"):
                 yield Button(
                     "Install" if self._mode == "registry" else "Add Backend",
