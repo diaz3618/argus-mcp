@@ -32,12 +32,9 @@ from argus_cli.tui.events import (
     ReAuthRequired,
 )
 from argus_cli.tui.screens.audit_log import AuditLogScreen
-from argus_cli.tui.screens.backend_detail import BackendDetailModal
 from argus_cli.tui.screens.catalog_browser import CatalogBrowserScreen
-from argus_cli.tui.screens.client_config import ClientConfigModal
 from argus_cli.tui.screens.containers import ContainersScreen
 from argus_cli.tui.screens.dashboard import DashboardScreen
-from argus_cli.tui.screens.exit_modal import ExitModal
 from argus_cli.tui.screens.export_import import ExportImportScreen
 from argus_cli.tui.screens.health import HealthScreen
 from argus_cli.tui.screens.kubernetes import KubernetesScreen
@@ -48,7 +45,6 @@ from argus_cli.tui.screens.server_logs import ServerLogsScreen
 from argus_cli.tui.screens.settings import SettingsScreen
 from argus_cli.tui.screens.setup_wizard import SetupWizardScreen
 from argus_cli.tui.screens.skills import SkillsScreen
-from argus_cli.tui.screens.theme_picker import ThemeScreen
 from argus_cli.tui.screens.tool_editor import ToolEditorScreen
 from argus_cli.tui.screens.tools import ToolsScreen
 from argus_cli.tui.widgets.backend_status import BackendStatusWidget
@@ -1004,6 +1000,8 @@ class ArgusApp(App):
                     timeout=4,
                 )
 
+        from argus_cli.tui.screens.backend_detail import BackendDetailModal
+
         self.push_screen(BackendDetailModal(event.backend), callback=_handle_result)
 
     async def _reconnect_backend(self, name: str) -> None:
@@ -1148,6 +1146,8 @@ class ArgusApp(App):
                 save_settings(settings)
                 self.exit()
 
+        from argus_cli.tui.screens.exit_modal import ExitModal
+
         self.push_screen(
             ExitModal(running_count=backends_running),
             callback=_on_exit_choice,
@@ -1206,6 +1206,8 @@ class ArgusApp(App):
                 save_settings(settings)
                 self.notify(f"Theme: {theme_name}", timeout=2)
 
+        from argus_cli.tui.screens.theme_picker import ThemeScreen
+
         self.push_screen(ThemeScreen(), _on_theme_selected)
 
     def action_export_client_config(self) -> None:
@@ -1221,6 +1223,8 @@ class ArgusApp(App):
             from argus_mcp.constants import DEFAULT_HOST, DEFAULT_PORT
 
             sse_url = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
+        from argus_cli.tui.screens.client_config import ClientConfigModal
+
         self.push_screen(ClientConfigModal(server_url=sse_url))
 
     def action_jump_mode(self) -> None:
