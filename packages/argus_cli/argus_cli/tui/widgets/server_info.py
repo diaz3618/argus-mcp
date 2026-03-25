@@ -34,6 +34,13 @@ class ServerInfoWidget(Widget):
     log_file: str = "N/A"
     log_level: str = "INFO"
 
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        # Render cache: skip Static.update() when text unchanged
+        self._cached_title: str = ""
+        self._cached_body: str = ""
+        self._refresh_pending: bool = False
+
     def compose(self) -> ComposeResult:
         yield Static("", id="title-row")
         yield Static("", id="info-body")
@@ -57,29 +64,45 @@ class ServerInfoWidget(Widget):
         return "\n".join(lines)
 
     def _refresh_display(self) -> None:
-        if w := safe_query(self, "#title-row", Static):
-            w.update(self._render_title())
-        if w := safe_query(self, "#info-body", Static):
-            w.update(self._render_body())
+        title = self._render_title()
+        if title != self._cached_title:
+            self._cached_title = title
+            if w := safe_query(self, "#title-row", Static):
+                w.update(title)
+        body = self._render_body()
+        if body != self._cached_body:
+            self._cached_body = body
+            if w := safe_query(self, "#info-body", Static):
+                w.update(body)
 
-    # Watchers – auto-refresh on any reactive change
-    def watch_server_name(self) -> None:
+    def _schedule_refresh(self) -> None:
+        """Coalesce multiple watcher calls into a single refresh."""
+        if not self._refresh_pending:
+            self._refresh_pending = True
+            self.call_later(self._do_deferred_refresh)
+
+    def _do_deferred_refresh(self) -> None:
+        self._refresh_pending = False
         self._refresh_display()
+
+    # Watchers – coalesce into a single deferred refresh
+    def watch_server_name(self) -> None:
+        self._schedule_refresh()
 
     def watch_server_version(self) -> None:
-        self._refresh_display()
+        self._schedule_refresh()
 
     def watch_sse_url(self) -> None:
-        self._refresh_display()
+        self._schedule_refresh()
 
     def watch_streamable_http_url(self) -> None:
-        self._refresh_display()
+        self._schedule_refresh()
 
     def watch_transport_type(self) -> None:
-        self._refresh_display()
+        self._schedule_refresh()
 
     def watch_status_text(self) -> None:
-        self._refresh_display()
+        self._schedule_refresh()
 
     def on_mount(self) -> None:
         self._refresh_display()

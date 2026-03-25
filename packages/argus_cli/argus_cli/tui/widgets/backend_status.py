@@ -44,6 +44,12 @@ class BackendStatusWidget(Widget):
     total: reactive[int] = reactive(0)
     backend_details: reactive[list] = reactive(list, always_update=True)
 
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        # Render cache: skip rebuilding detail text when unchanged
+        self._cached_detail_text: str = ""
+        self._cached_backend_fingerprint: int = 0
+
     def compose(self) -> ComposeResult:
         yield Static("Backend Services", id="backend-title")
         yield DataTable(id="backend-table")
@@ -166,6 +172,22 @@ class BackendStatusWidget(Widget):
             return
         details = self.backend_details
 
+        # Fingerprint the data to skip redundant work
+        fp = hash(
+            (
+                self.connected,
+                self.total,
+                tuple(
+                    (_get(b, "name"), _get(b, "phase"), _get(b, "last_latency_ms")) for b in details
+                )
+                if details
+                else (),
+            )
+        )
+        if fp == self._cached_backend_fingerprint:
+            return
+        self._cached_backend_fingerprint = fp
+
         if details:
             self._populate_backend_table(details, table)
             summary = self._build_phase_summary(details)
@@ -184,8 +206,11 @@ class BackendStatusWidget(Widget):
             detail_text = f"[{color}]{detail}[/{color}]  │  {summary}"
         else:
             detail_text = f"[{color}]{detail}[/{color}]"
-        if w := safe_query(self, "#backend-detail", Static):
-            w.update(detail_text)
+
+        if detail_text != self._cached_detail_text:
+            self._cached_detail_text = detail_text
+            if w := safe_query(self, "#backend-detail", Static):
+                w.update(detail_text)
 
     def watch_connected(self) -> None:
         self._refresh_display()
