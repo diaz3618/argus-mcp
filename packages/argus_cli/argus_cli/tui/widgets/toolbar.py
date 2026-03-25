@@ -86,6 +86,7 @@ class ToolbarWidget(Widget):
         yield _ToolbarAction("8·Health", "switch_mode('health')")
         yield _ToolbarAction("9·Sec", "switch_mode('security')")
         yield _ToolbarAction("0·Ops", "switch_mode('operations')")
+        yield _ToolbarAction("C·Containers", "switch_mode('containers')")
         yield _ToolbarSep()
         yield _ToolbarAction("Details", "_tb_server_details")
         yield _ToolbarSep()

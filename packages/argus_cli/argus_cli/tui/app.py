@@ -33,6 +33,7 @@ from argus_cli.tui.screens.audit_log import AuditLogScreen
 from argus_cli.tui.screens.backend_detail import BackendDetailModal
 from argus_cli.tui.screens.catalog_browser import CatalogBrowserScreen
 from argus_cli.tui.screens.client_config import ClientConfigModal
+from argus_cli.tui.screens.containers import ContainersScreen
 from argus_cli.tui.screens.dashboard import DashboardScreen
 from argus_cli.tui.screens.exit_modal import ExitModal
 from argus_cli.tui.screens.export_import import ExportImportScreen
@@ -114,6 +115,7 @@ class ArgusApp(App):
         Binding("9", "switch_mode('security')", "Sec", key_display="9"),
         Binding("0", "switch_mode('operations')", "Ops", key_display="0"),
         Binding("o", "switch_mode('operations')", "Ops", show=False),
+        Binding("c", "switch_mode('containers')", "Containers", show=False),
         Binding("w", "switch_mode('wizard')", "Wizard", show=False),
         Binding("x", "export_client_config", "Export Config", show=False),
         Binding("t", "show_tools", "Tools Tab", show=False),
@@ -139,6 +141,7 @@ class ArgusApp(App):
         "server_logs": ServerLogsScreen,
         "export_import": ExportImportScreen,
         "catalog": CatalogBrowserScreen,
+        "containers": ContainersScreen,
     }
 
     DEFAULT_MODE = "dashboard"
