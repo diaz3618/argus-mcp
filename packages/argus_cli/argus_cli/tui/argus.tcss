@@ -550,3 +550,41 @@ ExitModal {
 }
 
 #toolops-stats { dock: right; width: auto; color: $text-muted; }
+
+/* ── Chart Widgets ──────────────────────────────────────────── */
+
+.chart-controls {
+    height: 3;
+    align: right middle;
+    padding: 0 1;
+}
+
+.chart-zoom-btn {
+    width: 5;
+    min-width: 5;
+    margin-left: 1;
+}
+
+#uptime-section {
+    height: 14;
+}
+
+#tools-freq-section {
+    height: 16;
+}
+
+#health-latency-chart,
+#health-trend-chart {
+    height: 1fr;
+    min-height: 12;
+}
+
+#dashboard-uptime-chart {
+    height: 1fr;
+    min-height: 10;
+}
+
+#tools-freq-chart {
+    height: 1fr;
+    min-height: 10;
+}

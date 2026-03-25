@@ -52,6 +52,7 @@ from argus_cli.tui.widgets.event_log import EventLogWidget
 from argus_cli.tui.widgets.jump_overlay import Jumper, JumpOverlay
 from argus_cli.tui.widgets.server_info import ServerInfoWidget
 from argus_cli.tui.widgets.server_selector import ServerSelected, ServerSelectorWidget
+from argus_cli.tui.widgets.tplot import UptimeChart
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -617,6 +618,24 @@ class ArgusApp(App):
             backend_widget = self.screen.query_one(BackendStatusWidget)
             details = [b.model_dump() for b in backends_resp.backends]
             backend_widget.update_from_backends(details)
+        except NoMatches:
+            pass  # Widget not in active screen
+
+        # Feed uptime chart on dashboard
+        try:
+            uptime_chart = self.screen.query_one(UptimeChart)
+            details = [b.model_dump() for b in backends_resp.backends]
+            names = []
+            uptimes = []
+            for d in details:
+                names.append(d.get("name", "?"))
+                health = d.get("health") or {}
+                status = health.get("status", "unknown") if isinstance(health, dict) else "unknown"
+                uptimes.append(
+                    100.0 if status == "healthy" else 50.0 if status == "degraded" else 0.0
+                )
+            if names:
+                uptime_chart.set_data(names, uptimes)
         except NoMatches:
             pass  # Widget not in active screen
 

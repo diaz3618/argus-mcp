@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from textual.containers import Vertical
@@ -21,6 +22,7 @@ from argus_cli.tui.widgets.filter_bar import FilterBar
 from argus_cli.tui.widgets.health_panel import HealthPanel
 from argus_cli.tui.widgets.server_groups import ServerGroupsWidget
 from argus_cli.tui.widgets.sessions_panel import SessionsPanel
+from argus_cli.tui.widgets.tplot import HealthTrendChart, LatencyChart
 from argus_cli.tui.widgets.version_drift import VersionDriftPanel
 
 if TYPE_CHECKING:
@@ -38,6 +40,8 @@ class HealthScreen(ArgusScreen):
         "sessions-panel-widget": "s",
         "version-drift-widget": "v",
         "server-groups-widget": "g",
+        "health-latency-chart": "l",
+        "health-trend-chart": "r",
     }
 
     BINDINGS = [
@@ -67,6 +71,10 @@ class HealthScreen(ArgusScreen):
                     yield VersionDriftPanel(id="version-drift-widget")
                 with TabPane("Server Groups", id="tab-health-groups"):
                     yield ServerGroupsWidget(id="server-groups-widget")
+                with TabPane("Latency Chart", id="tab-health-latency"):
+                    yield LatencyChart(id="health-latency-chart")
+                with TabPane("Health Trends", id="tab-health-trends"):
+                    yield HealthTrendChart(id="health-trend-chart")
 
     def on_filter_bar_filter_changed(self, event: FilterBar.FilterChanged) -> None:
         """Re-filter health table when the filter bar changes."""
@@ -139,6 +147,22 @@ class HealthScreen(ArgusScreen):
                     )
                 with contextlib.suppress(NoMatches):
                     self.query_one(VersionDriftPanel).update_versions(version_servers)
+
+                # Feed latency chart with per-backend latency snapshot
+                now_str = datetime.now(tz=timezone.utc).strftime("%H:%M:%S")
+                backend_latencies: dict[str, float] = {}
+                for d in details:
+                    lat = (d.get("health") or {}).get("latency_ms")
+                    if lat is not None:
+                        name = d.get("name", "?")
+                        backend_latencies[name] = float(lat)
+                        # Also feed the single latency chart with average
+                if backend_latencies:
+                    avg_lat = sum(backend_latencies.values()) / len(backend_latencies)
+                    with contextlib.suppress(NoMatches):
+                        self.query_one(LatencyChart).add_point(now_str, avg_lat)
+                    with contextlib.suppress(NoMatches):
+                        self.query_one(HealthTrendChart).add_snapshot(now_str, backend_latencies)
             except (OSError, ConnectionError, ApiClientError):
                 pass
 

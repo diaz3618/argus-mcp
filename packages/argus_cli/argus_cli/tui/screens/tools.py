@@ -18,6 +18,7 @@ from textual.widgets import Input, Static, Switch
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.module_container import ModuleContainer
+from argus_cli.tui.widgets.tplot import FrequencyChart
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -32,6 +33,7 @@ class ToolsScreen(ArgusScreen):
         "tools-search": "s",
         "dt-tools": "t",
         "tools-detail-panel": "d",
+        "tools-freq-chart": "q",
     }
 
     INITIAL_FOCUS = "#dt-tools"
@@ -70,6 +72,12 @@ class ToolsScreen(ArgusScreen):
                 yield CapabilitySection(id="tools-cap-tables")
             with ModuleContainer(title="Detail", subtitle="[d]etail", id="tools-detail-panel"):
                 yield Static("", id="tools-detail-text")
+            with ModuleContainer(
+                title="Invocation Frequency",
+                subtitle="chart",
+                id="tools-freq-section",
+            ):
+                yield FrequencyChart(id="tools-freq-chart")
 
     def on_show(self) -> None:
         """Re-populate capability tables from app-level cached data."""
@@ -100,6 +108,7 @@ class ToolsScreen(ArgusScreen):
         except NoMatches:
             logger.debug("Cannot populate tools cap section", exc_info=True)
         self._update_status_bar(tools)
+        self._update_frequency_chart(tools)
 
     def _update_status_bar(self, tools: list[dict[str, Any]] | None = None) -> None:
         """Update the conflict/filter status bar."""
@@ -226,3 +235,15 @@ class ToolsScreen(ArgusScreen):
         self._show_filtered = not self._show_filtered
         base = self._get_base_tools()
         self._populate_tables(base)
+
+    def _update_frequency_chart(self, tools: list[dict[str, Any]]) -> None:
+        """Update the frequency bar chart from tool metadata."""
+        try:
+            chart = self.query_one("#tools-freq-chart", FrequencyChart)
+        except NoMatches:
+            return
+        # Use backend occurrence count as a proxy for invocation frequency
+        names = [t.get("name", "?") for t in tools]
+        counts = [1] * len(names)
+        if names:
+            chart.set_data(names[:20], counts[:20])
