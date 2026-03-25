@@ -16,6 +16,7 @@ from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static
 
 from argus_cli.tui._error_utils import safe_query
+from argus_cli.tui.widgets.percentage_bar import PercentageBar
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -112,6 +113,7 @@ class HealthPanel(Widget):
         with Vertical():
             yield Label("[b]Health Status[/b]", id="health-title")
             yield Static("Healthy: 0  Degraded: 0  Unhealthy: 0", id="health-summary")
+            yield PercentageBar(value=0.0, label="  0%", id="health-ratio-bar")
             yield DataTable(id="health-table")
             with Horizontal(id="health-actions-bar"):
                 yield Button("Reconnect", id="btn-health-reconnect", variant="warning")
@@ -246,6 +248,12 @@ class HealthPanel(Widget):
         summary = f"Healthy: {healthy}   Degraded: {degraded}   Unhealthy: {unhealthy}"
         if sw := safe_query(self, "#health-summary", Static):
             sw.update(summary)
+
+        total = healthy + degraded + unhealthy
+        pct = (healthy / total * 100.0) if total else 0.0
+        if bar := safe_query(self, "#health-ratio-bar", PercentageBar):
+            bar.value = pct
+            bar.label_text = f"{pct:3.0f}%"
 
         if cw := safe_query(self, "#circuit-breaker-info", Static):
             if circuit_info_lines:

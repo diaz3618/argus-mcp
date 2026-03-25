@@ -18,6 +18,7 @@ from textual.widgets import Input, Static, Switch
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.module_container import ModuleContainer
+from argus_cli.tui.widgets.percentage_bar import PercentageBar
 from argus_cli.tui.widgets.quick_actions import QuickAction, QuickActionBar
 from argus_cli.tui.widgets.tplot import FrequencyChart
 
@@ -69,6 +70,7 @@ class ToolsScreen(ArgusScreen):
                 )
                 yield Switch(value=True, id="tools-filter-switch")
             yield Static("", id="tools-status-bar")
+            yield PercentageBar(value=100.0, label="100%", id="tools-success-bar")
             with ModuleContainer(title="Capabilities", subtitle="[t]ools", id="tools-cap-section"):
                 yield CapabilitySection(id="tools-cap-tables")
             with ModuleContainer(title="Detail", subtitle="[d]etail", id="tools-detail-panel"):
@@ -144,6 +146,13 @@ class ToolsScreen(ArgusScreen):
             parts.append("[C] Conflicts only")
         with contextlib.suppress(NoMatches):
             self.query_one("#tools-status-bar", Static).update("  │  ".join(parts))
+
+        # Update tool success rate bar (non-conflicting / total)
+        pct = ((total_all - conflicts) / total_all * 100.0) if total_all else 100.0
+        with contextlib.suppress(NoMatches):
+            bar = self.query_one("#tools-success-bar", PercentageBar)
+            bar.value = pct
+            bar.label_text = f"{pct:3.0f}%"
 
     @staticmethod
     def _item_matches(item: dict[str, Any], query: str, fields: tuple) -> bool:
