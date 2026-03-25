@@ -20,10 +20,10 @@ from textual.widgets.option_list import Option
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
+from argus_cli.design import status_dot
+
 logger = logging.getLogger(__name__)
 
-_ICON_CONNECTED = "●"  # green dot (styled via Rich markup)
-_ICON_DISCONNECTED = "○"  # hollow dot
 _ICON_ACTIVE = "▸"  # pointer showing active
 
 
@@ -87,11 +87,7 @@ class ServerSelectorWidget(Widget):
             connected = bool(srv.get("connected", False))
 
             pointer = _ICON_ACTIVE if name == active_name else " "
-            dot = (
-                f"[green]{_ICON_CONNECTED}[/green]"
-                if connected
-                else f"[red]{_ICON_DISCONNECTED}[/red]"
-            )
+            dot = status_dot("connected") if connected else status_dot("disconnected")
             label = f"{pointer} {dot} {name}  [dim]{url}[/dim]"
             option_list.add_option(Option(label, id=name))
 

@@ -23,7 +23,7 @@ from textual.widgets import Footer, Header
 
 from argus_cli.tui._error_utils import safe_query
 from argus_cli.tui.api_client import ApiClientError
-from argus_cli.tui.commands import ThemeProvider
+from argus_cli.tui.commands import NavigationProvider, ThemeProvider
 from argus_cli.tui.events import (
     CapabilitiesReady,
     ConfigSyncUpdate,
@@ -100,7 +100,7 @@ class ArgusApp(App):
     SUB_TITLE = ""
     CSS_PATH = "argus.tcss"
 
-    COMMANDS = App.COMMANDS | {ThemeProvider}
+    COMMANDS = App.COMMANDS | {ThemeProvider, NavigationProvider}
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
@@ -387,6 +387,10 @@ class ArgusApp(App):
         saved_theme = settings.get("theme", "textual-dark")
         if saved_theme in self.available_themes:
             self.theme = saved_theme
+
+        from argus_cli.theme import sync_with_textual_theme
+
+        sync_with_textual_theme(self.theme or "textual-dark")
 
         self._ensure_server_manager()
 
@@ -1187,6 +1191,10 @@ class ArgusApp(App):
         settings["theme"] = next_theme
         save_settings(settings)
 
+        from argus_cli.theme import sync_with_textual_theme
+
+        sync_with_textual_theme(next_theme)
+
         self.notify(f"Theme: {next_theme}", timeout=2)
 
     def action_open_theme_picker(self) -> None:
@@ -1199,6 +1207,11 @@ class ArgusApp(App):
                 settings = load_settings()
                 settings["theme"] = theme_name
                 save_settings(settings)
+
+                from argus_cli.theme import sync_with_textual_theme
+
+                sync_with_textual_theme(theme_name)
+
                 self.notify(f"Theme: {theme_name}", timeout=2)
 
         from argus_cli.tui.screens.theme_picker import ThemeScreen

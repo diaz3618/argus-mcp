@@ -13,6 +13,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widget import Widget
 from textual.widgets import DataTable, Label, Static
 
+from argus_cli.design import status_dot
 from argus_cli.tui._error_utils import safe_query
 
 if TYPE_CHECKING:
@@ -74,7 +75,7 @@ class SyncStatusWidget(Widget):
     ) -> None:
         """Update the sync status line."""
         hash_short = config_hash[:8] + "…" if len(config_hash) > 8 else config_hash
-        state = "[green]● live[/green]" if is_live else "[dim]● idle[/dim]"
+        state = f"{status_dot('live')} live" if is_live else f"{status_dot('idle')} idle"
         if w := safe_query(self, "#sync-status-line", Static):
             w.update(
                 f"Config: {config_file}   Hash: {hash_short}   Last sync: {last_sync}   {state}"

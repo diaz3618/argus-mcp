@@ -10,6 +10,7 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import DataTable, Static
 
+from argus_cli.design import status_dot
 from argus_cli.tui._constants import PHASE_ICON, PHASE_STYLE
 from argus_cli.tui._error_utils import safe_query
 
@@ -195,9 +196,9 @@ class BackendStatusWidget(Widget):
             bar_parts: list[str] = []
             for i in range(self.total):
                 if i < self.connected:
-                    bar_parts.append("[green]●[/green]")
+                    bar_parts.append(status_dot("healthy"))
                 else:
-                    bar_parts.append("[red]○[/red]")
+                    bar_parts.append(status_dot("disconnected"))
             summary = " ".join(bar_parts) if bar_parts else "—"
 
         detail, color = self._compute_connection_detail()

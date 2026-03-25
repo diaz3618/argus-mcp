@@ -220,3 +220,37 @@ def status_markup(status: str) -> str:
     """Wrap a status string in Rich markup with appropriate color."""
     tag = _STATUS_TAG_MAP.get(str(status).lower(), "dim")
     return f"[{tag}]{status}[/{tag}]"
+
+
+# ── Textual ↔ YAML theme bridging ──────────────────────────────────────
+
+# Maps Textual built-in theme names to the closest YAML palette.
+# Themes not listed here fall back to catppuccin-mocha.
+TEXTUAL_TO_YAML: dict[str, str] = {
+    "textual-dark": "catppuccin-mocha",
+    "textual-light": "catppuccin-latte",
+    "catppuccin-mocha": "catppuccin-mocha",
+    "catppuccin-latte": "catppuccin-latte",
+    "catppuccin-frappe": "catppuccin-frappe",
+    "catppuccin-macchiato": "catppuccin-macchiato",
+    "dracula": "dracula",
+    "gruvbox": "gruvbox",
+    "monokai": "monokai",
+    "nord": "nord",
+    "solarized-light": "solarized-light",
+    "solarized-dark": "solarized-dark",
+    "tokyo-night": "tokyo-night",
+}
+
+
+def sync_with_textual_theme(textual_theme: str) -> str:
+    """Activate the YAML palette closest to *textual_theme*.
+
+    Returns the YAML palette name that was applied.
+    """
+    _ensure_loaded()
+    yaml_name = TEXTUAL_TO_YAML.get(textual_theme, _DEFAULT_THEME)
+    if yaml_name not in PALETTES:
+        yaml_name = _DEFAULT_THEME
+    set_active_theme(yaml_name)
+    return yaml_name

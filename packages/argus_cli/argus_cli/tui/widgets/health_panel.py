@@ -15,6 +15,7 @@ from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static
 
+from argus_cli.design import status_dot
 from argus_cli.tui._error_utils import safe_query
 from argus_cli.tui.widgets.percentage_bar import PercentageBar
 
@@ -179,13 +180,13 @@ class HealthPanel(Widget):
 
         if phase == "ready" or health_status == "healthy":
             category = "healthy"
-            state_display = "[green]● healthy[/green]"
+            state_display = f"{status_dot('healthy')} healthy"
         elif phase == "degraded" or health_status == "degraded":
             category = "degraded"
-            state_display = "[yellow]◑ degraded[/yellow]"
+            state_display = f"{status_dot('degraded')} degraded"
         else:
             category = "unhealthy"
-            state_display = "[red]✕ unhealthy[/red]"
+            state_display = f"{status_dot('error')} unhealthy"
 
         circuit_display = _CIRCUIT_DISPLAY.get(circuit, f"[dim]{circuit}[/dim]")
 

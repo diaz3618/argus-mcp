@@ -13,6 +13,7 @@ from textual.containers import Vertical
 from textual.widget import Widget
 from textual.widgets import DataTable, Label, Static
 
+from argus_cli.design import status_dot
 from argus_cli.tui._error_utils import safe_query
 
 if TYPE_CHECKING:
@@ -96,11 +97,11 @@ class OTelPanel(Widget):
         """Update OTel connection status."""
         self._enabled = enabled
         if enabled:
-            status = f"OTel: [green]● active[/green]    Exporter: {exporter}"
+            status = f"OTel: {status_dot('active')} active    Exporter: {exporter}"
             if prometheus_url:
                 status += f"    Prometheus: {prometheus_url}"
         else:
-            status = "OTel: [dim]● inactive[/dim]    (enable in config)"
+            status = f"OTel: {status_dot('idle')} inactive    (enable in config)"
 
         if w := safe_query(self, "#otel-status", Static):
             w.update(status)
@@ -138,11 +139,11 @@ class OTelPanel(Widget):
                 )
 
                 if health_status == "healthy":
-                    health_display = "[green]●[/green]"
+                    health_display = status_dot("healthy")
                 elif health_status == "degraded":
-                    health_display = "[yellow]◑[/yellow]"
+                    health_display = status_dot("degraded")
                 else:
-                    health_display = "[red]✕[/red]"
+                    health_display = status_dot("error")
 
                 table.add_row(
                     name,

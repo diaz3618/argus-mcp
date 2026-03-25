@@ -2,7 +2,7 @@
 
 Extends the built-in command palette with:
 - Per-theme switching commands with live preview on highlight.
-- Screen/mode discovery.
+- Navigation commands using the same verbs as the REPL.
 """
 
 from __future__ import annotations
@@ -15,6 +15,28 @@ from textual.command import Hit, Hits, Provider
 if TYPE_CHECKING:
     from textual.app import App
     from textual.screen import Screen
+
+# ── REPL verb → TUI mode mapping ───────────────────────────────────────
+# Lets TUI users type the same command group names they would use in the
+# REPL (e.g. "backends list", "health", "audit") and jump to the
+# matching TUI mode.  Keeps muscle memory consistent across interfaces.
+
+_VERB_MODE_MAP: list[tuple[str, str, str]] = [
+    # (display label, help text, mode name)
+    ("backends list", "Dashboard with backend overview", "dashboard"),
+    ("tools list", "Full-screen capability explorer", "tools"),
+    ("resources list", "Switch to tools mode (Resources tab)", "tools"),
+    ("prompts list", "Switch to tools mode (Prompts tab)", "tools"),
+    ("registry", "Server browser and discovery", "registry"),
+    ("config", "Settings and preferences", "settings"),
+    ("skills", "Manage installed skill presets", "skills"),
+    ("audit", "Structured event log with filters", "audit"),
+    ("health", "Backend health and version drift", "health"),
+    ("secrets", "Auth, authorization and secrets", "security"),
+    ("auth", "Auth, authorization and secrets", "security"),
+    ("workflows", "Workflows, optimizer and telemetry", "operations"),
+    ("server logs", "Per-server operational logs", "server_logs"),
+]
 
 
 class ThemeProvider(Provider):
@@ -64,11 +86,37 @@ class ThemeProvider(Provider):
 
     def _apply_theme(self, name: str) -> None:
         """Select *name* as the active theme and persist it."""
+        from argus_cli.theme import sync_with_textual_theme
         from argus_cli.tui.settings import load_settings, save_settings
 
         self.app.theme = name
         settings = load_settings()
         settings["theme"] = name
         save_settings(settings)
+        sync_with_textual_theme(name)
         self.app.notify(f"Theme: {name}", timeout=2)
         self._committed = True
+
+
+class NavigationProvider(Provider):
+    """Command provider mapping REPL verbs to TUI mode switches.
+
+    Typing ``backends list``, ``health``, ``audit``, etc. in the command
+    palette jumps to the same view the REPL would show, keeping muscle
+    memory consistent across interfaces.
+    """
+
+    async def search(self, query: str) -> Hits:
+        matcher = self.matcher(query)
+        for label, help_text, mode in _VERB_MODE_MAP:
+            score = matcher.match(label)
+            if score > 0:
+                yield Hit(
+                    score,
+                    matcher.highlight(label),
+                    partial(self._switch, mode),
+                    help=help_text,
+                )
+
+    def _switch(self, mode: str) -> None:
+        self.app.switch_mode(mode)
