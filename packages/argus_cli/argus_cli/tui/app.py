@@ -710,21 +710,22 @@ class ArgusApp(App):
         """Feed phase-aware backend data into BackendStatusWidget."""
         try:
             backend_widget = self.screen.query_one(BackendStatusWidget)
-            details = [b.model_dump() for b in backends_resp.backends]
-            backend_widget.update_from_backends(details)
+            backend_widget.update_from_backends(backends_resp.backends)
         except NoMatches:
             pass  # Widget not in active screen
 
         # Feed uptime chart on dashboard
         try:
             uptime_chart = self.screen.query_one(UptimeChart)
-            details = [b.model_dump() for b in backends_resp.backends]
             names = []
             uptimes = []
-            for d in details:
-                names.append(d.get("name", "?"))
-                health = d.get("health") or {}
-                status = health.get("status", "unknown") if isinstance(health, dict) else "unknown"
+            for b in backends_resp.backends:
+                names.append(getattr(b, "name", "?"))
+                health = getattr(b, "health", None)
+                if health is not None:
+                    status = getattr(health, "status", "unknown")
+                else:
+                    status = "unknown"
                 uptimes.append(
                     100.0 if status == "healthy" else 50.0 if status == "degraded" else 0.0
                 )
@@ -737,15 +738,11 @@ class ArgusApp(App):
         """Convert a CapabilitiesResponse into widget updates."""
         self._last_caps = caps
 
-        # Convert Pydantic models to dicts for populate()
-        tools = [t.model_dump() for t in caps.tools]
-        resources = [r.model_dump() for r in caps.resources]
-        prompts = [p.model_dump() for p in caps.prompts]
         route_map = caps.route_map
 
         try:
             cap_section = self.screen.query_one(CapabilitySection)
-            cap_section.populate(tools, resources, prompts, route_map)
+            cap_section.populate(caps.tools, caps.resources, caps.prompts, route_map)
         except NoMatches:
             pass  # Widget not in active screen
 
@@ -753,7 +750,8 @@ class ArgusApp(App):
             event_log = self.screen.query_one(EventLogWidget)
             event_log.add_event(
                 "✅ Service Ready",
-                f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts loaded",
+                f"{len(caps.tools)} tools, {len(caps.resources)} resources, "
+                f"{len(caps.prompts)} prompts loaded",
             )
         except NoMatches:
             pass  # Widget not in active screen

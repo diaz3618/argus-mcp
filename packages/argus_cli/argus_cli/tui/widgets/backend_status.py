@@ -19,6 +19,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _get(obj: Any, key: str, default: Any = None) -> Any:
+    """Get a value from a dict or Pydantic model."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 class BackendStatusWidget(Widget):
     """Compact panel showing per-backend lifecycle phases.
 
@@ -50,41 +57,48 @@ class BackendStatusWidget(Widget):
             table.zebra_stripes = True
         self._refresh_display()
 
-    def update_from_backends(self, backends: list[dict[str, Any]]) -> None:
-        """Populate widget from management API backend list."""
+    def update_from_backends(self, backends: list[Any]) -> None:
+        """Populate widget from management API backend list.
+
+        Accepts both dicts and Pydantic model objects.
+        """
         self.backend_details = backends
         self.total = len(backends)
-        self.connected = sum(1 for b in backends if b.get("phase") in ("ready", "degraded"))
+        self.connected = sum(1 for b in backends if _get(b, "phase") in ("ready", "degraded"))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Emit BackendSelected when user presses Enter on a row."""
         if event.row_key and event.row_key.value:
             name = str(event.row_key.value)
             backend = next(
-                (b for b in self.backend_details if b.get("name") == name),
+                (b for b in self.backend_details if _get(b, "name") == name),
                 None,
             )
             if backend:
+                # Convert Pydantic model to dict for BackendDetailModal
+                if not isinstance(backend, dict) and hasattr(backend, "model_dump"):
+                    backend = backend.model_dump()
                 self.post_message(self.BackendSelected(backend))
 
-    def _populate_backend_table(self, details: list[dict[str, Any]], table: DataTable) -> None:
+    def _populate_backend_table(self, details: list[Any], table: DataTable) -> None:
         """Fill the backend table with rows from *details*."""
         table.clear()
         for b in details:
-            phase = b.get("phase", "pending")
+            phase = _get(b, "phase", "pending")
             icon, color = PHASE_STYLE.get(phase, ("?", "dim"))
-            name = b.get("name", "?")
-            transport = b.get("type", "?")
+            name = _get(b, "name", "?")
+            transport = _get(b, "type", "?")
             transport_plain = {
                 "stdio": "stdio",
                 "sse": "SSE",
                 "streamable-http": "StreamableHTTP",
                 "streamable_http": "StreamableHTTP",
             }.get(transport, transport)
-            latency = b.get("last_latency_ms")
+            latency = _get(b, "last_latency_ms")
             if latency is None:
-                health = b.get("health", {})
-                latency = health.get("latency_ms") if isinstance(health, dict) else None
+                health = _get(b, "health")
+                if health is not None:
+                    latency = _get(health, "latency_ms")
             lat_str = f"{latency:.0f}ms" if latency else "—"
             table.add_row(
                 f"[{color}]{icon}[/{color}]",
@@ -96,11 +110,11 @@ class BackendStatusWidget(Widget):
             )
 
     @staticmethod
-    def _build_phase_summary(details: list[dict[str, Any]]) -> str:
+    def _build_phase_summary(details: list[Any]) -> str:
         """Return a Rich-formatted phase summary string."""
         counts: dict[str, int] = {}
         for b in details:
-            p = b.get("phase", "pending")
+            p = _get(b, "phase", "pending")
             counts[p] = counts.get(p, 0) + 1
         parts: list[str] = []
         for phase_key in ("ready", "degraded", "failed", "pending", "initializing"):
