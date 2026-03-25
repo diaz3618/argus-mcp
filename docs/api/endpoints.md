@@ -33,6 +33,7 @@ Liveness and readiness probe. **Always public** — no token required.
 | `backends.healthy` | int | Backends passing health checks |
 
 **Status logic:**
+
 - `healthy` — all backends connected and healthy
 - `degraded` — some backends unhealthy or disconnected
 - `unhealthy` — no backends connected
@@ -366,6 +367,7 @@ Initiate graceful server shutdown.
 ```
 
 The server will:
+
 1. Stop accepting new connections
 2. Complete in-flight requests
 3. Disconnect all backends

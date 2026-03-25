@@ -1,31 +1,36 @@
 # TUI Guide
 
-Argus MCP includes an interactive terminal UI built with
+Argus includes an interactive terminal UI built with
 [Textual](https://textual.textualize.io/). The TUI connects to a running
-Argus server via the management API and provides real-time monitoring,
-capability browsing, and server control.
+Argus server via the management API and to the argusd daemon via Unix Domain
+Socket, providing real-time monitoring, capability browsing, container/pod
+management, and server control.
 
 ## Launching
 
 ```bash
-# Connect to local server (default: http://127.0.0.1:9000)
+# Via the argus-cli package
+argus-tui
+
+# Or via the server package
 argus-mcp tui
 
 # Connect to remote server
-argus-mcp tui --server http://192.168.1.100:9000
+argus-tui --server http://192.168.1.100:9000
 
 # With authentication
-argus-mcp tui --token my-management-token
+argus-tui --token my-management-token
 
 # Multi-server mode
-argus-mcp tui --servers-config ~/.config/argus-mcp/servers.json
+argus-tui --servers-config ~/.config/argus-mcp/servers.json
 ```
 
 See [`argus-mcp tui`](../cli/tui.md) for all CLI options.
 
 ## Screens
 
-The TUI has ten modes, accessible via keybindings or the command palette.
+The TUI has twelve primary modes plus several modal/utility screens, accessible
+via keybindings or the command palette.
 
 ### Dashboard (key: `1` or `d`)
 
@@ -111,6 +116,28 @@ Operational controls:
 - Server groups and sync status
 - Workflow management
 
+### Containers (key: `c`)
+
+Docker container management powered by argusd:
+
+- **Overview** — Container list with status, resource usage, uptime
+- **Logs** — Multi-container log viewer with severity coloring
+- **Stats** — Reactive CPU/memory percentage bars from argusd push stream
+- **Exec** — Placeholder for interactive terminal (future)
+
+Requires argusd to be running. See [argusd docs](../architecture/07-argusd.md).
+
+### Kubernetes (key: `k`)
+
+Kubernetes pod management powered by argusd:
+
+- **Pods** — Pod list with status, node, IP, restarts, age
+- **Logs** — Per-pod log viewer with severity coloring
+- **Events** — Kubernetes events for the selected pod
+- **Details** — Describe output for the selected pod
+
+Only available when argusd has a Kubernetes connection.
+
 ## Keybindings
 
 | Key | Action |
@@ -126,6 +153,8 @@ Operational controls:
 | `8` or `h` | Switch to Health |
 | `9` | Switch to Security |
 | `0` or `o` | Switch to Operations |
+| `c` | Switch to Containers |
+| `k` | Switch to Kubernetes |
 | `t` | Show Tools tab |
 | `r` | Show Resources tab |
 | `p` | Show Prompts tab |
@@ -178,8 +207,14 @@ server reconnects the TUI to that instance.
 
 ## Theming
 
-The TUI supports Textual's built-in themes. Cycle through themes with `n` or
-open the theme picker with `T` (Shift+T) for a visual preview.
+The TUI ships with 16 built-in YAML color palettes and supports Textual's
+theme system. Cycle through themes with `n` or open the theme picker with
+`T` (Shift+T) for a visual preview.
+
+Built-in themes: catppuccin-frappe, catppuccin-latte, catppuccin-macchiato,
+catppuccin-mocha, dracula, everforest, gruvbox, kanagawa, monokai, nord,
+one-dark, rose-pine, rose-pine-moon, solarized-dark, solarized-light,
+tokyo-night.
 
 When a Textual theme is selected, the matching YAML palette is activated
 automatically so Rich output (status dots, tables, etc.) stays visually
@@ -203,5 +238,14 @@ Both the TUI and REPL share a unified visual language defined in
 |--------|---------|
 | Elicitation | Handle elicitation requests from backends |
 | Theme Picker | Visual theme selection with previews |
+| Backend Config | Transport-specific backend installation form |
+| Backend Detail | Full lifecycle status for a backend |
+| Server Detail | Registry server detail and install |
+| Catalog Browser | Catalog import pipeline with YAML editor |
+| Client Config | Client-side configuration editor |
+| Server Logs | Live server log viewer |
+| Export/Import | Configuration export and import |
+| Setup Wizard | First-run configuration wizard |
+| Exit Modal | Graceful exit with resume options |
 
 See [Screens Reference](screens.md) for detailed screen documentation.

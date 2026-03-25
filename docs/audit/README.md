@@ -154,9 +154,9 @@ Each backend tracks a 6-phase lifecycle:
 
 ```
 Pending → Initializing → Ready → Degraded → Failed
-                                     │
-                                     ▼
-                                ShuttingDown
+                                    │
+                                    ▼
+                               ShuttingDown
 ```
 
 | Phase | Description |

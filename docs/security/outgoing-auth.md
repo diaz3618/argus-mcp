@@ -163,6 +163,7 @@ copy-paste it into a browser on another machine:
 ```
 
 Detection heuristics:
+
 - `SSH_CONNECTION` or `SSH_TTY` environment variable is set
 - Linux system without `DISPLAY` or `WAYLAND_DISPLAY`
 

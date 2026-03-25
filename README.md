@@ -17,7 +17,17 @@ The project has a **server/client architecture**:
 - **`argus-mcp build`** — Pre-build container images for stdio backends.
 - **`argus-mcp tui`** — Textual-based terminal UI that connects to a running server over HTTP.
 - **`argus-mcp secret`** — Manage encrypted secrets (set, get, list, delete).
-- **`argus-mcp clean`** — Remove containers, images, and networks created by Argus MCP.
+- **`argus-mcp clean`** — Remove containers and images created by Argus MCP.
+
+### Companion Packages
+
+| Package | Entry Point | Description |
+|---------|-------------|-------------|
+| `argus-cli` | `argus` | Client CLI with 20 command groups and an interactive REPL for managing a running server |
+| `argus-cli` | `argus-tui` | Alternative TUI launcher from the client package |
+| `argusd` | `argusd` | Go sidecar daemon for Docker container and Kubernetes pod management (Unix Domain Socket API) |
+
+See the [CLI Reference](docs/cli/) and [REPL Guide](docs/cli/repl.md) for details.
 
 **Core Advantages:**
 

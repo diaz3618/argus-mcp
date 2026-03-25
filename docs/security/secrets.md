@@ -121,6 +121,7 @@ All resolved secret values are automatically registered with the
 - Works on string messages, dict args, and tuple args
 
 This ensures no plaintext secrets appear in:
+
 - Application log files
 - Console output
 - Audit trail messages

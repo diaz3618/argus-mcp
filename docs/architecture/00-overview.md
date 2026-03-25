@@ -40,11 +40,21 @@ operational visibility — all through a single connection point.
                      │  └──────────┘ └────────┘  └───────────┘  │
                      └──────────────────────────────────────────┘
                                          ▲
-                                         │ HTTP polling
+                                         │ HTTP polling / UDS
                                    ┌─────┴─────┐
-                                   │    TUI    │
-                                   │ (Textual) │
-                                   └───────────┘
+                                   │  argus    │
+                                   │  CLI/TUI  │
+                                   │  (client) │
+                                   └─────┬─────┘
+                                         │ UDS
+                                   ┌─────┴─────┐
+                                   │  argusd   │
+                                   │  (daemon) │
+                                   └─────┬─────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              │ Docker / Kubernetes │
+                              └─────────────────────┘
 ```
 
 ## Package Structure
@@ -181,6 +191,88 @@ argus_mcp/
     └── widgets/         # Reusable UI components
 ```
 
+### Packages (client ecosystem)
+
+The `packages/` directory holds standalone companion packages that
+communicate with the Argus MCP server over HTTP and with the argusd
+daemon over a Unix Domain Socket.
+
+```
+packages/
+├── argus_cli/                   # argus-cli — interactive client (MIT)
+│   ├── pyproject.toml           # Hatchling build, v0.1.0
+│   └── argus_cli/
+│       ├── main.py              # Typer app root — entry point "argus"
+│       ├── client.py            # httpx client for management API
+│       ├── config.py            # CLI configuration (CliConfig)
+│       ├── output.py            # Output formatting (rich, json, table, text)
+│       ├── theme.py             # Theme loading and management
+│       ├── design.py            # Unified design system (status dots, phase icons)
+│       ├── daemon_client.py     # Async client for argusd over UDS
+│       │
+│       ├── commands/            # Typer command groups (20 groups)
+│       │   ├── audit.py         # Audit log queries
+│       │   ├── auth.py          # Authentication management
+│       │   ├── backends.py      # Backend lifecycle (list, inspect, reconnect)
+│       │   ├── batch.py         # Bulk operations
+│       │   ├── config_cmd.py    # Configuration display and reload
+│       │   ├── config_server.py # Server-side config management
+│       │   ├── containers.py    # Docker container management (via argusd)
+│       │   ├── events.py        # Event stream queries
+│       │   ├── health.py        # Health and session status
+│       │   ├── operations.py    # Optimizer and telemetry controls
+│       │   ├── pods.py          # Kubernetes pod management (via argusd)
+│       │   ├── prompts.py       # MCP prompts (list, get)
+│       │   ├── registry.py      # Server registry (search, install)
+│       │   ├── resources.py     # MCP resources (list, read)
+│       │   ├── secrets.py       # Secrets management
+│       │   ├── server.py        # Server lifecycle (start, stop, status)
+│       │   ├── skills.py        # Skill pack management
+│       │   ├── tools.py         # MCP tools (list, inspect, call)
+│       │   └── workflows.py     # Workflow management
+│       │
+│       ├── repl/                # Interactive REPL (prompt-toolkit)
+│       │   ├── loop.py          # Main REPL loop and input handling
+│       │   ├── completions.py   # Dynamic tab completions from API
+│       │   ├── dispatch.py      # Command routing (Typer or REPL handler)
+│       │   ├── handlers.py      # REPL-only commands (use, alias, watch, etc.)
+│       │   ├── state.py         # Session state (connection, aliases, history)
+│       │   └── toolbar.py       # Status bar prompt and toolbar
+│       │
+│       ├── themes/              # 16 YAML color palettes
+│       │   ├── catppuccin-{frappe,latte,macchiato,mocha}.yaml
+│       │   ├── dracula.yaml, everforest.yaml, gruvbox.yaml
+│       │   ├── kanagawa.yaml, monokai.yaml, nord.yaml
+│       │   ├── one-dark.yaml, rose-pine.yaml, rose-pine-moon.yaml
+│       │   ├── solarized-{dark,light}.yaml, tokyo-night.yaml
+│       │
+│       ├── widgets/             # Rich CLI widgets
+│       │   ├── banner.py        # Startup banner
+│       │   ├── panels.py        # Reusable Rich panels
+│       │   ├── spinners.py      # Progress spinners
+│       │   └── tables.py        # Formatted Rich tables
+│       │
+│       └── tui/                 # Terminal UI (Textual) — enhanced
+│           ├── app.py           # ArgusApp (modes, keybindings, polling)
+│           ├── api_client.py    # HTTP client for management API
+│           ├── server_manager.py # Multi-server connections
+│           ├── screens/         # 20+ screens (see TUI docs)
+│           └── widgets/         # 35+ widgets (see TUI docs)
+│
+└── argusd/                      # argusd — Go sidecar daemon
+    ├── go.mod
+    ├── Makefile
+    ├── cmd/argusd/main.go       # Entry point — UDS HTTP server
+    └── internal/
+        ├── docker/client.go     # Docker Engine API client
+        ├── k8s/client.go        # Kubernetes API client (optional)
+        ├── labels/labels.go     # Argus resource labeling conventions
+        └── server/
+            ├── router.go        # HTTP route registration
+            ├── handlers.go      # Request handlers
+            └── sse.go           # Server-Sent Events streaming
+```
+
 ## Data Flow
 
 ### 1. Startup
@@ -248,6 +340,42 @@ ArgusApp (Textual)
     → Health, Backends, Capabilities, Events
   → Updates widgets with fresh data
   → Handles connection loss/restore gracefully
+```
+
+### 5. REPL Session
+
+```
+argus (no subcommand)
+  → start_repl()
+    → Connect to server (management API health check)
+    → Populate dynamic completions (backends, tools, resources, prompts)
+    → prompt-toolkit session with history, auto-suggest, toolbar
+    → User input
+      → REPL-only command (use, alias, watch, connect, set, clear, help)?
+          → Handle directly
+      → Typer command (backends list, tools call ...)?
+          → dispatch_command() → Typer CLI invoke
+    → Loop until exit/quit
+```
+
+### 6. argusd (Daemon)
+
+```
+argusd [-socket /path/to/argusd.sock]
+  → Initialize Docker client (required)
+  → Initialize Kubernetes client (optional)
+  → HTTP server on Unix Domain Socket
+    → /v1/health              GET   — Daemon health
+    → /v1/containers          GET   — List containers (Argus-labeled)
+    → /v1/containers/{id}     GET   — Inspect container
+    → /v1/containers/{id}/*   POST  — Start / stop / restart / remove
+    → /v1/containers/{id}/logs  GET — Stream container logs (SSE)
+    → /v1/containers/{id}/stats GET — Stream container stats (SSE)
+    → /v1/events              GET   — Docker event stream (SSE)
+    → /v1/pods                GET   — List pods (if K8s available)
+    → /v1/pods/{ns}/{name}/*  GET/DELETE — Describe, logs, events, delete
+    → /v1/deployments/{ns}/{name}/restart POST — Rollout restart
+  ← DaemonClient (argus_cli) connects via httpx UDS transport
 ```
 
 ## Deployment Modes

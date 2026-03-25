@@ -11,11 +11,13 @@
 |---------|-------------|
 | [Getting Started](getting-started.md) | Installation, first run, quick config |
 | [Configuration](configuration.md) | Full config reference (YAML) |
-| [CLI Reference](cli/) | Command-line interface |
+| [CLI Reference](cli/) | `argus-mcp` server commands and `argus` client commands |
+| [REPL Guide](cli/repl.md) | Interactive `argus` read-eval-print loop |
 | [Architecture](architecture/) | System design, component overview, data flow |
+| [argusd Daemon](architecture/07-argusd.md) | Go sidecar for Docker and Kubernetes management |
 | [Management API](api/) | REST endpoints for monitoring and control |
 | [Security](security/) | Authentication, authorization, secrets |
-| [TUI Guide](tui/) | Interactive terminal UI |
+| [TUI Guide](tui/) | Interactive terminal UI (containers, Kubernetes, catalog) |
 | [Middleware](middleware.md) | Request pipeline and middleware chain |
 | [Audit & Observability](audit/) | Audit logging, telemetry, health checks |
 | [Skills](skills/) | Portable bundles of tools, workflows, and config |
@@ -45,10 +47,12 @@ docs/
 │   ├── 03-config.md       ← Config loading pipeline
 │   ├── 04-runtime.md      ← Service lifecycle
 │   ├── 05-plugins.md      ← Plugin system (built-in & external)
-│   └── 06-connection-pool.md ← Session pool, HTTP pool, retry
+│   ├── 06-connection-pool.md ← Session pool, HTTP pool, retry
+│   └── 07-argusd.md       ← argusd Go daemon (Docker & Kubernetes)
 │
 ├── cli/
-│   ├── README.md          ← CLI overview
+│   ├── README.md          ← CLI overview (argus-mcp + argus)
+│   ├── repl.md            ← argus interactive REPL
 │   ├── server.md          ← `argus-mcp server`
 │   ├── tui.md             ← `argus-mcp tui`
 │   └── secret.md          ← `argus-mcp secret`
@@ -100,7 +104,12 @@ docs/
 | **Middleware** | Pluggable request pipeline (auth → authz → telemetry → audit → recovery → routing) |
 | **Container Isolation** | Automatic per-backend hardened containers for stdio backends (Docker/Podman) |
 | **Management API** | REST interface at `/manage/v1/` for monitoring and control |
+| **argus CLI** | Client CLI (`argus`) for interacting with a running server — supports one-shot commands and an interactive REPL |
+| **REPL** | Read-eval-print loop in the `argus` CLI with tab completion, aliases, backend scoping, and watch mode |
+| **argusd** | Go sidecar daemon providing Docker container and Kubernetes pod management over a Unix Domain Socket |
 | **TUI** | Textual-based terminal UI that connects to the management API |
+| **Containers Screen** | TUI screen for managing Docker containers via argusd |
+| **Kubernetes Screen** | TUI screen for managing Kubernetes pods via argusd |
 | **Optimizer** | Replaces full tool catalog with `find_tool` + `call_tool` meta-tools |
 | **Skill** | A portable bundle of tools, workflows, and config |
 | **Workflow** | A composite tool pipeline expressed as a DAG of steps |
