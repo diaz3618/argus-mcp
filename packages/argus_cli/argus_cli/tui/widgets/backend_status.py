@@ -80,34 +80,59 @@ class BackendStatusWidget(Widget):
                     backend = backend.model_dump()
                 self.post_message(self.BackendSelected(backend))
 
+    def _backend_row(self, b: Any) -> tuple[str, ...]:
+        """Build a row tuple for a single backend entry."""
+        phase = _get(b, "phase", "pending")
+        icon, color = PHASE_STYLE.get(phase, ("?", "dim"))
+        name = _get(b, "name", "?")
+        transport = _get(b, "type", "?")
+        transport_plain = {
+            "stdio": "stdio",
+            "sse": "SSE",
+            "streamable-http": "StreamableHTTP",
+            "streamable_http": "StreamableHTTP",
+        }.get(transport, transport)
+        latency = _get(b, "last_latency_ms")
+        if latency is None:
+            health = _get(b, "health")
+            if health is not None:
+                latency = _get(health, "latency_ms")
+        lat_str = f"{latency:.0f}ms" if latency else "—"
+        return (
+            f"[{color}]{icon}[/{color}]",
+            name,
+            transport_plain,
+            phase.title(),
+            lat_str,
+        )
+
     def _populate_backend_table(self, details: list[Any], table: DataTable) -> None:
-        """Fill the backend table with rows from *details*."""
-        table.clear()
+        """Fill or diff-update the backend table with rows from *details*."""
+        new_rows: dict[str, tuple[str, ...]] = {}
         for b in details:
-            phase = _get(b, "phase", "pending")
-            icon, color = PHASE_STYLE.get(phase, ("?", "dim"))
             name = _get(b, "name", "?")
-            transport = _get(b, "type", "?")
-            transport_plain = {
-                "stdio": "stdio",
-                "sse": "SSE",
-                "streamable-http": "StreamableHTTP",
-                "streamable_http": "StreamableHTTP",
-            }.get(transport, transport)
-            latency = _get(b, "last_latency_ms")
-            if latency is None:
-                health = _get(b, "health")
-                if health is not None:
-                    latency = _get(health, "latency_ms")
-            lat_str = f"{latency:.0f}ms" if latency else "—"
-            table.add_row(
-                f"[{color}]{icon}[/{color}]",
-                name,
-                transport_plain,
-                phase.title(),
-                lat_str,
-                key=name,
-            )
+            new_rows[name] = self._backend_row(b)
+
+        existing_keys = {str(rk.value) for rk in table.rows}
+
+        # Remove rows no longer present
+        for key in existing_keys - new_rows.keys():
+            table.remove_row(key)
+
+        for name, cells in new_rows.items():
+            if name in existing_keys:
+                # Update only if values changed
+                try:
+                    current = tuple(table.get_cell(name, col.key) for col in table.columns.values())
+                    if current != cells:
+                        for col, val in zip(table.columns.values(), cells, strict=False):
+                            table.update_cell(name, col.key, val)
+                except Exception:
+                    # Row/column mismatch — fall back to remove+add
+                    table.remove_row(name)
+                    table.add_row(*cells, key=name)
+            else:
+                table.add_row(*cells, key=name)
 
     @staticmethod
     def _build_phase_summary(details: list[Any]) -> str:

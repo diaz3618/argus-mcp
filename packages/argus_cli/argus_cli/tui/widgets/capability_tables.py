@@ -46,6 +46,13 @@ class CapabilitySection(Widget):
     prompts_count: reactive[int] = reactive(0)
     _conflicts_count: int = 0
 
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        # Snapshot of previous row data for diff-based skipping
+        self._prev_tools_keys: tuple[str, ...] = ()
+        self._prev_resources_keys: tuple[str, ...] = ()
+        self._prev_prompts_keys: tuple[str, ...] = ()
+
     def compose(self) -> ComposeResult:
         with TabbedContent(id="cap-tabs"):
             with TabPane("Tools (0)", id="tab-tools"):
@@ -171,14 +178,27 @@ class CapabilitySection(Widget):
         prompts: list[Any],
         route_map: dict[str, tuple[str, str]] | None = None,
     ) -> None:
-        """Fill all three tables from MCP type lists or API dicts."""
+        """Fill all three tables from MCP type lists or API dicts.
+
+        Uses a lightweight fingerprint (sorted names) to skip re-population
+        when the data has not changed since the last call.
+        """
         rmap = route_map or {}
 
-        self._conflicts_count = self._populate_tools_table(tools, rmap)
-        self.tools_count = len(tools)
+        tools_keys = tuple(sorted(_attr_or_key(t, "name", "") for t in tools))
+        if tools_keys != self._prev_tools_keys:
+            self._conflicts_count = self._populate_tools_table(tools, rmap)
+            self.tools_count = len(tools)
+            self._prev_tools_keys = tools_keys
 
-        self._populate_resources_table(resources, rmap)
-        self.resources_count = len(resources)
+        resources_keys = tuple(sorted(_attr_or_key(r, "name", "") for r in resources))
+        if resources_keys != self._prev_resources_keys:
+            self._populate_resources_table(resources, rmap)
+            self.resources_count = len(resources)
+            self._prev_resources_keys = resources_keys
 
-        self._populate_prompts_table(prompts, rmap)
-        self.prompts_count = len(prompts)
+        prompts_keys = tuple(sorted(_attr_or_key(p, "name", "") for p in prompts))
+        if prompts_keys != self._prev_prompts_keys:
+            self._populate_prompts_table(prompts, rmap)
+            self.prompts_count = len(prompts)
+            self._prev_prompts_keys = prompts_keys
