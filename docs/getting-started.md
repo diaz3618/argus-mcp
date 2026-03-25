@@ -4,6 +4,19 @@
 
 - **Python 3.10+** (3.12 or 3.13 recommended)
 - **[uv](https://docs.astral.sh/uv/)** (recommended) or pip
+- **Go 1.25+** — only needed if you want to build the `argusd` daemon
+
+## Package Overview
+
+Argus ships as three packages that can be installed independently:
+
+| Package | Language | Description |
+|---------|----------|-------------|
+| **argus-mcp** | Python | The MCP gateway server — aggregates backends, exposes SSE / Streamable HTTP transports, management API, and a built-in TUI. |
+| **argus-cli** | Python | Interactive client CLI and REPL for managing a running Argus server. Ships the `argus` and `argus-tui` commands. |
+| **argusd** | Go | Lightweight sidecar daemon for Docker and Kubernetes management over a Unix Domain Socket. |
+
+Only `argus-mcp` is required. Install the other packages when you need them.
 
 ## Installation
 
@@ -25,6 +38,43 @@ Verify:
 ```bash
 argus-mcp --help
 ```
+
+### argus-cli (client)
+
+The client CLI lives in `packages/argus_cli/` and can be installed from source:
+
+```bash
+cd packages/argus_cli
+
+# With uv
+uv pip install -e .
+
+# With TUI support
+uv pip install -e ".[tui]"
+
+# Or plain pip
+pip install -e .
+```
+
+Verify:
+
+```bash
+argus --help
+```
+
+### argusd (Go daemon)
+
+The sidecar daemon lives in `packages/argusd/` and is built with Go:
+
+```bash
+cd packages/argusd
+make build
+```
+
+The resulting `argusd` binary listens on a Unix Domain Socket
+(`/var/run/argusd.sock` by default).
+
+See [Architecture — argusd](architecture/07-argusd.md) for full details.
 
 ### From Source
 
@@ -171,6 +221,53 @@ If a management token is configured, include the `Authorization` header:
 curl -H "Authorization: Bearer $ARGUS_MGMT_TOKEN" \
      http://127.0.0.1:9000/manage/v1/status
 ```
+
+### 6. Use the argus Client CLI
+
+With the server running, use the `argus` client for one-shot commands or an
+interactive REPL session:
+
+```bash
+# One-shot commands
+argus backends list
+argus tools list --output json
+argus health status
+
+# Connect to a specific server
+argus -s http://192.168.1.100:9000 backends list
+```
+
+Start the interactive REPL (tab completion, history, status toolbar):
+
+```bash
+argus
+```
+
+Or launch the enhanced TUI directly:
+
+```bash
+argus-tui
+```
+
+See [CLI Reference](cli/README.md) for all 20 command groups and
+[REPL Guide](cli/repl.md) for REPL details.
+
+### 7. Run argusd (optional)
+
+If you need Docker container or Kubernetes pod management from the CLI,
+start the `argusd` daemon:
+
+```bash
+cd packages/argusd
+make run
+```
+
+The daemon exposes a local HTTP API over a Unix Domain Socket. The `argus`
+client commands `argus containers` and `argus pods` communicate with it
+automatically when the socket is available.
+
+See [Architecture — argusd](architecture/07-argusd.md) for configuration
+and deployment options.
 
 ## Multi-Server TUI
 
