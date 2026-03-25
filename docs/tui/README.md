@@ -32,8 +32,9 @@ The TUI has ten modes, accessible via keybindings or the command palette.
 The default screen showing an overview of the Argus instance:
 
 - **Server Info** — Name, version, uptime, transport URLs
-- **Backend Status** — Connection state and health for each backend, color-coded
-  by lifecycle phase (Ready=green, Degraded=yellow, Failed=red)
+- **Backend Status** — Connection state and health for each backend,
+  with status dots (● healthy, ◑ degraded, ✕ failed) and phase icons
+  from the shared design module
 - **Event Log** — Real-time event stream with severity indicators
 - **Capability Summary** — Quick counts of tools, resources, and prompts
 
@@ -136,21 +137,11 @@ Operational controls:
 
 Press `Ctrl+P` to open the command palette with quick access to:
 
-- Dashboard Mode
-- Tools Mode
-- Registry Mode
-- Settings Mode
-- Skills Mode
-- Editor Mode
-- Audit Mode
-- Health Mode
-- Security Mode
-- Operations Mode
-- Show Server Details
-- Show Connection Info
-- Show Tools/Resources/Prompts Tab
-- Open Theme Picker
-- Cycle Theme
+- All TUI modes (Dashboard, Tools, Registry, Settings, Skills, etc.)
+- REPL-style navigation verbs (e.g. `backends list`, `health`, `audit`)
+- Theme switching with live preview
+- Server details and connection info
+- Tools/Resources/Prompts tab switching
 
 ## Polling
 
@@ -189,6 +180,22 @@ server reconnects the TUI to that instance.
 
 The TUI supports Textual's built-in themes. Cycle through themes with `n` or
 open the theme picker with `T` (Shift+T) for a visual preview.
+
+When a Textual theme is selected, the matching YAML palette is activated
+automatically so Rich output (status dots, tables, etc.) stays visually
+consistent with the TUI chrome. Custom YAML palettes can be placed in
+`~/.config/argus-mcp/themes/`.
+
+## Design System
+
+Both the TUI and REPL share a unified visual language defined in
+`argus_cli/design.py`:
+
+| Convention | Examples |
+|------------|----------|
+| Status dots | ● healthy, ● connected, ◑ degraded, ○ disconnected, ✕ error |
+| Phase icons | ◌ pending, ⟳ initializing, ● ready, ◑ degraded, ✕ failed |
+| Transport badges | `stdio`, `SSE`, `StreamableHTTP` |
 
 ## Additional Screens
 

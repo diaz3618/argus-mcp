@@ -55,6 +55,8 @@ argus_mcp/
 ├── __main__.py          # python -m argus_mcp
 ├── cli.py               # Entry point: server, build, stop, status, tui, secret, clean
 ├── constants.py         # Shared constants
+├── design.py            # Shared iconography (status dots, phase icons, transport badges)
+├── theme.py             # Theme engine (YAML palettes + Textual CSS bridge)
 ├── errors.py            # Base exception hierarchy
 ├── _error_utils.py      # Error formatting helpers
 ├── _task_utils.py       # Asyncio task utilities
@@ -167,6 +169,8 @@ argus_mcp/
     ├── server_manager.py # Multi-server connections
     ├── events.py        # Custom Textual messages
     ├── settings.py      # TUI preferences
+    ├── commands.py      # Command palette providers (Theme, Navigation)
+    ├── _constants.py    # Phase/icon/badge constants (re-exports design.py)
     ├── argus.tcss    # Stylesheet
     ├── screens/         # Dashboard, Tools, Registry, Settings, ...
     └── widgets/         # Reusable UI components

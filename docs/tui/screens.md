@@ -34,7 +34,7 @@ The primary monitoring screen with a grid layout:
 │                  │                           │
 │  Server Info     │  Backend Status           │
 │  - Name          │  - Per-backend state      │
-│  - Version       │  - Phase (color-coded)    │
+│  - Version       │  - Phase (status dots)    │
 │  - Uptime        │  - Health indicators      │
 │  - Transport     │  - Capability counts      │
 │                  │                           │
@@ -239,7 +239,7 @@ Visual theme selection:
 
 | Widget | File | Description |
 |--------|------|-------------|
-| `BackendStatusWidget` | `backend_status.py` | Color-coded backend lifecycle display |
+| `BackendStatusWidget` | `backend_status.py` | Backend lifecycle display (uses `design.py` status dots) |
 | `CapabilitySection` | `capability_tables.py` | Tabbed tables for tools/resources/prompts |
 | `ElicitationFormWidget` | `elicitation_form.py` | Dynamic elicitation form |
 | `EventLogWidget` | `event_log.py` | Scrollable event timeline |
@@ -257,7 +257,7 @@ Visual theme selection:
 | `ServerInfoWidget` | `server_info.py` | Server details (name, version, uptime) |
 | `ServerSelectorWidget` | `server_selector.py` | Multi-server dropdown with connect action |
 | `SessionsPanelWidget` | `sessions_panel.py` | Active session tracking |
-| `SyncStatusWidget` | `sync_status.py` | Config sync status indicator |
+| `SyncStatusWidget` | `sync_status.py` | Config sync status indicator (uses `design.py` status dots) |
 | `Toolbar` | `toolbar.py` | Action bar |
 | `ToolPreviewWidget` | `tool_preview.py` | Tool JSON schema display |
 | `VersionBadgeWidget` | `version_badge.py` | Version display badge |
