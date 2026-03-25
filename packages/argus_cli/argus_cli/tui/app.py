@@ -21,6 +21,7 @@ from textual.widgets import Footer, Header
 
 from argus_cli.tui._error_utils import safe_query
 from argus_cli.tui.api_client import ApiClientError
+from argus_cli.tui.commands import ThemeProvider
 from argus_cli.tui.events import (
     CapabilitiesReady,
     ConfigSyncUpdate,
@@ -94,6 +95,8 @@ class ArgusApp(App):
     TITLE = f"{SERVER_NAME} v{SERVER_VERSION}"
     SUB_TITLE = ""
     CSS_PATH = "argus.tcss"
+
+    COMMANDS = App.COMMANDS | {ThemeProvider}
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
@@ -314,6 +317,18 @@ class ArgusApp(App):
             title="Cycle Theme",
             help="Switch to the next enabled theme",
             callback=self.action_next_theme,
+        )
+
+        yield SystemCommand(
+            title="Jump Mode",
+            help="Spatial navigation overlay for quick widget focus (;)",
+            callback=self.action_jump_mode,
+        )
+
+        yield SystemCommand(
+            title="Reconnect All Backends",
+            help="Re-establish connections to all configured backends",
+            callback=self._reconnect_all_backends,
         )
 
     def _show_server_details(self) -> None:
@@ -883,6 +898,31 @@ class ArgusApp(App):
                 pass
         except (OSError, ConnectionError, ApiClientError) as exc:
             self.notify(f"Reconnect failed: {exc}", title="Error", severity="error")
+
+    def _reconnect_all_backends(self) -> None:
+        """Reconnect all configured backends via the management API."""
+        self.run_worker(self._do_reconnect_all(), name="reconnect-all", exclusive=True)
+
+    async def _do_reconnect_all(self) -> None:
+        """Worker: reconnect every backend."""
+        mgr = self._server_manager
+        if mgr is None:
+            return
+        client = getattr(mgr, "active_client", None)
+        if client is None:
+            self.notify("No active server connection", severity="warning")
+            return
+        entries = getattr(mgr, "entries", {})
+        for name in entries:
+            try:
+                await client.post_reconnect(name)
+            except (OSError, ConnectionError, ApiClientError):
+                pass
+        self.notify(
+            f"Reconnect requested for {len(entries)} backend(s)",
+            title="Reconnect All",
+            timeout=4,
+        )
 
     def on_re_auth_required(self, event: ReAuthRequired) -> None:
         """Handle a backend requiring interactive re-authentication."""
