@@ -22,8 +22,13 @@ Only `argus-mcp` is required. Install the other packages when you need them.
 
 ### From PyPI (recommended)
 
+Both Python packages are published to PyPI and can be installed without
+cloning the repository.
+
+#### argus-mcp (server)
+
 ```bash
-# uv tool install — isolated, auto-managed (recommended)
+# uv — isolated, auto-managed (recommended)
 uv tool install argus-mcp
 
 # pipx — same isolation, more established
@@ -39,21 +44,20 @@ Verify:
 argus-mcp --help
 ```
 
-### argus-cli (client)
-
-The client CLI lives in `packages/argus_cli/` and can be installed from source:
+#### argus-cli (client)
 
 ```bash
-cd packages/argus_cli
+# uv
+uv tool install argus-cli
 
-# With uv
-uv pip install -e .
+# With the optional TUI
+uv tool install "argus-cli[tui]"
 
-# With TUI support
-uv pip install -e ".[tui]"
+# pipx
+pipx install argus-cli
 
-# Or plain pip
-pip install -e .
+# pip
+pip install argus-cli
 ```
 
 Verify:
@@ -62,33 +66,36 @@ Verify:
 argus --help
 ```
 
-### argusd (Go daemon)
+#### argusd (Go daemon)
 
-The sidecar daemon lives in `packages/argusd/` and is built with Go:
-
-```bash
-cd packages/argusd
-make build
-```
-
-The resulting `argusd` binary listens on a Unix Domain Socket
-(`/var/run/argusd.sock` by default).
-
-See [Architecture — argusd](architecture/07-argusd.md) for full details.
+`argusd` is a Go binary — download a pre-built release from
+[GitHub Releases](https://github.com/diaz3618/argus-mcp/releases), or
+build from source (see below).
 
 ### From Source
 
+Clone the repository to install everything together, or to work on
+development:
+
 ```bash
-# Clone and enter the repository
 git clone https://github.com/diaz3618/argus-mcp.git
 cd argus-mcp
 
-# Install all runtime + dev dependencies
+# Install argus-mcp with all dev dependencies
 uv sync --group dev
 
-# Or just runtime dependencies
-uv sync
+# Install argus-cli from its sub-package
+uv pip install -e packages/argus_cli
+
+# With TUI support
+uv pip install -e "packages/argus_cli[tui]"
+
+# Build argusd (requires Go 1.25+)
+cd packages/argusd && make build && cd ../..
 ```
+
+See [Architecture — argusd](architecture/07-argusd.md) for argusd
+configuration and deployment details.
 
 ## Quick Start
 
@@ -97,12 +104,13 @@ uv sync
 Argus looks for config files in this order:
 `config.yaml` → `config.yml`
 
-Copy and edit the example:
+If you cloned the repository, copy the example:
 
 ```bash
 cp example_config.yaml config.yaml
 ```
 
+Otherwise, create a `config.yaml` in your working directory.
 A minimal config with one stdio backend:
 
 ```yaml
@@ -255,11 +263,16 @@ See [CLI Reference](cli/README.md) for all 20 command groups and
 ### 7. Run argusd (optional)
 
 If you need Docker container or Kubernetes pod management from the CLI,
-start the `argusd` daemon:
+start the `argusd` daemon. Download the binary from
+[GitHub Releases](https://github.com/diaz3618/argus-mcp/releases) or
+build from source:
 
 ```bash
-cd packages/argusd
-make run
+# From a cloned repo
+cd packages/argusd && make run
+
+# Or run a pre-built binary directly
+./argusd
 ```
 
 The daemon exposes a local HTTP API over a Unix Domain Socket. The `argus`
