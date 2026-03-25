@@ -107,6 +107,7 @@ class RegistryBrowserWidget(Widget):
         self._transport_filter: str = _ALL_TRANSPORTS
         self._visible_columns: set[str] = {k for k, _, vis in _COLUMNS if vis}
         self._filter_enabled: bool = True
+        self._search_debounce: object | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="registry-search-bar"):
@@ -138,7 +139,15 @@ class RegistryBrowserWidget(Widget):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "registry-search":
-            self.search_query = event.value if self._filter_enabled else ""
+            if self._search_debounce is not None:
+                self._search_debounce.stop()  # type: ignore[union-attr]
+            if not self._filter_enabled:
+                self.search_query = ""
+                return
+            value = event.value
+            self._search_debounce = self.set_timer(
+                0.15, lambda: setattr(self, "search_query", value)
+            )
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
         if event.switch.id == "registry-filter-switch":
