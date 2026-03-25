@@ -35,6 +35,9 @@ _VERB_MODE_MAP: list[tuple[str, str, str]] = [
     ("secrets", "Auth, authorization and secrets", "security"),
     ("auth", "Auth, authorization and secrets", "security"),
     ("workflows", "Workflows, optimizer and telemetry", "operations"),
+    ("events", "Events stream and log", "dashboard"),
+    ("containers", "Container management and stats", "containers"),
+    ("pods", "Kubernetes pod management", "kubernetes"),
     ("server logs", "Per-server operational logs", "server_logs"),
 ]
 
