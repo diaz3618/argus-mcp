@@ -139,13 +139,26 @@ class ServerManager:
         logger.info("Active server set to '%s'", name)
 
     async def connect(self, name: str) -> None:
-        """Create and connect the :class:`ApiClient` for *name*."""
+        """Create and connect the :class:`ApiClient` for *name*.
+
+        If a client already exists and its underlying transport is still
+        open, it is reused instead of creating a new one.  This avoids
+        the overhead of tearing down and re-establishing a TCP connection
+        after a transient poll failure.
+        """
         if name not in self._servers:
             raise KeyError(f"No server named '{name}'")
 
         entry = self._servers[name]
         if entry.client is not None and entry.connected:
             return  # already connected
+
+        # Reuse existing client if the transport is still alive
+        if entry.client is not None and entry.client.is_connected:
+            await entry.client.connect()
+            entry.connected = True
+            logger.info("Reconnected to server '%s' (reused client)", name)
+            return
 
         client = ApiClient(base_url=entry.url, token=entry.token)
         await client.connect()
