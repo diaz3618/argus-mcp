@@ -131,6 +131,7 @@ def _register_commands() -> None:
     from argus_cli.commands.backends import app as backends_app
     from argus_cli.commands.batch import app as batch_app
     from argus_cli.commands.config_cmd import app as config_app
+    from argus_cli.commands.containers import app as containers_app
     from argus_cli.commands.events import app as events_app
     from argus_cli.commands.health import app as health_app
     from argus_cli.commands.operations import app as operations_app
@@ -194,6 +195,12 @@ def _register_commands() -> None:
         rich_help_panel="Operations",
     )
     app.add_typer(batch_app, name="batch", help="Bulk operations.", rich_help_panel="Operations")
+    app.add_typer(
+        containers_app,
+        name="containers",
+        help="Container management — list, logs, stats, lifecycle.",
+        rich_help_panel="Infrastructure",
+    )
 
 
 _register_commands()
