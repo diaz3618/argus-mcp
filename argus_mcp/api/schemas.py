@@ -215,3 +215,19 @@ class SessionDetail(BaseModel):
 class SessionsResponse(BaseModel):
     active_sessions: int = 0
     sessions: List[SessionDetail] = Field(default_factory=list)
+
+
+# ── Batch ───────────────────────────────────────────────────────────────
+
+
+class BatchResponse(BaseModel):
+    """Combined response for ``GET /manage/v1/batch``.
+
+    Returns status, backends, capabilities, and recent events in a
+    single round-trip to eliminate per-poll HTTP overhead.
+    """
+
+    status: StatusResponse
+    backends: BackendsResponse = Field(default_factory=BackendsResponse)
+    capabilities: CapabilitiesResponse = Field(default_factory=CapabilitiesResponse)
+    events: EventsResponse = Field(default_factory=EventsResponse)

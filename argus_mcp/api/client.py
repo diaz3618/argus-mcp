@@ -16,6 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from argus_mcp.api.schemas import (
     BackendsResponse,
+    BatchResponse,
     CapabilitiesResponse,
     EventsResponse,
     HealthResponse,
@@ -162,6 +163,11 @@ class ApiClient:
             params["group"] = group
         resp = await self._request("get", "groups", params=params)
         return resp.json()
+
+    async def get_batch(self, events_limit: int = 20) -> BatchResponse:
+        """``GET /manage/v1/batch`` — combined status/backends/capabilities/events."""
+        resp = await self._request("get", "batch", params={"events_limit": events_limit})
+        return self._validate(BatchResponse, resp.json(), "batch")
 
     # ── SSE streaming ──────────────────────────────────────────────────
 

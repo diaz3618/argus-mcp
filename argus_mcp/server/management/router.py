@@ -33,6 +33,7 @@ from argus_mcp.server.management.schemas import (
     BackendDetail,
     BackendHealth,
     BackendsResponse,
+    BatchResponse,
     CapabilitiesResponse,
     ErrorResponse,
     EventItem,
@@ -139,6 +140,12 @@ async def handle_ready(request: Request) -> JSONResponse:
 
 async def handle_status(request: Request) -> JSONResponse:
     """Full service status including runtime state, config, and transport."""
+    resp = _build_status(request)
+    return JSONResponse(resp.model_dump())
+
+
+def _build_status(request: Request) -> StatusResponse:
+    """Build the :class:`StatusResponse` — shared by ``/status`` and ``/batch``."""
     service = _get_service(request)
     svc_status = service.get_status()
 
@@ -148,7 +155,7 @@ async def handle_status(request: Request) -> JSONResponse:
     sse_url = urlunparse(("http", f"{host}:{port}", SSE_PATH, "", "", ""))
     streamable_http_url = urlunparse(("http", f"{host}:{port}", STREAMABLE_HTTP_PATH, "", "", ""))
 
-    resp = StatusResponse(
+    return StatusResponse(
         service=StatusService(
             name=svc_status.server_name,
             version=svc_status.server_version,
@@ -169,11 +176,16 @@ async def handle_status(request: Request) -> JSONResponse:
         ),
         feature_flags=_get_feature_flags(),
     )
-    return JSONResponse(resp.model_dump())
 
 
 async def handle_backends(request: Request) -> JSONResponse:
     """List all backend server connections with their status."""
+    resp = _build_backends(request)
+    return JSONResponse(resp.model_dump())
+
+
+def _build_backends(request: Request) -> BackendsResponse:
+    """Build the :class:`BackendsResponse` — shared by ``/backends`` and ``/batch``."""
     service = _get_service(request)
     route_map = service.registry.get_route_map()
 
@@ -248,7 +260,7 @@ async def handle_backends(request: Request) -> JSONResponse:
         )
 
     resp = BackendsResponse(backends=backends)
-    return JSONResponse(resp.model_dump())
+    return resp
 
 
 async def handle_groups(request: Request) -> JSONResponse:
@@ -309,6 +321,26 @@ async def handle_capabilities(request: Request) -> JSONResponse:
         return _error_json("bad_request", "Backend name contains invalid characters.", 400)
     if filter_type and filter_type not in ("tools", "resources", "prompts"):
         return _error_json("bad_request", "Type must be one of: tools, resources, prompts.", 400)
+
+    resp = _build_capabilities(
+        service,
+        route_map,
+        filter_type=filter_type,
+        filter_backend=filter_backend,
+        filter_search=filter_search,
+    )
+    return JSONResponse(resp.model_dump())
+
+
+def _build_capabilities(
+    service: ArgusService,
+    route_map: Dict[str, Any],
+    *,
+    filter_type: Optional[str] = None,
+    filter_backend: Optional[str] = None,
+    filter_search: str = "",
+) -> CapabilitiesResponse:
+    """Build the :class:`CapabilitiesResponse` — shared by ``/capabilities`` and ``/batch``."""
 
     def _filter_caps(type_name, items, name_fn, detail_fn):
         """Filter capabilities by backend/search and build detail objects."""
@@ -384,7 +416,7 @@ async def handle_capabilities(request: Request) -> JSONResponse:
         optimizer_active=optimizer_active,
         mcp_visible_tool_count=mcp_visible_tool_count,
     )
-    return JSONResponse(resp.model_dump())
+    return resp
 
 
 async def handle_events(request: Request) -> JSONResponse:
@@ -404,6 +436,18 @@ async def handle_events(request: Request) -> JSONResponse:
     since = request.query_params.get("since")
     severity = request.query_params.get("severity")
 
+    resp = _build_events(service, limit=limit, since=since, severity=severity)
+    return JSONResponse(resp.model_dump())
+
+
+def _build_events(
+    service: ArgusService,
+    *,
+    limit: int = 100,
+    since: Optional[str] = None,
+    severity: Optional[str] = None,
+) -> EventsResponse:
+    """Build the :class:`EventsResponse` — shared by ``/events`` and ``/batch``."""
     raw_events = service.get_events(limit=limit, since=since, severity=severity)
     items = [
         EventItem(
@@ -417,8 +461,35 @@ async def handle_events(request: Request) -> JSONResponse:
         )
         for e in raw_events
     ]
+    return EventsResponse(events=items)
 
-    resp = EventsResponse(events=items)
+
+async def handle_batch(request: Request) -> JSONResponse:
+    """Combined status + backends + capabilities + events in one response.
+
+    Eliminates the per-poll multi-request overhead — one RTT per cycle.
+    Accepts an optional ``events_limit`` query parameter (default 20).
+    """
+    service = _get_service(request)
+    route_map = service.registry.get_route_map()
+
+    try:
+        events_limit = int(request.query_params.get("events_limit", "20"))
+    except (ValueError, TypeError):
+        events_limit = 20
+    events_limit = max(MGMT_EVENTS_LIMIT_MIN, min(events_limit, MGMT_EVENTS_LIMIT_MAX))
+
+    status_resp = _build_status(request)
+    backends_resp = _build_backends(request)
+    caps_resp = _build_capabilities(service, route_map)
+    events_resp = _build_events(service, limit=events_limit)
+
+    resp = BatchResponse(
+        status=status_resp,
+        backends=backends_resp,
+        capabilities=caps_resp,
+        events=events_resp,
+    )
     return JSONResponse(resp.model_dump())
 
 
@@ -602,6 +673,7 @@ management_routes = Router(
         Route("/sessions", endpoint=handle_sessions, methods=["GET"]),
         Route("/events", endpoint=handle_events, methods=["GET"]),
         Route("/events/stream", endpoint=handle_events_stream, methods=["GET"]),
+        Route("/batch", endpoint=handle_batch, methods=["GET"]),
         Route("/reload", endpoint=handle_reload, methods=["POST"]),
         Route("/reconnect/{name}", endpoint=handle_reconnect, methods=["POST"]),
         Route("/reauth/{name}", endpoint=handle_reauth, methods=["POST"]),

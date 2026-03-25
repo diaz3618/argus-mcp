@@ -644,15 +644,16 @@ class ArgusApp(App):
             return
 
         try:
-            status = await client.get_status()
-            self._apply_status_response(status)
+            batch = await client.get_batch(events_limit=20)
+
+            self._apply_status_response(batch.status)
 
             # Compute a lightweight status hash for adaptive polling
             _status_hash = hash(
                 (
-                    status.service.state,
-                    status.config.backend_count,
-                    getattr(status.service, "uptime", None),
+                    batch.status.service.state,
+                    batch.status.config.backend_count,
+                    getattr(batch.status.service, "uptime", None),
                 )
             )
 
@@ -663,24 +664,18 @@ class ArgusApp(App):
                 self.post_message(ConnectionRestored())
 
             if not self._caps_loaded:
-                caps = await client.get_capabilities()
-                self._apply_capabilities_response(caps)
+                self._apply_capabilities_response(batch.capabilities)
                 self._caps_loaded = True
 
-            # Fetch events, backends, sessions, and groups in parallel
-            events_result, backends_result, sessions_result, groups_result = await asyncio.gather(
-                client.get_events(limit=20),
-                client.get_backends(),
+            self._apply_events_response(batch.events)
+            self._apply_backends_response(batch.backends)
+
+            # Sessions and groups are not in the batch — fetch in parallel
+            sessions_result, groups_result = await asyncio.gather(
                 client.get_sessions(),
                 client.get_groups(),
                 return_exceptions=True,
             )
-
-            if not isinstance(events_result, BaseException):
-                self._apply_events_response(events_result)
-
-            if not isinstance(backends_result, BaseException):
-                self._apply_backends_response(backends_result)
 
             if not isinstance(sessions_result, BaseException):
                 self._last_sessions = sessions_result
