@@ -20,6 +20,7 @@ from argus_cli.tui.api_client import ApiClientError
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.filter_bar import FilterBar
 from argus_cli.tui.widgets.health_panel import HealthPanel
+from argus_cli.tui.widgets.quick_actions import QuickAction, QuickActionBar
 from argus_cli.tui.widgets.server_groups import ServerGroupsWidget
 from argus_cli.tui.widgets.sessions_panel import SessionsPanel
 from argus_cli.tui.widgets.tplot import HealthTrendChart, LatencyChart
@@ -75,6 +76,13 @@ class HealthScreen(ArgusScreen):
                     yield LatencyChart(id="health-latency-chart")
                 with TabPane("Health Trends", id="tab-health-trends"):
                     yield HealthTrendChart(id="health-trend-chart")
+            yield QuickActionBar(
+                actions=[
+                    QuickAction("/", "Filter", self.action_focus_filter),
+                    QuickAction(";", "Jump", lambda: self.app.action_jump_mode()),
+                ],
+                id="health-quick-actions",
+            )
 
     def on_filter_bar_filter_changed(self, event: FilterBar.FilterChanged) -> None:
         """Re-filter health table when the filter bar changes."""

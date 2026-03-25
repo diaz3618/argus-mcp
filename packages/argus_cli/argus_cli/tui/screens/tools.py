@@ -18,6 +18,7 @@ from textual.widgets import Input, Static, Switch
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.module_container import ModuleContainer
+from argus_cli.tui.widgets.quick_actions import QuickAction, QuickActionBar
 from argus_cli.tui.widgets.tplot import FrequencyChart
 
 if TYPE_CHECKING:
@@ -78,6 +79,15 @@ class ToolsScreen(ArgusScreen):
                 id="tools-freq-section",
             ):
                 yield FrequencyChart(id="tools-freq-chart")
+            yield QuickActionBar(
+                actions=[
+                    QuickAction("/", "Search", self.action_focus_search),
+                    QuickAction("c", "Conflicts", self.action_toggle_conflicts),
+                    QuickAction("f", "Show Filtered", self.action_toggle_filtered),
+                    QuickAction(";", "Jump", lambda: self.app.action_jump_mode()),
+                ],
+                id="tools-quick-actions",
+            )
 
     def on_show(self) -> None:
         """Re-populate capability tables from app-level cached data."""

@@ -17,6 +17,7 @@ from argus_cli.tui.widgets.backend_status import BackendStatusWidget
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.event_log import EventLogWidget
 from argus_cli.tui.widgets.module_container import ModuleContainer
+from argus_cli.tui.widgets.quick_actions import QuickAction, QuickActionBar
 from argus_cli.tui.widgets.server_info import ServerInfoWidget
 from argus_cli.tui.widgets.server_selector import ServerSelectorWidget
 from argus_cli.tui.widgets.tplot import UptimeChart
@@ -59,3 +60,12 @@ class DashboardScreen(ArgusScreen):
             yield CapabilitySection()
         with ModuleContainer(title="Connection Uptime", subtitle="[u]ptime", id="uptime-section"):
             yield UptimeChart(id="dashboard-uptime-chart")
+        yield QuickActionBar(
+            actions=[
+                QuickAction("x", "Export Config", lambda: self.app.action_export_client_config()),
+                QuickAction("T", "Themes", lambda: self.app.action_open_theme_picker()),
+                QuickAction("n", "Next Theme", lambda: self.app.action_next_theme()),
+                QuickAction(";", "Jump", lambda: self.app.action_jump_mode()),
+            ],
+            id="dashboard-quick-actions",
+        )
