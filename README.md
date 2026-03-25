@@ -298,6 +298,7 @@ The management API is mounted at `/manage/v1/` and provides:
 | Endpoint | Method | Description |
 | -------- | ------ | ----------- |
 | `/manage/v1/health` | GET | Health check (uptime, backend health summary) |
+| `/manage/v1/ready` | GET | Readiness probe (returns 503 until backends connect) |
 | `/manage/v1/status` | GET | Server status (version, config, endpoints, feature flags) |
 | `/manage/v1/backends` | GET | List all backends with connection state and capabilities |
 | `/manage/v1/groups` | GET | List logical server groups |
@@ -305,8 +306,10 @@ The management API is mounted at `/manage/v1/` and provides:
 | `/manage/v1/sessions` | GET | Active MCP client sessions |
 | `/manage/v1/events` | GET | Recent event log entries |
 | `/manage/v1/events/stream` | GET | Live SSE event stream |
+| `/manage/v1/batch` | GET | Combined status, backends, capabilities, and events in one response |
 | `/manage/v1/reload` | POST | Hot-reload configuration |
 | `/manage/v1/reconnect/{name}` | POST | Reconnect a specific backend |
+| `/manage/v1/reauth/{name}` | POST | Trigger interactive re-authentication for a backend |
 | `/manage/v1/shutdown` | POST | Graceful server shutdown |
 
 When `ARGUS_MGMT_TOKEN` is set, include `Authorization: Bearer <token>` in requests.
