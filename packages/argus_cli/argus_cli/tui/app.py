@@ -6,6 +6,7 @@ HTTP via :class:`ServerManager`.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -571,29 +572,26 @@ class ArgusApp(App):
                 self._apply_capabilities_response(caps)
                 self._caps_loaded = True
 
-            events = await client.get_events(limit=20)
-            self._apply_events_response(events)
+            # Fetch events, backends, sessions, and groups in parallel
+            events_result, backends_result, sessions_result, groups_result = await asyncio.gather(
+                client.get_events(limit=20),
+                client.get_backends(),
+                client.get_sessions(),
+                client.get_groups(),
+                return_exceptions=True,
+            )
 
-            # Fetch backends for phase-aware status display
-            try:
-                backends_resp = await client.get_backends()
-                self._apply_backends_response(backends_resp)
-            except (OSError, ConnectionError, ApiClientError):
-                pass  # Non-critical — status poll already covers basics
+            if not isinstance(events_result, BaseException):
+                self._apply_events_response(events_result)
 
-            # Fetch sessions for health screen
-            try:
-                sessions_resp = await client.get_sessions()
-                self._last_sessions = sessions_resp
-            except (OSError, ConnectionError, ApiClientError):
-                pass
+            if not isinstance(backends_result, BaseException):
+                self._apply_backends_response(backends_result)
 
-            # Fetch groups for health screen
-            try:
-                groups_resp = await client.get_groups()
-                self._last_groups = groups_resp
-            except (OSError, ConnectionError, ApiClientError):
-                pass
+            if not isinstance(sessions_result, BaseException):
+                self._last_sessions = sessions_result
+
+            if not isinstance(groups_result, BaseException):
+                self._last_groups = groups_result
 
         except (OSError, ConnectionError, ApiClientError) as exc:
             was_connected = self._connected
