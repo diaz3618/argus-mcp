@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 # Pattern for interpolation: ${step_id.output} or ${inputs.param}
 _INTERPOLATION_RE = re.compile(r"\$\{([a-zA-Z0-9_]+)\.([a-zA-Z0-9_.]+)\}")
 
-# Type for tool invocation callback
 ToolInvoker = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, Any]]
 
 
@@ -106,7 +105,6 @@ class WorkflowExecutor:
         results: Dict[str, StepResult],
     ) -> StepResult:
         """Execute a single step with retry and condition support."""
-        # Check condition
         if step.condition:
             if not self._evaluate_condition(step.condition, context):
                 logger.debug("Step '%s' skipped (condition false)", step.id)
@@ -124,7 +122,6 @@ class WorkflowExecutor:
                         error=f"Dependency '{dep_id}' failed",
                     )
 
-        # Interpolate arguments
         resolved_args = self._interpolate(step.args, context)
 
         last_error: Optional[str] = None
@@ -230,7 +227,6 @@ class WorkflowExecutor:
             val = self._resolve_ref(eq_match.group(1), eq_match.group(2), context)
             return str(val) == eq_match.group(3)
 
-        # Inequality
         neq_match = re.match(
             r"\$\{([a-zA-Z0-9_]+)\.([a-zA-Z0-9_.]+)\}\s*!=\s*'([^']*)'",
             condition,

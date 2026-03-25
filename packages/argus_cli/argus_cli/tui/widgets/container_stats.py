@@ -80,7 +80,6 @@ class ContainerStatsPanel(Widget):
         self._cpu_history.append(cpu)
         self._mem_history.append(mem)
 
-        # Update detail text
         self._mem_usage = stats.get("mem_usage", "—")
         self._mem_limit = stats.get("mem_limit", "—")
         self._net_rx = stats.get("net_rx", "—")

@@ -145,7 +145,6 @@ class ToolEditorScreen(ArgusScreen):
         for tool in tools:
             name = tool.get("name", "unknown")
             backend = tool.get("backend", "")
-            # Check modifications for include status
             mods = self._modifications.get(name, {})
             included = mods.get("included", tool.get("included", True))
             status = "✓" if included else "✗"
@@ -195,7 +194,6 @@ class ToolEditorScreen(ArgusScreen):
                 self._modifications[self._selected_tool] = {}
             self._modifications[self._selected_tool]["rename"] = event.value
 
-            # Update preview
             tool_info = next(
                 (t for t in self._tools if t.get("name") == self._selected_tool),
                 None,
@@ -276,7 +274,6 @@ class ToolEditorScreen(ArgusScreen):
                 title="Saved",
             )
 
-            # Trigger hot-reload
             self._trigger_reload()
 
         except (OSError, yaml.YAMLError) as exc:
