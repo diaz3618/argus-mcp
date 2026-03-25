@@ -94,10 +94,16 @@ class CapabilitySection(Widget):
         self._update_tab_labels()
 
     def _populate_tools_table(self, tools: list[Any], rmap: dict[str, tuple[str, str]]) -> int:
-        """Fill the Tools DataTable and return the conflict count."""
+        """Fill the Tools DataTable and return the conflict count.
+
+        Tools are grouped by backend server with styled separator rows.
+        """
         dt_tools = self.query_one("#dt-tools", DataTable)
         dt_tools.clear()
         conflicts = 0
+
+        # Build (server, row_data) pairs for grouping
+        rows_by_server: dict[str, list[tuple]] = {}
         for t in tools:
             name = _attr_or_key(t, "name", "—")
             original = _attr_or_key(t, "original_name", "")
@@ -114,7 +120,18 @@ class CapabilitySection(Widget):
             else:
                 original_display = "—"
 
-            dt_tools.add_row(name, original_display, server, _trunc(desc), key=name)
+            rows_by_server.setdefault(server, []).append(
+                (name, original_display, server, _trunc(desc))
+            )
+
+        # Emit rows grouped by server with header separators
+        for server_name, rows in sorted(rows_by_server.items()):
+            count = len(rows)
+            header = f"[b]▸ {server_name}[/b] ({count} tool{'s' if count != 1 else ''})"
+            dt_tools.add_row(header, "", "", "", key=f"__group__{server_name}")
+            for name, orig, srv, desc in rows:
+                dt_tools.add_row(f"  {name}", orig, srv, desc, key=name)
+
         return conflicts
 
     def _populate_resources_table(

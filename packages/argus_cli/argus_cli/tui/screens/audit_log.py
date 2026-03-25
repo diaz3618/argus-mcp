@@ -198,3 +198,29 @@ class AuditLogScreen(BaseLogScreen):
 
     def action_toggle_filter(self) -> None:
         self.action_focus_search()
+
+    def _refresh_table(self) -> None:
+        """Rebuild the table with events grouped by date."""
+        try:
+            table = self.query_one(f"#{self._table_id()}", DataTable)
+            table.clear()
+
+            filtered = self._apply_filters(self._events)
+
+            # Group events by date extracted from timestamp
+            current_date = ""
+            for evt in filtered:
+                ts = str(evt.get("timestamp", ""))
+                date_part = ts.split("T")[0] if "T" in ts else ts[:10]
+                if date_part and date_part != current_date:
+                    current_date = date_part
+                    ncols = len(self._columns())
+                    header_cells = (f"[b]\u25b8 {current_date}[/b]",) + ("",) * (ncols - 1)
+                    table.add_row(*header_cells)
+                table.add_row(*self._event_to_row(evt))
+
+            from textual.widgets import Static
+
+            self.query_one(f"#{self._stats_id()}", Static).update(self._compute_stats(filtered))
+        except NoMatches:
+            logger.debug("Cannot refresh audit table", exc_info=True)
