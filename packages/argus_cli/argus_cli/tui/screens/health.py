@@ -11,11 +11,13 @@ import contextlib
 import logging
 from typing import TYPE_CHECKING
 
+from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import TabbedContent, TabPane
 
 from argus_cli.tui.api_client import ApiClientError
 from argus_cli.tui.screens.base import ArgusScreen
+from argus_cli.tui.widgets.filter_bar import FilterBar
 from argus_cli.tui.widgets.health_panel import HealthPanel
 from argus_cli.tui.widgets.server_groups import ServerGroupsWidget
 from argus_cli.tui.widgets.sessions_panel import SessionsPanel
@@ -38,16 +40,64 @@ class HealthScreen(ArgusScreen):
         "server-groups-widget": "g",
     }
 
+    BINDINGS = [
+        ("slash", "focus_filter", "Filter"),
+    ]
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._health_filter_query: str = ""
+        self._health_filter_enabled: bool = True
+        self._cached_backends: list[dict] = []
+
     def compose_content(self) -> ComposeResult:
-        with TabbedContent(id="health-tabs"):
-            with TabPane("Status", id="tab-health-status"):
-                yield HealthPanel(id="health-panel-widget")
-            with TabPane("Sessions", id="tab-health-sessions"):
-                yield SessionsPanel(id="sessions-panel-widget")
-            with TabPane("Versions", id="tab-health-versions"):
-                yield VersionDriftPanel(id="version-drift-widget")
-            with TabPane("Server Groups", id="tab-health-groups"):
-                yield ServerGroupsWidget(id="server-groups-widget")
+        with Vertical(id="health-layout"):
+            yield FilterBar(
+                placeholder="Filter backends: name or latency (e.g. >=100)…",
+                label="Filter:",
+                input_id="health-filter-input",
+                id="health-filter-bar",
+            )
+            with TabbedContent(id="health-tabs"):
+                with TabPane("Status", id="tab-health-status"):
+                    yield HealthPanel(id="health-panel-widget")
+                with TabPane("Sessions", id="tab-health-sessions"):
+                    yield SessionsPanel(id="sessions-panel-widget")
+                with TabPane("Versions", id="tab-health-versions"):
+                    yield VersionDriftPanel(id="version-drift-widget")
+                with TabPane("Server Groups", id="tab-health-groups"):
+                    yield ServerGroupsWidget(id="server-groups-widget")
+
+    def on_filter_bar_filter_changed(self, event: FilterBar.FilterChanged) -> None:
+        """Re-filter health table when the filter bar changes."""
+        self._health_filter_query = event.query
+        self._health_filter_enabled = event.enabled
+        self._apply_health_filter()
+
+    def _apply_health_filter(self) -> None:
+        """Filter the health panel's DataTable rows."""
+        if not self._cached_backends:
+            return
+        if not self._health_filter_enabled or not self._health_filter_query:
+            with contextlib.suppress(NoMatches):
+                self.query_one(HealthPanel).update_from_backends(self._cached_backends)
+            return
+        q = self._health_filter_query
+        filtered = []
+        for b in self._cached_backends:
+            name = b.get("name", "")
+            if FilterBar.matches_text(name, q):
+                filtered.append(b)
+                continue
+            lat = (b.get("health") or {}).get("latency_ms")
+            if lat is not None and FilterBar.matches_numeric(lat, q):
+                filtered.append(b)
+        with contextlib.suppress(NoMatches):
+            self.query_one(HealthPanel).update_from_backends(filtered)
+
+    def action_focus_filter(self) -> None:
+        with contextlib.suppress(NoMatches):
+            self.query_one("#health-filter-bar", FilterBar).focus_input()
 
     def on_show(self) -> None:
         """Refresh health data from cached app state."""
@@ -72,8 +122,8 @@ class HealthScreen(ArgusScreen):
             try:
                 backends_resp = await client.get_backends()
                 details = [b.model_dump() for b in backends_resp.backends]
-                with contextlib.suppress(NoMatches):
-                    self.query_one(HealthPanel).update_from_backends(details)
+                self._cached_backends = details
+                self._apply_health_filter()
                 with contextlib.suppress(NoMatches):
                     self.query_one(ServerGroupsWidget).update_groups(details)
 

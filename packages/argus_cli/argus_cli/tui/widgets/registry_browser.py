@@ -13,7 +13,7 @@ from textual.containers import Horizontal
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Checkbox, DataTable, Input, Label, Select, Static
+from textual.widgets import Checkbox, DataTable, Input, Label, Select, Static, Switch
 
 from argus_cli.tui._error_utils import safe_query
 
@@ -70,6 +70,10 @@ class RegistryBrowserWidget(Widget):
     RegistryBrowserWidget #registry-transport-filter {
         width: 24;
     }
+    RegistryBrowserWidget #registry-filter-switch {
+        width: auto;
+        margin-left: 1;
+    }
     RegistryBrowserWidget #registry-column-bar {
         height: auto;
         max-height: 3;
@@ -102,6 +106,7 @@ class RegistryBrowserWidget(Widget):
         self._sort_reverse: bool = False
         self._transport_filter: str = _ALL_TRANSPORTS
         self._visible_columns: set[str] = {k for k, _, vis in _COLUMNS if vis}
+        self._filter_enabled: bool = True
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="registry-search-bar"):
@@ -116,6 +121,7 @@ class RegistryBrowserWidget(Widget):
                 allow_blank=False,
                 id="registry-transport-filter",
             )
+            yield Switch(value=True, id="registry-filter-switch")
         with Horizontal(id="registry-column-bar"):
             for key, label, default_vis in _COLUMNS:
                 yield Checkbox(
@@ -132,7 +138,16 @@ class RegistryBrowserWidget(Widget):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "registry-search":
-            self.search_query = event.value
+            self.search_query = event.value if self._filter_enabled else ""
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.switch.id == "registry-filter-switch":
+            self._filter_enabled = event.value
+            if event.value:
+                inp = safe_query(self, "#registry-search", Input)
+                self.search_query = inp.value if inp else ""
+            else:
+                self.search_query = ""
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "registry-transport-filter":

@@ -12,9 +12,10 @@ from typing import TYPE_CHECKING, Any
 
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Button, DataTable, Input, Label, Select, Static
+from textual.widgets import Button, DataTable, Input, Label, Select, Static, Switch
 
 from argus_cli.tui.screens._base_log import BaseLogScreen
+from argus_cli.tui.widgets.filter_bar import FilterBar
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -44,6 +45,8 @@ class AuditLogScreen(BaseLogScreen):
         super().__init__(**kwargs)
         self._filter_user: str = ""
         self._filter_server: str = ""
+        self._filter_latency: str = ""
+        self._filter_enabled: bool = True
 
     def _table_id(self) -> str:
         return "audit-table"
@@ -74,6 +77,9 @@ class AuditLogScreen(BaseLogScreen):
         return (ts, user, method, tool, server, lat_str, self._format_status(status))
 
     def _apply_filters(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not self._filter_enabled:
+            return events
+
         result = events
 
         # Method filter
@@ -97,6 +103,15 @@ class AuditLogScreen(BaseLogScreen):
                 e
                 for e in result
                 if q in (e.get("server", "") or e.get("backend", "") or "").lower()
+            ]
+
+        # Latency filter (operator-aware: >=100, <50, >200)
+        if self._filter_latency:
+            lat_q = self._filter_latency
+            result = [
+                e
+                for e in result
+                if FilterBar.matches_numeric(e.get("latency_ms", e.get("duration_ms")), lat_q)
             ]
 
         return result
@@ -130,6 +145,8 @@ class AuditLogScreen(BaseLogScreen):
                 )
                 yield Input(placeholder="User…", id="audit-user-filter")
                 yield Input(placeholder="Server…", id="audit-server-filter")
+                yield Input(placeholder="Latency (e.g. >=100)…", id="audit-latency-filter")
+                yield Switch(value=True, id="audit-filter-switch")
                 yield Button(
                     "⏸ Pause" if not self._paused else "▶ Resume",
                     id="btn-audit-pause",
@@ -155,6 +172,14 @@ class AuditLogScreen(BaseLogScreen):
             self._refresh_table()
         elif event.input.id == "audit-server-filter":
             self._filter_server = event.value.strip()
+            self._refresh_table()
+        elif event.input.id == "audit-latency-filter":
+            self._filter_latency = event.value.strip()
+            self._refresh_table()
+
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        if event.switch.id == "audit-filter-switch":
+            self._filter_enabled = event.value
             self._refresh_table()
 
     def on_select_changed(self, event: Select.Changed) -> None:

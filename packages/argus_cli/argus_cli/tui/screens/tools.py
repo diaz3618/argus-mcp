@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
-from textual.widgets import Input, Static
+from textual.widgets import Input, Static, Switch
 
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
@@ -51,6 +51,7 @@ class ToolsScreen(ArgusScreen):
         self._cached_route_map: dict | None = None
         self._conflicts_only: bool = False
         self._show_filtered: bool = False
+        self._filter_enabled: bool = True
 
     def compose_content(self) -> ComposeResult:
         with Vertical(id="tools-layout"):
@@ -63,6 +64,7 @@ class ToolsScreen(ArgusScreen):
                     placeholder="Search tools, resources, prompts… (press /)",
                     id="tools-search",
                 )
+                yield Switch(value=True, id="tools-filter-switch")
             yield Static("", id="tools-status-bar")
             with ModuleContainer(title="Capabilities", subtitle="[t]ools", id="tools-cap-section"):
                 yield CapabilitySection(id="tools-cap-tables")
@@ -129,17 +131,41 @@ class ToolsScreen(ArgusScreen):
         """Return True if *query* appears in any of the named *fields*."""
         return any(query in (item.get(f, "") or "").lower() for f in fields)
 
+    def on_switch_changed(self, event: Switch.Changed) -> None:
+        """Toggle filter active state without clearing the input."""
+        if event.switch.id != "tools-filter-switch":
+            return
+        self._filter_enabled = event.value
+        self._apply_search_filter()
+
+    def _apply_search_filter(self) -> None:
+        """Re-apply the current search filter."""
+        try:
+            search = self.query_one("#tools-search", Input)
+        except NoMatches:
+            return
+        query = search.value.strip().lower()
+        if not query or not self._filter_enabled:
+            base = self._get_base_tools()
+            self._populate_tables(base)
+            return
+        self._filter_with_query(query)
+
     def on_input_changed(self, event: Input.Changed) -> None:
         """Live-filter capability tables based on search text."""
         if event.input.id != "tools-search":
             return
+        if not self._filter_enabled:
+            return
         query = event.value.strip().lower()
         if not query:
-            # Reset to full data (respecting conflicts-only toggle)
             base = self._get_base_tools()
             self._populate_tables(base)
             return
+        self._filter_with_query(query)
 
+    def _filter_with_query(self, query: str) -> None:
+        """Apply text filter across tools, resources, and prompts."""
         base_tools = self._get_base_tools()
         filtered_tools = [
             t
