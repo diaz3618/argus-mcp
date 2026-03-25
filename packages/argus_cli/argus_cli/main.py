@@ -135,6 +135,7 @@ def _register_commands() -> None:
     from argus_cli.commands.events import app as events_app
     from argus_cli.commands.health import app as health_app
     from argus_cli.commands.operations import app as operations_app
+    from argus_cli.commands.pods import app as pods_app
     from argus_cli.commands.prompts import app as prompts_app
     from argus_cli.commands.registry import app as registry_app
     from argus_cli.commands.resources import app as resources_app
@@ -199,6 +200,12 @@ def _register_commands() -> None:
         containers_app,
         name="containers",
         help="Container management — list, logs, stats, lifecycle.",
+        rich_help_panel="Infrastructure",
+    )
+    app.add_typer(
+        pods_app,
+        name="pods",
+        help="Kubernetes pod management — list, logs, events, lifecycle.",
         rich_help_panel="Infrastructure",
     )
 

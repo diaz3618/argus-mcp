@@ -38,6 +38,7 @@ from argus_cli.tui.screens.dashboard import DashboardScreen
 from argus_cli.tui.screens.exit_modal import ExitModal
 from argus_cli.tui.screens.export_import import ExportImportScreen
 from argus_cli.tui.screens.health import HealthScreen
+from argus_cli.tui.screens.kubernetes import KubernetesScreen
 from argus_cli.tui.screens.operations import OperationsScreen
 from argus_cli.tui.screens.registry import RegistryScreen
 from argus_cli.tui.screens.security import SecurityScreen
@@ -116,6 +117,7 @@ class ArgusApp(App):
         Binding("0", "switch_mode('operations')", "Ops", key_display="0"),
         Binding("o", "switch_mode('operations')", "Ops", show=False),
         Binding("c", "switch_mode('containers')", "Containers", show=False),
+        Binding("k", "switch_mode('kubernetes')", "Kubernetes", show=False),
         Binding("w", "switch_mode('wizard')", "Wizard", show=False),
         Binding("x", "export_client_config", "Export Config", show=False),
         Binding("t", "show_tools", "Tools Tab", show=False),
@@ -142,6 +144,7 @@ class ArgusApp(App):
         "export_import": ExportImportScreen,
         "catalog": CatalogBrowserScreen,
         "containers": ContainersScreen,
+        "kubernetes": KubernetesScreen,
     }
 
     DEFAULT_MODE = "dashboard"

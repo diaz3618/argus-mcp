@@ -87,6 +87,7 @@ class ToolbarWidget(Widget):
         yield _ToolbarAction("9·Sec", "switch_mode('security')")
         yield _ToolbarAction("0·Ops", "switch_mode('operations')")
         yield _ToolbarAction("C·Containers", "switch_mode('containers')")
+        yield _ToolbarAction("K·K8s", "switch_mode('kubernetes')")
         yield _ToolbarSep()
         yield _ToolbarAction("Details", "_tb_server_details")
         yield _ToolbarSep()
