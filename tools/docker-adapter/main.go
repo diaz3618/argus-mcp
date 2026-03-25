@@ -427,10 +427,19 @@ func doCreate(ctx context.Context, cli *client.Client, args map[string]string) R
 
 	readOnly := args["read_only"] == "true"
 
+	// Parse labels from JSON object string (optional).
+	var labelMap map[string]string
+	if l := args["labels"]; l != "" {
+		if err := json.Unmarshal([]byte(l), &labelMap); err != nil {
+			return Response{Error: fmt.Sprintf("invalid labels JSON: %v", err)}
+		}
+	}
+
 	config := &container.Config{
 		Image:        img,
 		Cmd:          cmd,
 		Env:          envList,
+		Labels:       labelMap,
 		OpenStdin:    true,
 		StdinOnce:    true,
 		AttachStdin:  true,

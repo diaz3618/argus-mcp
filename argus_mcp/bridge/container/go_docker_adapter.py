@@ -206,6 +206,7 @@ class GoDockerAdapter:
         volumes: Optional[List[str]] = None,
         read_only: bool = False,
         cap_drop: Optional[List[str]] = None,
+        labels: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """Create a container and return its ID (or None on failure)."""
         args: Dict[str, str] = {"image": image, "name": name}
@@ -227,6 +228,8 @@ class GoDockerAdapter:
             args["read_only"] = "true"
         if cap_drop:
             args["cap_drop"] = json.dumps(cap_drop)
+        if labels:
+            args["labels"] = json.dumps(labels)
         resp = await self._call("create", args)
         if not resp.get("ok"):
             logger.error("Go adapter create failed: %s", resp.get("error", "unknown"))

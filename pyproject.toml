@@ -33,6 +33,7 @@ include = ["argus_mcp*"]
 
 [tool.uv.workspace]
 members = ["packages/*"]
+exclude = ["packages/argusd"]
 
 [tool.uv.sources]
 argus-mcp = { workspace = true }

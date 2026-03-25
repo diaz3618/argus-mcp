@@ -76,6 +76,7 @@ COPY --from=builder --chown={{ container_user }}:{{ container_user }} /app/mcp-s
 
 # Switch to non-root user
 USER {{ container_user }}
+LABEL argus.image="true"
 
 # Run the pre-built MCP server binary
 ENTRYPOINT ["/app/mcp-server"{% for arg in runtime_args %}, "{{ arg }}"{% endfor %}]
