@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 from argus_mcp.constants import (
@@ -70,6 +71,9 @@ logger = logging.getLogger(__name__)
 # Polling interval for status updates (seconds).
 _POLL_BASE = 2.0
 _POLL_MAX = 8.0
+
+# Maximum number of event IDs to remember (LRU eviction).
+_SEEN_EVENTS_MAX = 10_000
 
 # Transport path suffixes that users might accidentally include in the
 # ``--server`` URL.  We strip these so the management API client always
@@ -172,7 +176,7 @@ class ArgusApp(App):
         # Polling state
         self._connected = False
         self._caps_loaded = False
-        self._seen_event_ids: set[str] = set()
+        self._seen_event_ids: OrderedDict[str, None] = OrderedDict()
         self._poll_timer: object | None = None
         self._sse_worker: object | None = None
         self._poll_interval: float = _POLL_BASE
@@ -207,6 +211,12 @@ class ArgusApp(App):
     @property
     def last_events(self) -> list | None:
         return getattr(self, "_last_events", None)
+
+    def _record_event_id(self, event_id: str) -> None:
+        """Remember an event ID with bounded LRU eviction."""
+        self._seen_event_ids[event_id] = None
+        while len(self._seen_event_ids) > _SEEN_EVENTS_MAX:
+            self._seen_event_ids.popitem(last=False)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -571,7 +581,7 @@ class ArgusApp(App):
                 if event_id and event_id in self._seen_event_ids:
                     continue
                 if event_id:
-                    self._seen_event_ids.add(event_id)
+                    self._record_event_id(event_id)
 
                 stage = event_data.get("stage", "event")
                 message = event_data.get("message", "")
@@ -798,7 +808,7 @@ class ArgusApp(App):
         for ev in events_resp.events:
             if ev.id in self._seen_event_ids:
                 continue
-            self._seen_event_ids.add(ev.id)
+            self._record_event_id(ev.id)
             extra: list[str] = []
             if ev.details:
                 for k, v in ev.details.items():
