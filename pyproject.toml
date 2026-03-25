@@ -45,6 +45,7 @@ argus-mcp = "argus_mcp.cli:main"
 dev = [
     "black>=24.4.2",
     "import-linter>=2.1",
+    "maturin>=1.7.0",
     "mypy>=1.17.1",
     "ruff>=0.14.13",
     "textual-dev>=1.0.0",

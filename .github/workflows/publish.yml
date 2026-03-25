@@ -22,8 +22,10 @@ jobs:
         package:
           - name: argus-mcp
             path: .
+            rust: true
           - name: argus-cli
             path: packages/argus_cli
+            rust: false
 
     steps:
       - name: Checkout code
@@ -32,12 +34,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
           pip install build
+
+      - name: Install Rust toolchain
+        if: matrix.package.rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install maturin
+        if: matrix.package.rust
+        run: pip install maturin
+
+      - name: Build Rust extensions
+        if: matrix.package.rust
+        run: |
+          pip install -e .
+          python scripts/build_rust.py
 
       - name: Build distribution packages
         run: python -m build ${{ matrix.package.path }}
@@ -77,6 +93,33 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.12.4
         with:
           skip-existing: true
+
+  # ──────────────────────────────────────────────
+  # argusd — cross-compile and upload Go binaries
+  # ──────────────────────────────────────────────
+  build-argusd:
+    name: Build argusd binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/argusd/go.mod
+          cache-dependency-path: packages/argusd/go.sum
+
+      - name: Cross-compile argusd
+        run: make -C packages/argusd build-all
+
+      - name: Upload argusd binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: argusd-binaries
+          path: packages/argusd/dist/
 
   publish-to-testpypi:
     name: Publish to TestPyPI
