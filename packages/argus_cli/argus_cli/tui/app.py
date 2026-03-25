@@ -68,7 +68,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Polling interval for status updates (seconds).
-_POLL_INTERVAL = 2.0
+_POLL_BASE = 2.0
+_POLL_MAX = 8.0
 
 # Transport path suffixes that users might accidentally include in the
 # ``--server`` URL.  We strip these so the management API client always
@@ -174,6 +175,8 @@ class ArgusApp(App):
         self._seen_event_ids: set[str] = set()
         self._poll_timer: object | None = None
         self._sse_worker: object | None = None
+        self._poll_interval: float = _POLL_BASE
+        self._last_status_hash: int = 0
 
         # Cached data for cross-screen access
         self._last_status: Any | None = None
@@ -533,7 +536,9 @@ class ArgusApp(App):
             self.post_message(ConnectionLost(reason=reason))
 
         # Start periodic polling regardless — it will retry on failure
-        self._poll_timer = self.set_interval(_POLL_INTERVAL, self._poll_tick, name="status-poll")
+        self._poll_timer = self.set_interval(
+            self._poll_interval, self._poll_tick, name="status-poll"
+        )
 
         # Start SSE event stream if connected
         if self._connected:
@@ -636,6 +641,15 @@ class ArgusApp(App):
             status = await client.get_status()
             self._apply_status_response(status)
 
+            # Compute a lightweight status hash for adaptive polling
+            _status_hash = hash(
+                (
+                    status.service.state,
+                    status.config.backend_count,
+                    getattr(status.service, "uptime", None),
+                )
+            )
+
             if not self._connected:
                 self._connected = True
                 self._caps_loaded = False
@@ -677,6 +691,24 @@ class ArgusApp(App):
             self.post_message(ConnectionLost(reason=str(exc)))
             if not was_connected:
                 logger.debug("Poll failed (still disconnected): %s", exc)
+            # Reset to fast polling on errors so recovery is quick
+            _status_hash = 0
+
+        # Adaptive polling interval: back off when nothing changes
+        changed = _status_hash != self._last_status_hash
+        self._last_status_hash = _status_hash
+        if changed:
+            new_interval = _POLL_BASE
+        else:
+            new_interval = min(self._poll_interval * 2, _POLL_MAX)
+
+        if new_interval != self._poll_interval:
+            self._poll_interval = new_interval
+            if self._poll_timer is not None:
+                self._poll_timer.stop()  # type: ignore[union-attr]
+            self._poll_timer = self.set_interval(
+                self._poll_interval, self._poll_tick, name="status-poll"
+            )
 
         # Refresh selector to reflect connection status changes
         self._refresh_server_selector()
@@ -856,6 +888,8 @@ class ArgusApp(App):
         self._caps_loaded = False
         self._seen_event_ids.clear()
         self._stop_sse_stream()
+        self._poll_interval = _POLL_BASE
+        self._last_status_hash = 0
 
         entry = mgr.active_entry
         if entry:
