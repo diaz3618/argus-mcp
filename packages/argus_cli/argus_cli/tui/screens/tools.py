@@ -17,6 +17,7 @@ from textual.widgets import Input, Static
 
 from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
+from argus_cli.tui.widgets.module_container import ModuleContainer
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -63,8 +64,10 @@ class ToolsScreen(ArgusScreen):
                     id="tools-search",
                 )
             yield Static("", id="tools-status-bar")
-            yield CapabilitySection(id="tools-cap-section")
-            yield Static("", id="tools-detail-panel")
+            with ModuleContainer(title="Capabilities", subtitle="[t]ools", id="tools-cap-section"):
+                yield CapabilitySection(id="tools-cap-tables")
+            with ModuleContainer(title="Detail", subtitle="[d]etail", id="tools-detail-panel"):
+                yield Static("", id="tools-detail-text")
 
     def on_show(self) -> None:
         """Re-populate capability tables from app-level cached data."""
@@ -85,7 +88,7 @@ class ToolsScreen(ArgusScreen):
         """Populate capability tables and update conflict status bar."""
         tools = filtered_tools if filtered_tools is not None else self._cached_tools
         try:
-            cap = self.query_one("#tools-cap-section", CapabilitySection)
+            cap = self.query_one("#tools-cap-tables", CapabilitySection)
             cap.populate(
                 tools,
                 self._cached_resources,
@@ -152,7 +155,7 @@ class ToolsScreen(ArgusScreen):
             p for p in self._cached_prompts if self._item_matches(p, query, ("name", "description"))
         ]
         try:
-            cap = self.query_one("#tools-cap-section", CapabilitySection)
+            cap = self.query_one("#tools-cap-tables", CapabilitySection)
             cap.populate(
                 filtered_tools, filtered_resources, filtered_prompts, self._cached_route_map
             )

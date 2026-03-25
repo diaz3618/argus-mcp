@@ -41,8 +41,6 @@ Screen {
 ServerInfoWidget {
     height: auto;
     max-height: 10;
-    border: round $accent;
-    padding: 0 1;
 }
 
 ServerInfoWidget .label {
@@ -65,8 +63,6 @@ ServerInfoWidget #title-row {
 BackendStatusWidget {
     height: auto;
     max-height: 12;
-    border: round $accent;
-    padding: 0 1;
 }
 
 BackendStatusWidget #backend-title {
@@ -120,7 +116,6 @@ BackendDetailModal #bdm-actions {
 }
 
 EventLogWidget {
-    border: round $accent;
     min-height: 8;
 }
 
@@ -132,7 +127,6 @@ EventLogWidget RichLog {
 #cap-section {
     height: 1fr;
     min-height: 8;
-    border: round $accent;
 }
 
 #cap-section ContentSwitcher {
@@ -186,7 +180,6 @@ Header {
 #tools-cap-section {
     height: 1fr;
     min-height: 8;
-    border: round $accent;
 }
 
 #tools-cap-section ContentSwitcher {
@@ -200,7 +193,6 @@ Header {
 #tools-detail-panel {
     height: auto;
     max-height: 6;
-    padding: 0 1;
     color: $text-muted;
 }
 

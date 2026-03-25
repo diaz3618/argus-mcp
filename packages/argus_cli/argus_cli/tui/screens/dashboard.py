@@ -16,6 +16,7 @@ from argus_cli.tui.screens.base import ArgusScreen
 from argus_cli.tui.widgets.backend_status import BackendStatusWidget
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.event_log import EventLogWidget
+from argus_cli.tui.widgets.module_container import ModuleContainer
 from argus_cli.tui.widgets.server_info import ServerInfoWidget
 from argus_cli.tui.widgets.server_selector import ServerSelectorWidget
 
@@ -28,6 +29,7 @@ class DashboardScreen(ArgusScreen):
 
     JUMP_TARGETS = {
         "srv-selector": "s",
+        "backends-module": "b",
         "main-area": "e",
         "cap-section": "c",
     }
@@ -45,8 +47,11 @@ class DashboardScreen(ArgusScreen):
         with Horizontal(id="top-row"):
             with Vertical(id="sidebar"):
                 yield ServerSelectorWidget(id="srv-selector")
-                yield ServerInfoWidget()
-                yield BackendStatusWidget()
-            with Vertical(id="main-area"):
+                with ModuleContainer(title="Server", subtitle="[s]erver", id="server-info-module"):
+                    yield ServerInfoWidget()
+                with ModuleContainer(title="Backends", subtitle="[b]ackends", id="backends-module"):
+                    yield BackendStatusWidget()
+            with ModuleContainer(title="Events", subtitle="[e]vents", id="main-area"):
                 yield EventLogWidget()
-        yield CapabilitySection(id="cap-section")
+        with ModuleContainer(title="Capabilities", subtitle="[c]apabilities", id="cap-section"):
+            yield CapabilitySection()
