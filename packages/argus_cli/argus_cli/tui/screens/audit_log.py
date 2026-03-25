@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 class AuditLogScreen(BaseLogScreen):
     """Dedicated audit log viewer with filtering and export."""
 
+    JUMP_TARGETS = {
+        "audit-table": "t",
+        "btn-audit-export": "e",
+    }
+
     INITIAL_FOCUS = "#audit-table"
 
     BINDINGS = [

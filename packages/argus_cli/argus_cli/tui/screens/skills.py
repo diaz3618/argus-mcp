@@ -50,6 +50,11 @@ class SkillsScreen(ArgusScreen):
     (auto-configure backends), and uninstall.
     """
 
+    JUMP_TARGETS = {
+        "skills-search": "s",
+        "skills-table": "t",
+    }
+
     INITIAL_FOCUS = "#skills-table"
 
     BINDINGS = [

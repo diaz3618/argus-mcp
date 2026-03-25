@@ -47,6 +47,10 @@ class SettingsScreen(ArgusScreen):
     management, Theme preferences, Config viewer, and About info.
     """
 
+    JUMP_TARGETS = {
+        "settings-tabs": "t",
+    }
+
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="settings-tabs"):
             with TabPane("General", id="tab-general"), Vertical(id="general-section"):

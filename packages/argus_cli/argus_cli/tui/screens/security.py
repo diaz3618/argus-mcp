@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 class SecurityScreen(ArgusScreen):
     """Security configuration mode — auth, policies, secrets, network."""
 
+    JUMP_TARGETS = {
+        "security-tabs": "t",
+        "secrets-panel-widget": "s",
+        "network-panel-widget": "n",
+    }
+
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="security-tabs"):
             with TabPane("Authentication", id="tab-sec-auth"):

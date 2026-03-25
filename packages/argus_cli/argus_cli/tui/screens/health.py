@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 class HealthScreen(ArgusScreen):
     """Health monitoring mode — per-backend status, sessions, versions."""
 
+    JUMP_TARGETS = {
+        "health-tabs": "t",
+        "health-panel-widget": "h",
+        "sessions-panel-widget": "s",
+        "version-drift-widget": "v",
+        "server-groups-widget": "g",
+    }
+
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="health-tabs"):
             with TabPane("Status", id="tab-health-status"):

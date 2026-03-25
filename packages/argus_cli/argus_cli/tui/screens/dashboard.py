@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 class DashboardScreen(ArgusScreen):
     """Main dashboard screen."""
 
+    JUMP_TARGETS = {
+        "srv-selector": "s",
+        "main-area": "e",
+        "cap-section": "c",
+    }
+
     def on_show(self) -> None:
         """Trigger app-level initialization once the screen is shown."""
         if getattr(self, "_ds_init_done", False):

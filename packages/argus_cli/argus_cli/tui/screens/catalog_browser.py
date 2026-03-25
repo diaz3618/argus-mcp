@@ -54,6 +54,11 @@ servers:
 class CatalogBrowserScreen(ArgusScreen):
     """Parse YAML catalogs, preview staged entries, and commit them to config."""
 
+    JUMP_TARGETS = {
+        "catalog-control-bar": "c",
+        "catalog-staged": "s",
+    }
+
     BINDINGS = [
         ("escape", "go_back", "Back"),
         ("s", "stage", "Stage"),

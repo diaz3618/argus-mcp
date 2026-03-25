@@ -26,6 +26,10 @@ class ArgusScreen(Screen):
 
     INITIAL_FOCUS: str | None = None
 
+    # Mapping of widget-id → single-letter key for jump mode navigation.
+    # Override in subclasses to define per-screen jump targets.
+    JUMP_TARGETS: dict[str, str] = {}
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield ToolbarWidget()

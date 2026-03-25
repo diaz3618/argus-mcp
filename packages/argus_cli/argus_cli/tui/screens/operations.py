@@ -25,6 +25,12 @@ if TYPE_CHECKING:
 class OperationsScreen(ArgusScreen):
     """Operations mode — workflows, tool optimizer, and telemetry."""
 
+    JUMP_TARGETS = {
+        "ops-tabs": "t",
+        "workflows-panel-widget": "w",
+        "optimizer-panel-widget": "o",
+    }
+
     def compose_content(self) -> ComposeResult:
         with TabbedContent(id="ops-tabs"):
             with TabPane("Workflows", id="tab-ops-workflows"):

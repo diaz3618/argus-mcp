@@ -49,6 +49,11 @@ class RegistryScreen(ArgusScreen):
     (with cache fallback) and populates the browser widget.
     """
 
+    JUMP_TARGETS = {
+        "registry-browser": "b",
+        "install-panel": "i",
+    }
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._installed_names: set[str] = set()

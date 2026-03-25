@@ -16,6 +16,7 @@ from argus_mcp.constants import (
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
 from textual.css.query import NoMatches
+from textual.widget import Widget
 from textual.widgets import Footer, Header
 
 from argus_cli.tui._error_utils import safe_query
@@ -48,6 +49,7 @@ from argus_cli.tui.screens.tools import ToolsScreen
 from argus_cli.tui.widgets.backend_status import BackendStatusWidget
 from argus_cli.tui.widgets.capability_tables import CapabilitySection
 from argus_cli.tui.widgets.event_log import EventLogWidget
+from argus_cli.tui.widgets.jump_overlay import Jumper, JumpOverlay
 from argus_cli.tui.widgets.server_info import ServerInfoWidget
 from argus_cli.tui.widgets.server_selector import ServerSelected, ServerSelectorWidget
 
@@ -115,6 +117,7 @@ class ArgusApp(App):
         Binding("p", "show_prompts", "Prompts Tab", show=False),
         Binding("n", "next_theme", "Next Theme", show=False),
         Binding("T", "open_theme_picker", "Themes", key_display="shift+t", show=False),
+        Binding("semicolon", "jump_mode", "Jump", show=False),
     ]
 
     MODES = {
@@ -1034,3 +1037,25 @@ class ArgusApp(App):
 
             sse_url = f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"
         self.push_screen(ClientConfigModal(server_url=sse_url))
+
+    def action_jump_mode(self) -> None:
+        """Open the jump-mode overlay for the active screen."""
+        screen = self.screen
+        targets = getattr(screen, "JUMP_TARGETS", None)
+        if not targets:
+            return
+        jumper = Jumper(targets, screen)
+
+        def _on_jump_result(result: str | Widget | None) -> None:
+            if result is None:
+                return
+            if isinstance(result, Widget):
+                result.focus()
+            elif isinstance(result, str):
+                try:
+                    widget = screen.query_one(f"#{result}")
+                    widget.focus()
+                except NoMatches:
+                    logger.debug("Jump target #%s not found", result)
+
+        self.push_screen(JumpOverlay(jumper), _on_jump_result)
