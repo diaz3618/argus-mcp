@@ -49,19 +49,23 @@ Create a `servers.json` file to connect to multiple Argus instances:
 
 ```json
 {
-  "servers": {
-    "local": {
+  "servers": [
+    {
+      "name": "local",
       "url": "http://127.0.0.1:9000"
     },
-    "staging": {
+    {
+      "name": "staging",
       "url": "http://staging.example.com:9000",
       "token": "staging-token"
     },
-    "production": {
+    {
+      "name": "production",
       "url": "http://prod.example.com:9000",
       "token": "prod-token"
     }
-  }
+  ],
+  "active": "local"
 }
 ```
 

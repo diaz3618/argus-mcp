@@ -21,8 +21,11 @@
 | [Skills](skills/) | Portable bundles of tools, workflows, and config |
 | [Workflows](workflows/) | Composite tool pipelines (DAG-based) |
 | [Registry](registry/) | Browse and install MCP servers from remote catalogs |
+| [Plugins](architecture/05-plugins.md) | Built-in and external plugin system |
 | [Optimizer](optimizer/) | `find_tool` / `call_tool` meta-tools |
 | [Config Sync](sync/) | Hot-reload and change detection |
+| [Docker](docker.md) | Docker build and deployment |
+| [Kubernetes](kubernetes.md) | Helm chart deployment |
 
 ## Documentation Map
 
@@ -32,13 +35,17 @@ docs/
 ├── getting-started.md     ← Install & first run
 ├── configuration.md       ← Full config reference
 ├── middleware.md           ← Middleware pipeline
+├── docker.md              ← Docker build & deployment
+├── kubernetes.md           ← Helm chart deployment
 │
 ├── architecture/
 │   ├── 00-overview.md     ← High-level architecture
 │   ├── 01-server.md       ← Server & transport layer
 │   ├── 02-bridge.md       ← Bridge: routing, registry, orchestration
 │   ├── 03-config.md       ← Config loading pipeline
-│   └── 04-runtime.md      ← Service lifecycle
+│   ├── 04-runtime.md      ← Service lifecycle
+│   ├── 05-plugins.md      ← Plugin system (built-in & external)
+│   └── 06-connection-pool.md ← Session pool, HTTP pool, retry
 │
 ├── cli/
 │   ├── README.md          ← CLI overview
@@ -102,6 +109,6 @@ docs/
 
 ## Version
 
-Current version: **0.7.0**
+Current version: **0.8.0**
 
 License: GPL-3.0-only

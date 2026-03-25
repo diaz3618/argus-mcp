@@ -6,7 +6,8 @@ Start the headless Argus gateway server.
 
 ```bash
 argus-mcp server [--host HOST] [--port PORT] [--log-level LEVEL] [--config PATH]
-                 [-d] [--name NAME] [-v | -vv]
+                 [-d] [--name NAME] [-v | -vv] [-q] [--auto-reauth]
+                 [--parallel | --no-parallel]
 ```
 
 ## Options
@@ -21,7 +22,9 @@ argus-mcp server [--host HOST] [--port PORT] [--log-level LEVEL] [--config PATH]
 | `--name` | string | `default` | Session name for detached mode (max 32 chars, alphanumeric + hyphens) |
 | `-v` | flag | — | Show backend connection progress during startup |
 | `-vv` | flag | — | Show full subprocess/debug output during startup |
-| `-q`, `--quiet` | flag | `false` | Suppress startup output |
+| `-q`, `--quiet`, `--silent` | flag | `false` | Suppress startup output |
+| `--auto-reauth` | flag | `false` | Automatically open the browser for re-authentication when an OAuth backend's refresh token is expired or revoked |
+| `--parallel`, `--no-parallel` | flag | `false` | Build and connect stdio backends concurrently instead of sequentially |
 
 ## Config File Resolution
 

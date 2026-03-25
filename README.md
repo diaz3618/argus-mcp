@@ -105,13 +105,14 @@ Argus MCP v0.8.0
 
 positional arguments:
   {server,build,stop,status,tui,secret,clean}
-    server       Run the headless Argus server (Uvicorn + MCP bridge)
-    build        Pre-build container images for stdio backends
+    server       Run the headless Argus server (Uvicorn + MCP bridge,
+                 with container isolation)
+    build        Pre-build container images for all stdio backends
     stop         Stop a detached Argus server
     status       List all running Argus server sessions
     tui          Launch the Textual TUI connected to a running Argus server
     secret       Manage encrypted secrets (set, get, list, delete)
-    clean        Remove containers, images, and networks created by argus-mcp
+    clean        Remove containers and images created by argus-mcp
 
 options:
   -h, --help     show this help message and exit

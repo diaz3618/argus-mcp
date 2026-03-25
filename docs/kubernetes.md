@@ -119,8 +119,8 @@ configMap:
         host: 0.0.0.0
         port: 9000
       backends:
-        - name: my-backend
-          transport: stdio
+        my-backend:
+          type: stdio
           command: npx
           args: ["-y", "@example/mcp-server"]
 ```
