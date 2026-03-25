@@ -1,4 +1,4 @@
-# mods/sse_test_server.py
+# tests/fixtures/sse_test_server.py
 import asyncio
 import logging
 import signal

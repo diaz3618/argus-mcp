@@ -120,7 +120,6 @@ extend-exclude = [
 python_version = "3.10"
 files = [
     "argus_mcp/",
-    "mods/*.py",
 ]
 exclude = "(^logs/|^img/|^internal/|^memory-bank/|^\\.venv/|^__pycache__/)"
 pretty = true
