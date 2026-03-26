@@ -616,7 +616,11 @@ async def _build_from_string(
         try:
             await adapter.start()
             ok = await adapter.build(dockerfile_content, image_tag)
-            return ok
+            if ok:
+                return True
+            logger.warning(
+                "Go adapter build returned failure for '%s', falling back to CLI", image_tag
+            )
         except Exception:  # noqa: BLE001
             logger.debug("Go adapter build failed, falling back to CLI", exc_info=True)
         finally:

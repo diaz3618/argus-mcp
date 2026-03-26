@@ -108,3 +108,45 @@ func TestBoolPtr(t *testing.T) {
 		t.Error("boolPtr(false) should return pointer to false")
 	}
 }
+
+func TestStripSyntaxDirective(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"removes syntax line",
+			"# syntax=docker/dockerfile:1\nFROM alpine\nRUN echo hello",
+			"FROM alpine\nRUN echo hello",
+		},
+		{
+			"removes with spaces",
+			"# syntax = docker/dockerfile:1.4\nFROM node:22",
+			"FROM node:22",
+		},
+		{
+			"no syntax directive",
+			"FROM alpine\nRUN echo hello",
+			"FROM alpine\nRUN echo hello",
+		},
+		{
+			"empty string",
+			"",
+			"",
+		},
+		{
+			"preserves other comments",
+			"# syntax=docker/dockerfile:1\n# This is a comment\nFROM alpine",
+			"# This is a comment\nFROM alpine",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := stripSyntaxDirective(tc.input)
+			if got != tc.want {
+				t.Errorf("stripSyntaxDirective(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}

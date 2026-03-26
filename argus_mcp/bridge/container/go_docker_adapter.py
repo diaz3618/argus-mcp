@@ -190,7 +190,11 @@ class GoDockerAdapter:
         if build_args:
             args["build_args"] = json.dumps(build_args)
         resp = await self._call("build", args)
-        return resp.get("ok", False)
+        if not resp.get("ok", False):
+            error_msg = resp.get("error", "unknown error")
+            logger.warning("Go adapter build failed for '%s': %s", image_tag, error_msg)
+            return False
+        return True
 
     async def create(
         self,
