@@ -37,7 +37,7 @@ impl RustPiiFilter {
     #[new]
     #[pyo3(signature = (categories=None))]
     fn new(categories: Option<Vec<String>>) -> PyResult<Self> {
-        let filtered: Vec<&&(&str, &str, &str)> = if let Some(ref cats) = categories {
+        let filtered: Vec<&(&str, &str, &str)> = if let Some(ref cats) = categories {
             PII_DEFS
                 .iter()
                 .filter(|(name, _, _)| cats.iter().any(|c| c == name))
