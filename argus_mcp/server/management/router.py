@@ -64,8 +64,6 @@ from argus_mcp.server.management.schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Strong references to background tasks to prevent GC before completion
-_background_tasks: set[asyncio.Task[None]] = set()
 
 _BACKEND_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
@@ -638,8 +636,10 @@ async def handle_shutdown(request: Request) -> JSONResponse:
     )
     # Strong reference prevents GC before task completes
     task.add_done_callback(_log_task_exception)
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    from argus_mcp.server.app import mcp_server
+    from argus_mcp.server.state import get_state
+
+    get_state(mcp_server).track_task(task)
     return JSONResponse(resp.model_dump())
 
 
