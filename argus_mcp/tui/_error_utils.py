@@ -9,7 +9,7 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional, TypeVar, overload
+from typing import TYPE_CHECKING, Optional, TypeVar, cast, overload
 
 if TYPE_CHECKING:
     from textual.widget import Widget
@@ -76,6 +76,6 @@ def log_on_exception(
                 logger.log(level, "%s in %s", message, fn.__qualname__, exc_info=True)
                 return default
 
-        return wrapper  # type: ignore[return-value]
+        return cast(_F, wrapper)
 
     return decorator

@@ -7,7 +7,7 @@ HTTP via :class:`ServerManager`.
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, Optional, Set
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Set
 
 from textual.app import App, ComposeResult, SystemCommand
 from textual.binding import Binding
@@ -51,6 +51,9 @@ from argus_mcp.tui.widgets.capability_tables import CapabilitySection
 from argus_mcp.tui.widgets.event_log import EventLogWidget
 from argus_mcp.tui.widgets.server_info import ServerInfoWidget
 from argus_mcp.tui.widgets.server_selector import ServerSelected, ServerSelectorWidget
+
+if TYPE_CHECKING:
+    from argus_mcp.tui.server_manager import ServerManager
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +138,7 @@ class ArgusApp(App):
         server_url: Optional[str] = None,
         token: Optional[str] = None,
         *,
-        server_manager: Optional[object] = None,
+        server_manager: Optional[ServerManager] = None,
     ) -> None:
         super().__init__()
 
@@ -146,7 +149,7 @@ class ArgusApp(App):
         self._token = token
 
         # Server manager — always used for connection management
-        self._server_manager: Optional[object] = server_manager  # ServerManager
+        self._server_manager: Optional[ServerManager] = server_manager
 
         # Polling state
         self._connected = False
@@ -161,7 +164,7 @@ class ArgusApp(App):
         self._last_groups: Optional[Any] = None
 
     @property
-    def server_manager(self) -> Optional[object]:
+    def server_manager(self) -> Optional[ServerManager]:
         return self._server_manager
 
     @property
@@ -392,9 +395,8 @@ class ArgusApp(App):
 
     def _start_remote_mode(self, info: ServerInfoWidget, event_log: EventLogWidget) -> None:
         """Initialize remote-mode: connect to server(s) via HTTP."""
-        from argus_mcp.tui.server_manager import ServerManager
-
-        mgr: ServerManager = self._server_manager  # type: ignore[assignment]
+        mgr = self._server_manager
+        assert mgr is not None
 
         if mgr.count == 0:
             from argus_mcp.constants import DEFAULT_HOST, DEFAULT_PORT
@@ -451,9 +453,8 @@ class ArgusApp(App):
 
     async def _initial_connect(self) -> None:
         """Connect all servers via the manager and fetch initial state."""
-        from argus_mcp.tui.server_manager import ServerManager
-
-        mgr: ServerManager = self._server_manager  # type: ignore[assignment]
+        mgr = self._server_manager
+        assert mgr is not None
 
         results = await mgr.connect_all()
         for name, err in results.items():
@@ -502,9 +503,8 @@ class ArgusApp(App):
 
     async def _poll_once(self) -> None:
         """Single poll cycle: fetch status + events from active server."""
-        from argus_mcp.tui.server_manager import ServerManager
-
-        mgr: ServerManager = self._server_manager  # type: ignore[assignment]
+        mgr = self._server_manager
+        assert mgr is not None
         entry = mgr.active_entry
         if entry is None:
             return
@@ -695,9 +695,7 @@ class ArgusApp(App):
 
     def _refresh_server_selector(self) -> None:
         """Update the ServerSelectorWidget with current server entries."""
-        from argus_mcp.tui.server_manager import ServerManager
-
-        mgr: Optional[ServerManager] = self._server_manager  # type: ignore[assignment]
+        mgr = self._server_manager
         if mgr is None:
             return
 
@@ -718,9 +716,7 @@ class ArgusApp(App):
 
     def on_server_selected(self, event: ServerSelected) -> None:
         """Handle the user switching to a different server."""
-        from argus_mcp.tui.server_manager import ServerManager
-
-        mgr: Optional[ServerManager] = self._server_manager  # type: ignore[assignment]
+        mgr = self._server_manager
         if mgr is None:
             return
 

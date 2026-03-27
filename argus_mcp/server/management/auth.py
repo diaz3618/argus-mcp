@@ -176,7 +176,8 @@ class BearerAuthMiddleware:
         provided_token = auth_header[7:]  # Strip "Bearer " prefix
 
         # Constant-time comparison to prevent timing attacks
-        if not hmac.compare_digest(provided_token, self._token):  # type: ignore[arg-type]
+        assert self._token is not None  # guaranteed by auth_enabled check above
+        if not hmac.compare_digest(provided_token, self._token):
             client = scope.get("client")
             client_host = client[0] if client else "unknown"
             logger.warning(

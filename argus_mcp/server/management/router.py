@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from urllib.parse import urlunparse
 
 from starlette.requests import Request
@@ -65,7 +65,7 @@ from argus_mcp.server.management.schemas import (
 logger = logging.getLogger(__name__)
 
 # Strong references to background tasks to prevent GC before completion
-_background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
+_background_tasks: set[asyncio.Task[None]] = set()
 
 _BACKEND_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
@@ -230,7 +230,7 @@ def _build_backends(request: Request) -> BackendsResponse:
         if service.group_manager is not None:
             from argus_mcp.bridge.groups import GroupManager
 
-            gm: GroupManager = service.group_manager  # type: ignore[assignment]
+            gm = cast(GroupManager, service.group_manager)
             group_name = gm.group_of(bi.name)
 
         status_phase = "pending"
@@ -288,7 +288,7 @@ async def handle_groups(request: Request) -> JSONResponse:
 
     from argus_mcp.bridge.groups import GroupManager
 
-    gm: GroupManager = service.group_manager  # type: ignore[assignment]
+    gm = cast(GroupManager, service.group_manager)
 
     if filter_group:
         servers = sorted(gm.servers_in(filter_group))

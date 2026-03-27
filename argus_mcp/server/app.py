@@ -50,8 +50,8 @@ class _MCPSlashMiddleware:
 
 # Module-level MCP server instance
 mcp_server = McpServer(SERVER_NAME)
-mcp_server.manager: Optional[object] = None  # type: ignore[assignment]
-mcp_server.registry: Optional[object] = None  # type: ignore[assignment]
+setattr(mcp_server, "manager", None)
+setattr(mcp_server, "registry", None)
 logger.debug("Underlying MCP server instance '%s' created.", mcp_server.name)
 
 # SDK session manager for Streamable-HTTP transport.
@@ -111,7 +111,7 @@ def create_app() -> Starlette:
     # wraps in reverse order, so last-added executes first).
     application.add_middleware(OriginValidationMiddleware)
     # Store mgmt_app reference so lifespan can propagate service state to it.
-    application.state.mgmt_app = mgmt_app  # type: ignore[attr-defined]
+    setattr(application.state, "mgmt_app", mgmt_app)
     logger.info(
         "Starlette ASGI app '%s' created. "
         "SSE GET on %s, POST on %s, Streamable HTTP on %s, Manage on %s",

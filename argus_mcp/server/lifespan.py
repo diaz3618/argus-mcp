@@ -599,11 +599,13 @@ def _propagate_to_mgmt_app(app_state: Any, service: "ArgusService") -> None:
     mgmt_app = getattr(app_state, "mgmt_app", None)
     if mgmt_app is None:
         return
-    mgmt_app.state.argus_service = service  # type: ignore[attr-defined]
-    mgmt_app.state.host = getattr(app_state, "host", "127.0.0.1")  # type: ignore[attr-defined]
-    mgmt_app.state.port = getattr(app_state, "port", 0)  # type: ignore[attr-defined]
-    mgmt_app.state.transport_type = getattr(  # type: ignore[attr-defined]
-        app_state, "transport_type", "streamable-http"
+    setattr(mgmt_app.state, "argus_service", service)
+    setattr(mgmt_app.state, "host", getattr(app_state, "host", "127.0.0.1"))
+    setattr(mgmt_app.state, "port", getattr(app_state, "port", 0))
+    setattr(
+        mgmt_app.state,
+        "transport_type",
+        getattr(app_state, "transport_type", "streamable-http"),
     )
 
 
@@ -686,7 +688,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     # Propagate CLI --parallel flag for concurrent container builds.
     service._parallel = getattr(app_state, "parallel", False)
     # Store service on app.state so management API can access it later (0.2).
-    app_state.argus_service = service  # type: ignore[attr-defined]
+    setattr(app_state, "argus_service", service)
 
     # Also propagate to the management sub-app so its request handlers see
     # argus_service on *their* request.app.state (the sub-app's state).

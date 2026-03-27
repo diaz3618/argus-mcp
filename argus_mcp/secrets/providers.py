@@ -21,7 +21,7 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +86,9 @@ class FileProvider(SecretProvider):
 
     def __init__(self, path: str = "secrets.enc") -> None:
         self._path = path
-        self._fernet: Optional[object] = None  # lazy
+        self._fernet: Any = None  # lazy
 
-    def _ensure_fernet(self) -> object:
+    def _ensure_fernet(self) -> Any:
         if self._fernet is not None:
             return self._fernet
 
@@ -116,7 +116,7 @@ class FileProvider(SecretProvider):
         try:
             with open(self._path, "rb") as f:
                 encrypted = f.read()
-            decrypted = fernet.decrypt(encrypted)  # type: ignore[attr-defined]
+            decrypted = fernet.decrypt(encrypted)
             loaded: Dict[str, str] = json.loads(decrypted)
             return loaded
         except (OSError, ValueError) as exc:
@@ -128,7 +128,7 @@ class FileProvider(SecretProvider):
     def _save(self, data: Dict[str, str]) -> None:
         fernet = self._ensure_fernet()
         plaintext = json.dumps(data).encode()
-        encrypted = fernet.encrypt(plaintext)  # type: ignore[attr-defined]
+        encrypted = fernet.encrypt(plaintext)
         # Atomic write: write to temp file then rename
         import tempfile
 
@@ -174,10 +174,10 @@ class KeyringProvider(SecretProvider):
     SERVICE_NAME = "argus-mcp"
 
     def __init__(self) -> None:
-        self._keyring: Optional[object] = None
+        self._keyring: Any = None
         self._names_key = "__argus_mcp_secret_names__"
 
-    def _ensure_keyring(self) -> object:
+    def _ensure_keyring(self) -> Any:
         if self._keyring is not None:
             return self._keyring
         try:
@@ -192,32 +192,32 @@ class KeyringProvider(SecretProvider):
 
     def get(self, name: str) -> Optional[str]:
         kr = self._ensure_keyring()
-        result: Optional[str] = kr.get_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
+        result: Optional[str] = kr.get_password(self.SERVICE_NAME, name)
         return result
 
     def set(self, name: str, value: str) -> None:
         kr = self._ensure_keyring()
-        kr.set_password(self.SERVICE_NAME, name, value)  # type: ignore[attr-defined]
+        kr.set_password(self.SERVICE_NAME, name, value)
         # Track names in a separate entry
         names = set(self.list_names())
         names.add(name)
-        kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))  # type: ignore[attr-defined]
+        kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))
 
     def delete(self, name: str) -> None:
         kr = self._ensure_keyring()
         try:
-            kr.delete_password(self.SERVICE_NAME, name)  # type: ignore[attr-defined]
+            kr.delete_password(self.SERVICE_NAME, name)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Failed to delete secret '%s' from keyring: %s", name, exc, exc_info=True
             )
         names = set(self.list_names())
         names.discard(name)
-        kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))  # type: ignore[attr-defined]
+        kr.set_password(self.SERVICE_NAME, self._names_key, json.dumps(sorted(names)))
 
     def list_names(self) -> List[str]:
         kr = self._ensure_keyring()
-        raw = kr.get_password(self.SERVICE_NAME, self._names_key)  # type: ignore[attr-defined]
+        raw = kr.get_password(self.SERVICE_NAME, self._names_key)
         if raw:
             try:
                 loaded: List[str] = json.loads(raw)
