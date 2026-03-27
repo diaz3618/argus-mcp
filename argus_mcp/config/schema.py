@@ -89,6 +89,8 @@ __all__ = [
     "SecretsConfig",
     "ArgusConfig",
     "PluginsConfig",
+    "SkillsConfig",
+    "WorkflowsConfig",
 ]
 
 
@@ -319,6 +321,32 @@ class SecretsConfig(BaseModel):
     )
 
 
+class SkillsConfig(BaseModel):
+    """Skills discovery configuration."""
+
+    directory: str = Field(
+        default="skills",
+        description="Directory where skills are installed.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Enable skill discovery and management.",
+    )
+
+
+class WorkflowsConfig(BaseModel):
+    """Workflow discovery configuration."""
+
+    directory: str = Field(
+        default="workflows",
+        description="Directory where workflow YAML files are stored.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Enable workflow discovery.",
+    )
+
+
 class ArgusConfig(BaseModel):
     """Top-level validated configuration for Argus MCP.
 
@@ -395,6 +423,14 @@ class ArgusConfig(BaseModel):
     plugins: PluginsConfig = Field(
         default_factory=PluginsConfig,
         description="Plugin framework configuration.",
+    )
+    skills: SkillsConfig = Field(
+        default_factory=SkillsConfig,
+        description="Skills discovery configuration.",
+    )
+    workflows: WorkflowsConfig = Field(
+        default_factory=WorkflowsConfig,
+        description="Workflow discovery configuration.",
     )
 
     @field_validator("backends")
