@@ -12,8 +12,6 @@ import pytest
 from argus_mcp.runtime.models import ServiceState, is_valid_transition
 from argus_mcp.runtime.service import ArgusService, _InvalidStateTransition
 
-# Helpers
-
 
 def _dummy_config() -> Dict[str, Any]:
     """Return a minimal backends dict for testing."""

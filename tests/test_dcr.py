@@ -17,8 +17,6 @@ from argus_mcp.bridge.auth.dcr import (
 )
 from argus_mcp.bridge.auth.discovery import OAuthMetadata
 
-# Helpers
-
 
 def _make_metadata(
     *,

@@ -29,8 +29,6 @@ from argus_mcp.plugins.models import (
 )
 from argus_mcp.plugins.registry import _PLUGIN_CLASSES, PluginRegistry, register_plugin
 
-# Helpers
-
 
 def _make_config(
     name: str = "test-plugin",

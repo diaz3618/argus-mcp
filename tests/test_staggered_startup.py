@@ -20,8 +20,6 @@ from argus_mcp.constants import (
     STARTUP_STAGGER_DELAY,
 )
 
-# Helpers
-
 
 def _fake_config(name: str, svr_type: str = "stdio") -> Dict[str, Any]:
     """Build a minimal fake config entry for a backend."""

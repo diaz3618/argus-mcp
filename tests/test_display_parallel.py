@@ -40,7 +40,6 @@ from argus_mcp.display.installer import (
 )
 
 
-# Helpers
 def _make_configs(*backends: tuple[str, str]) -> dict:
     configs = {}
     for name, cmd in backends:

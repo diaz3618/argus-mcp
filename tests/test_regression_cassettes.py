@@ -30,8 +30,6 @@ import pytest
 CASSETTES_DIR = Path(__file__).parent / "cassettes"
 SERVER_URL = "http://127.0.0.1:9000"
 
-# Helpers
-
 
 def _cassette_path(name: str) -> Path:
     return CASSETTES_DIR / f"{name}.json"
