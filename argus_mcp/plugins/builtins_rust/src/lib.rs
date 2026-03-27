@@ -47,18 +47,21 @@ impl RustPiiFilter {
         };
 
         let regex_strs: Vec<&str> = filtered.iter().map(|(_, pat, _)| *pat).collect();
-        let regex_set = RegexSet::new(&regex_strs).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-        })?;
+        let regex_set = RegexSet::new(&regex_strs)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
         let patterns: Vec<PiiPattern> = filtered
             .into_iter()
-            .map(|(name, pat, repl)| PiiPattern {
-                name,
-                regex: Regex::new(pat).unwrap(),
-                replacement: repl,
+            .map(|(name, pat, repl)| -> Result<PiiPattern, PyErr> {
+                Ok(PiiPattern {
+                    name,
+                    regex: Regex::new(pat).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
+                    })?,
+                    replacement: repl,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             regex_set,
@@ -118,10 +121,7 @@ const SECRET_DEFS: &[(&str, &str)] = &[
         r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
     ),
     ("GitHub Token", r"gh[ps]_[A-Za-z0-9_]{36,}"),
-    (
-        "Generic Bearer",
-        r"(?i)Bearer\s+[A-Za-z0-9._~+/=-]{20,}",
-    ),
+    ("Generic Bearer", r"(?i)Bearer\s+[A-Za-z0-9._~+/=-]{20,}"),
 ];
 
 static REDACTION: &str = "***REDACTED***";
@@ -139,17 +139,20 @@ impl RustSecretsScanner {
     #[pyo3(signature = (redaction=None))]
     fn new(redaction: Option<&str>) -> PyResult<Self> {
         let regex_strs: Vec<&str> = SECRET_DEFS.iter().map(|(_, pat)| *pat).collect();
-        let regex_set = RegexSet::new(&regex_strs).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-        })?;
+        let regex_set = RegexSet::new(&regex_strs)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
         let patterns: Vec<SecretPattern> = SECRET_DEFS
             .iter()
-            .map(|(label, pat)| SecretPattern {
-                label,
-                regex: Regex::new(pat).unwrap(),
+            .map(|(label, pat)| -> Result<SecretPattern, PyErr> {
+                Ok(SecretPattern {
+                    label,
+                    regex: Regex::new(pat).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
+                    })?,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             regex_set,
