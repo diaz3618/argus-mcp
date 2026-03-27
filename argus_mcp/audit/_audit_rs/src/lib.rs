@@ -3,8 +3,6 @@ use pyo3::types::PyDict;
 use serde::Serialize;
 use serde_json;
 
-// ── Audit event structs matching Python AuditEvent model ──
-
 #[derive(Serialize)]
 struct AuditSource<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]

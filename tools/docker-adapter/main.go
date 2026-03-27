@@ -245,8 +245,6 @@ func doListImages(ctx context.Context, cli *client.Client, prefix string) Respon
 	return Response{OK: true, Data: result}
 }
 
-// --- Validation regexes for build and create ops ---
-
 var (
 	imageTagRe        = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-z0-9._-]+$`)
 	buildArgKeyRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)

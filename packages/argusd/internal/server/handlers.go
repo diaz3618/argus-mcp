@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// ───────────────────────── Health ────────────────────────────
-
 // Health reports daemon readiness.
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]interface{}{
@@ -20,8 +18,6 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, resp)
 }
-
-// ───────────────────── Docker Containers ─────────────────────
 
 // ListContainers returns all Argus-managed containers.
 func (h *Handler) ListContainers(w http.ResponseWriter, r *http.Request) {
@@ -177,10 +173,20 @@ func (a *sseEventAdapter) Write(p []byte) (int, error) {
 
 func (a *sseEventAdapter) Flush() {}
 
-// ───────────────────── Kubernetes Pods ────────────────────────
+// requireK8s returns true if h.K8s is nil and responds with 503.
+func (h *Handler) requireK8s(w http.ResponseWriter) bool {
+	if h.K8s == nil {
+		respondError(w, http.StatusServiceUnavailable, "kubernetes client not available")
+		return true
+	}
+	return false
+}
 
 // ListPods returns all Argus-managed pods.
 func (h *Handler) ListPods(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	pods, err := h.K8s.ListPods(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
@@ -191,6 +197,9 @@ func (h *Handler) ListPods(w http.ResponseWriter, r *http.Request) {
 
 // DescribePod returns detailed pod information.
 func (h *Handler) DescribePod(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	ns := r.PathValue("ns")
 	name := r.PathValue("name")
 	info, err := h.K8s.DescribePod(r.Context(), ns, name)
@@ -203,6 +212,9 @@ func (h *Handler) DescribePod(w http.ResponseWriter, r *http.Request) {
 
 // DeletePod deletes an Argus-managed pod.
 func (h *Handler) DeletePod(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	ns := r.PathValue("ns")
 	name := r.PathValue("name")
 	if err := h.K8s.DeletePod(r.Context(), ns, name); err != nil {
@@ -214,6 +226,9 @@ func (h *Handler) DeletePod(w http.ResponseWriter, r *http.Request) {
 
 // PodLogs streams pod logs via SSE.
 func (h *Handler) PodLogs(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	ns := r.PathValue("ns")
 	name := r.PathValue("name")
 	container := r.URL.Query().Get("container")
@@ -255,6 +270,9 @@ func (a *ssePodLogAdapter) Flush() {}
 
 // PodEvents returns Kubernetes events for a pod.
 func (h *Handler) PodEvents(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	ns := r.PathValue("ns")
 	name := r.PathValue("name")
 	events, err := h.K8s.PodEvents(r.Context(), ns, name)
@@ -267,6 +285,9 @@ func (h *Handler) PodEvents(w http.ResponseWriter, r *http.Request) {
 
 // RolloutRestart triggers a rolling restart of an Argus-managed deployment.
 func (h *Handler) RolloutRestart(w http.ResponseWriter, r *http.Request) {
+	if h.requireK8s(w) {
+		return
+	}
 	ns := r.PathValue("ns")
 	name := r.PathValue("name")
 	if err := h.K8s.RolloutRestart(r.Context(), ns, name); err != nil {

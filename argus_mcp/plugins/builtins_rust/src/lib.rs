@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use regex::{Regex, RegexSet};
 
-// ── PII filter ──────────────────────────────────────────────────────────
 
 struct PiiPattern {
     name: &'static str,
@@ -96,7 +95,6 @@ impl RustPiiFilter {
     }
 }
 
-// ── Secrets scanner ─────────────────────────────────────────────────────
 
 struct SecretPattern {
     label: &'static str,
@@ -189,7 +187,6 @@ impl RustSecretsScanner {
     }
 }
 
-// ── Module ──────────────────────────────────────────────────────────────
 
 #[pymodule]
 mod security_plugins_rs {
