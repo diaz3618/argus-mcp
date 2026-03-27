@@ -38,9 +38,7 @@ class ServerEntry:
 
 
 class ServerManager:
-    """Manages multiple named Argus server connections.
-
-    Responsibilities
+    """Responsibilities
     ----------------
     * Load / save the server list from ``servers.json``.
     * Create and own one :class:`ApiClient` per entry.

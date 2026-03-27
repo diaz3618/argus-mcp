@@ -77,7 +77,6 @@ __all__ = [
     # schema_server
     "ManagementSettings",
     "ServerSettings",
-    # This file
     "ConflictResolutionConfig",
     "AuditConfig",
     "OptimizerConfig",

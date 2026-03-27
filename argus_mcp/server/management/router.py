@@ -667,9 +667,6 @@ async def handle_sessions(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
-# ── Registry endpoints ──────────────────────────────────────────────────
-
-
 async def handle_registry_search(request: Request) -> JSONResponse:
     """Search external MCP server registries (Glama, Smithery, etc.)."""
     service = _get_service(request)
@@ -747,9 +744,6 @@ async def handle_registry_search(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
-# ── Skills endpoints ────────────────────────────────────────────────────
-
-
 def _get_skill_manager():
     """Retrieve the SkillManager from the MCP server state."""
     from argus_mcp.server.app import mcp_server
@@ -817,9 +811,6 @@ async def handle_skills_disable(request: Request) -> JSONResponse:
     mgr.disable(name)
     resp = SkillActionResponse(name=name, action="disabled")
     return JSONResponse(resp.model_dump())
-
-
-# ── MCP proxy endpoints ────────────────────────────────────────────────
 
 
 async def handle_tools_call(request: Request) -> JSONResponse:

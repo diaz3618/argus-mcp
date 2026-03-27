@@ -52,9 +52,7 @@ class _InvalidStateTransition(Exception):
 
 
 class ArgusService:
-    """Manages the full lifecycle of the Argus MCP server.
-
-    State machine::
+    """State machine::
 
         PENDING ─► STARTING ─► RUNNING ─► STOPPING ─► STOPPED
                        │                                  │

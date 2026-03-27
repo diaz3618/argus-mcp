@@ -40,9 +40,7 @@ class InstalledSkill:
 
 
 class SkillManager:
-    """Manages the lifecycle of skill packages.
-
-    Skills are stored in ``skills_dir`` with the layout::
+    """Skills are stored in ``skills_dir`` with the layout::
 
         skills_dir/
           my-skill/

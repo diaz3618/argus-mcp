@@ -18,9 +18,6 @@ from pydantic import BaseModel, Field
 SESSION_DEFAULT_TTL: float = 1800.0
 
 
-# ── Health ──────────────────────────────────────────────────────────────
-
-
 class HealthBackends(BaseModel):
     total: int = 0
     connected: int = 0
@@ -37,9 +34,6 @@ class HealthResponse(BaseModel):
 class ReadyResponse(BaseModel):
     ready: bool = False
     reason: str = ""
-
-
-# ── Status ──────────────────────────────────────────────────────────────
 
 
 class StatusService(BaseModel):
@@ -70,9 +64,6 @@ class StatusResponse(BaseModel):
     feature_flags: Dict[str, bool] = Field(default_factory=dict)
 
 
-# ── Backends ────────────────────────────────────────────────────────────
-
-
 class BackendCapabilities(BaseModel):
     tools: int = 0
     resources: int = 0
@@ -101,9 +92,6 @@ class BackendDetail(BaseModel):
 
 class BackendsResponse(BaseModel):
     backends: List[BackendDetail] = Field(default_factory=list)
-
-
-# ── Capabilities ────────────────────────────────────────────────────────
 
 
 class ToolDetail(BaseModel):
@@ -139,9 +127,6 @@ class CapabilitiesResponse(BaseModel):
     mcp_visible_tool_count: int = 0
 
 
-# ── Events ──────────────────────────────────────────────────────────────
-
-
 class EventItem(BaseModel):
     id: str
     timestamp: str  # ISO-8601
@@ -156,16 +141,10 @@ class EventsResponse(BaseModel):
     events: List[EventItem] = Field(default_factory=list)
 
 
-# ── Error ───────────────────────────────────────────────────────────────
-
-
 class ErrorResponse(BaseModel):
     error: str
     message: str
     details: Optional[Dict[str, Any]] = None
-
-
-# ── Mutations ───────────────────────────────────────────────────────────
 
 
 class ReloadResponse(BaseModel):
@@ -198,9 +177,6 @@ class ShutdownResponse(BaseModel):
     shutting_down: bool = True
 
 
-# ── Sessions ────────────────────────────────────────────────────────────
-
-
 class SessionDetail(BaseModel):
     id: str
     transport_type: str = ""
@@ -217,9 +193,6 @@ class SessionsResponse(BaseModel):
     sessions: List[SessionDetail] = Field(default_factory=list)
 
 
-# ── Batch ───────────────────────────────────────────────────────────────
-
-
 class BatchResponse(BaseModel):
     """Combined response for ``GET /manage/v1/batch``.
 
@@ -231,3 +204,40 @@ class BatchResponse(BaseModel):
     backends: BackendsResponse = Field(default_factory=BackendsResponse)
     capabilities: CapabilitiesResponse = Field(default_factory=CapabilitiesResponse)
     events: EventsResponse = Field(default_factory=EventsResponse)
+
+
+class RegistryServerEntry(BaseModel):
+    name: str
+    description: str = ""
+    transport: str = "stdio"
+    url: str = ""
+    command: str = ""
+    args: List[str] = Field(default_factory=list)
+    version: str = ""
+    categories: List[str] = Field(default_factory=list)
+
+
+class RegistrySearchResponse(BaseModel):
+    servers: List[RegistryServerEntry] = Field(default_factory=list)
+    registry: str = ""
+    total: int = 0
+
+
+class SkillDetail(BaseModel):
+    name: str
+    version: str = ""
+    description: str = ""
+    status: str = "disabled"  # enabled | disabled
+    tools: int = 0
+    workflows: int = 0
+    author: str = ""
+
+
+class SkillsListResponse(BaseModel):
+    skills: List[SkillDetail] = Field(default_factory=list)
+
+
+class SkillActionResponse(BaseModel):
+    name: str
+    action: str  # enabled | disabled
+    ok: bool = True

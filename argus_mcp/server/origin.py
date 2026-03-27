@@ -123,7 +123,6 @@ class OriginValidationMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Check against explicitly allowed origins.
         if origin_lower in self._allowed_origins:
             await self.app(scope, receive, send)
             return

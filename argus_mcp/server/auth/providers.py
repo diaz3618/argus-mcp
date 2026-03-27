@@ -92,12 +92,10 @@ class JWTAuthProvider:
 
 
 class AuthProviderRegistry:
-    """Manages the active auth provider based on configuration.
+    """Usage::
 
-    Usage::
-
-        registry = AuthProviderRegistry.from_config(config_dict)
-        user = await registry.authenticate(token_string)
+    registry = AuthProviderRegistry.from_config(config_dict)
+    user = await registry.authenticate(token_string)
     """
 
     def __init__(self, provider: Any) -> None:

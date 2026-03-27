@@ -119,8 +119,6 @@ class ApiClient:
         except ValidationError as exc:
             raise ApiClientError(f"Invalid response from {path}: {exc}") from exc
 
-    # ── GET endpoints ──────────────────────────────────────────────────
-
     async def get_health(self) -> HealthResponse:
         """``GET /manage/v1/health``"""
         resp = await self._request("get", "health")
@@ -169,8 +167,6 @@ class ApiClient:
         resp = await self._request("get", "batch", params={"events_limit": events_limit})
         return self._validate(BatchResponse, resp.json(), "batch")
 
-    # ── SSE streaming ──────────────────────────────────────────────────
-
     async def stream_events(self) -> AsyncIterator[dict[str, Any]]:
         """``GET /manage/v1/events/stream`` — SSE event stream.
 
@@ -198,8 +194,6 @@ class ApiClient:
                             logger.debug("Malformed SSE data: %s", data_buf)
                     event_type = ""
                     data_buf = []
-
-    # ── POST endpoints ─────────────────────────────────────────────────
 
     async def post_reload(self) -> ReloadResponse:
         """``POST /manage/v1/reload``"""
