@@ -76,6 +76,30 @@ class TestArgusConfig:
         cfg = ArgusConfig(feature_flags={"beta_tools": True})
         assert cfg.feature_flags["beta_tools"] is True
 
+    def test_skills_config_defaults(self):
+        """ArgusConfig.skills should default to SkillsConfig(directory='skills', enabled=True)."""
+        cfg = ArgusConfig()
+        assert cfg.skills.directory == "skills"
+        assert cfg.skills.enabled is True
+
+    def test_skills_config_custom(self):
+        """ArgusConfig should accept skills: {directory: 'examples/skills'} from YAML."""
+        cfg = ArgusConfig(skills={"directory": "examples/skills", "enabled": False})
+        assert cfg.skills.directory == "examples/skills"
+        assert cfg.skills.enabled is False
+
+    def test_workflows_config_defaults(self):
+        """ArgusConfig.workflows should default to WorkflowsConfig(directory='workflows', enabled=True)."""
+        cfg = ArgusConfig()
+        assert cfg.workflows.directory == "workflows"
+        assert cfg.workflows.enabled is True
+
+    def test_workflows_config_custom(self):
+        """ArgusConfig should accept workflows: {directory: 'examples/workflows'} from YAML."""
+        cfg = ArgusConfig(workflows={"directory": "examples/workflows", "enabled": False})
+        assert cfg.workflows.directory == "examples/workflows"
+        assert cfg.workflows.enabled is False
+
 
 # ServerSettings
 

@@ -56,6 +56,7 @@ class TestInit:
         assert svc.resources == []
         assert svc.prompts == []
         assert svc.config_data is None
+        assert svc.full_config is None
         assert svc.is_running is False
         assert svc.health_checker is None
         assert svc.group_manager is None
