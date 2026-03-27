@@ -44,12 +44,17 @@ from argus_mcp.server.management.schemas import (
     ReadyResponse,
     ReAuthResponse,
     ReconnectResponse,
+    RegistrySearchResponse,
+    RegistryServerEntry,
     ReloadResponse,
     ResourceDetail,
     SessionDetail,
     SessionsResponse,
     ShutdownRequest,
     ShutdownResponse,
+    SkillActionResponse,
+    SkillDetail,
+    SkillsListResponse,
     StatusConfig,
     StatusResponse,
     StatusService,
@@ -662,6 +667,263 @@ async def handle_sessions(request: Request) -> JSONResponse:
     return JSONResponse(resp.model_dump())
 
 
+# ── Registry endpoints ──────────────────────────────────────────────────
+
+
+async def handle_registry_search(request: Request) -> JSONResponse:
+    """Search external MCP server registries (Glama, Smithery, etc.)."""
+    service = _get_service(request)
+
+    q = request.query_params.get("q", "").strip()
+    if not q:
+        return _error_json("bad_request", "Query parameter 'q' is required.", 400)
+    if len(q) > MGMT_QUERY_PARAM_MAX_LEN or not _SAFE_QUERY_RE.match(q):
+        return _error_json("bad_request", "Invalid query parameter.", 400)
+
+    limit_str = request.query_params.get("limit", "20")
+    try:
+        limit = max(1, min(int(limit_str), 100))
+    except ValueError:
+        limit = 20
+
+    registry_name = request.query_params.get("registry", "").strip() or None
+
+    # Read registries from the full config model if available,
+    # falling back to the legacy config_data dict for compatibility.
+    full_cfg = service.full_config
+    if full_cfg is not None and hasattr(full_cfg, "registries") and full_cfg.registries:
+        registries = [r.model_dump() for r in full_cfg.registries]
+    else:
+        config_data = service.config_data or {}
+        registries = config_data.get("registries", [])
+    if not isinstance(registries, list) or not registries:
+        return _error_json("not_configured", "No registries configured.", 404)
+
+    # Filter to requested registry if specified
+    if registry_name:
+        registries = [r for r in registries if r.get("name") == registry_name]
+        if not registries:
+            return _error_json("not_found", f"Registry '{registry_name}' not found.", 404)
+
+    from argus_mcp.registry.client import RegistryClient
+
+    all_servers: list[dict[str, Any]] = []
+    used_registry = ""
+    for reg in registries:
+        reg_url = reg.get("url", "")
+        reg_type = reg.get("type", "auto")
+        if not reg_url:
+            continue
+        client = RegistryClient(base_url=reg_url, registry_type=reg_type)
+        try:
+            results = await client.search(query=q, limit=limit)
+            for entry in results:
+                all_servers.append(
+                    RegistryServerEntry(
+                        name=entry.name,
+                        description=entry.description,
+                        transport=entry.transport,
+                        url=entry.url,
+                        command=entry.command,
+                        args=entry.args,
+                        version=entry.version,
+                        categories=entry.categories,
+                    ).model_dump()
+                )
+            if results:
+                used_registry = reg.get("name", reg_url)
+        except Exception:
+            logger.debug("Registry search failed for %s", reg_url, exc_info=True)
+        finally:
+            await client.close()
+        if all_servers:
+            break  # Use first registry that returns results
+
+    resp = RegistrySearchResponse(
+        servers=all_servers[:limit],
+        registry=used_registry,
+        total=len(all_servers),
+    )
+    return JSONResponse(resp.model_dump())
+
+
+# ── Skills endpoints ────────────────────────────────────────────────────
+
+
+def _get_skill_manager():
+    """Retrieve the SkillManager from the MCP server state."""
+    from argus_mcp.server.app import mcp_server
+    from argus_mcp.server.state import get_state
+
+    return get_state(mcp_server).skill_manager
+
+
+async def handle_skills_list(request: Request) -> JSONResponse:
+    """List all discovered skills with status."""
+    mgr = _get_skill_manager()
+    if mgr is None:
+        return _error_json("not_available", "Skill manager not initialized.", 503)
+
+    mgr.discover()
+    skills = mgr.list_skills()
+    details = [
+        SkillDetail(
+            name=s.manifest.name,
+            version=s.manifest.version,
+            description=s.manifest.description,
+            status=s.status.value,
+            tools=len(s.manifest.tools),
+            workflows=len(s.manifest.workflows),
+            author=s.manifest.author,
+        ).model_dump()
+        for s in skills
+    ]
+    return JSONResponse(SkillsListResponse(skills=details).model_dump())
+
+
+async def handle_skills_enable(request: Request) -> JSONResponse:
+    """Enable a skill by name."""
+    mgr = _get_skill_manager()
+    if mgr is None:
+        return _error_json("not_available", "Skill manager not initialized.", 503)
+
+    name = request.path_params.get("name", "")
+    if not name or not _BACKEND_NAME_RE.match(name):
+        return _error_json("bad_request", "Invalid skill name.", 400)
+
+    skill = mgr.get(name)
+    if skill is None:
+        return _error_json("not_found", f"Skill '{name}' not found.", 404)
+
+    mgr.enable(name)
+    resp = SkillActionResponse(name=name, action="enabled")
+    return JSONResponse(resp.model_dump())
+
+
+async def handle_skills_disable(request: Request) -> JSONResponse:
+    """Disable a skill by name."""
+    mgr = _get_skill_manager()
+    if mgr is None:
+        return _error_json("not_available", "Skill manager not initialized.", 503)
+
+    name = request.path_params.get("name", "")
+    if not name or not _BACKEND_NAME_RE.match(name):
+        return _error_json("bad_request", "Invalid skill name.", 400)
+
+    skill = mgr.get(name)
+    if skill is None:
+        return _error_json("not_found", f"Skill '{name}' not found.", 404)
+
+    mgr.disable(name)
+    resp = SkillActionResponse(name=name, action="disabled")
+    return JSONResponse(resp.model_dump())
+
+
+# ── MCP proxy endpoints ────────────────────────────────────────────────
+
+
+async def handle_tools_call(request: Request) -> JSONResponse:
+    """Proxy an MCP tools/call request to the correct backend."""
+    service = _get_service(request)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return _error_json("bad_request", "Invalid JSON body.", 400)
+
+    tool_name = body.get("tool", "").strip()
+    if not tool_name:
+        return _error_json("bad_request", "Field 'tool' is required.", 400)
+    arguments = body.get("arguments", {})
+    if not isinstance(arguments, dict):
+        return _error_json("bad_request", "'arguments' must be an object.", 400)
+
+    route_info = service.registry.resolve_capability(tool_name)
+    if not route_info:
+        return _error_json("not_found", f"Tool '{tool_name}' not found.", 404)
+
+    svr_name, orig_name = route_info
+    session = service.manager.get_session(svr_name)
+    if not session:
+        return _error_json(
+            "backend_unavailable",
+            f"Backend '{svr_name}' session not available.",
+            503,
+        )
+
+    try:
+        result = await session.call_tool(name=orig_name, arguments=arguments)
+    except Exception as exc:
+        logger.warning("tools/call %s failed: %s", tool_name, exc, exc_info=True)
+        return _error_json("call_failed", str(exc), 502)
+
+    # Serialize MCP CallToolResult
+    content_list = []
+    for item in getattr(result, "content", []):
+        content_list.append(
+            {"type": getattr(item, "type", "text"), "text": getattr(item, "text", str(item))}
+        )
+    return JSONResponse(
+        {
+            "tool": tool_name,
+            "backend": svr_name,
+            "content": content_list,
+            "isError": getattr(result, "isError", False),
+        }
+    )
+
+
+async def handle_resources_read(request: Request) -> JSONResponse:
+    """Proxy an MCP resources/read request to the correct backend."""
+    service = _get_service(request)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return _error_json("bad_request", "Invalid JSON body.", 400)
+
+    uri = body.get("uri", "").strip()
+    if not uri:
+        return _error_json("bad_request", "Field 'uri' is required.", 400)
+
+    route_info = service.registry.resolve_capability(uri)
+    if not route_info:
+        return _error_json("not_found", f"Resource '{uri}' not found.", 404)
+
+    svr_name, orig_uri = route_info
+    session = service.manager.get_session(svr_name)
+    if not session:
+        return _error_json(
+            "backend_unavailable",
+            f"Backend '{svr_name}' session not available.",
+            503,
+        )
+
+    try:
+        result = await session.read_resource(uri=orig_uri)
+    except Exception as exc:
+        logger.warning("resources/read %s failed: %s", uri, exc, exc_info=True)
+        return _error_json("read_failed", str(exc), 502)
+
+    # Serialize MCP ReadResourceResult
+    contents_list = []
+    for item in getattr(result, "contents", []):
+        contents_list.append(
+            {
+                "uri": getattr(item, "uri", uri),
+                "text": getattr(item, "text", str(item)),
+                "mimeType": getattr(item, "mimeType", None),
+            }
+        )
+    return JSONResponse(
+        {
+            "uri": uri,
+            "backend": svr_name,
+            "contents": contents_list,
+        }
+    )
+
+
 management_routes = Router(
     routes=[
         Route("/health", endpoint=handle_health, methods=["GET"]),
@@ -678,5 +940,11 @@ management_routes = Router(
         Route("/reconnect/{name}", endpoint=handle_reconnect, methods=["POST"]),
         Route("/reauth/{name}", endpoint=handle_reauth, methods=["POST"]),
         Route("/shutdown", endpoint=handle_shutdown, methods=["POST"]),
+        Route("/registry/search", endpoint=handle_registry_search, methods=["GET"]),
+        Route("/skills", endpoint=handle_skills_list, methods=["GET"]),
+        Route("/skills/{name}/enable", endpoint=handle_skills_enable, methods=["POST"]),
+        Route("/skills/{name}/disable", endpoint=handle_skills_disable, methods=["POST"]),
+        Route("/tools/call", endpoint=handle_tools_call, methods=["POST"]),
+        Route("/resources/read", endpoint=handle_resources_read, methods=["POST"]),
     ]
 )
