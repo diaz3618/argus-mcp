@@ -24,7 +24,7 @@
 FROM rust:1.85-slim AS rust-builder
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3-dev && \
+    apt-get install -y --no-install-recommends python3-dev python3-pip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
