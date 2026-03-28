@@ -124,11 +124,7 @@ def call(
         str | None, typer.Option("--json", "-j", help="Raw JSON arguments.")
     ] = None,
 ) -> None:
-    """Look up an MCP tool and show invocation guidance.
-
-    Verifies the tool exists, then directs the user to the interactive
-    shell for live MCP tool invocation.
-    """
+    """Invoke an MCP tool via the server proxy and display the result."""
     from argus_cli.client import ArgusClient, ArgusClientError
     from argus_cli.output import print_error, print_info, render_json_data
 
@@ -148,7 +144,6 @@ def call(
                 print_error(f"Invalid argument format '{kv}' — expected key=value.")
                 raise typer.Exit(1) from None
             k, v = kv.split("=", 1)
-            # Try to parse value as JSON for non-string types
             try:
                 arguments[k] = json.loads(v)
             except json.JSONDecodeError:
@@ -156,28 +151,24 @@ def call(
 
     print_info(f"Calling tool '{name}'...")
 
-    # First verify the tool exists
     try:
         with ArgusClient(cfg) as client:
-            data = client.capabilities(type_filter="tools", search=name)
-        tools = data.get("tools", [])
-        match = next((t for t in tools if t.get("name") == name), None)
-        if match is None:
-            print_error(f"Tool '{name}' not found.")
-            raise typer.Exit(1) from None
+            result = client.call_tool(name, arguments)
     except ArgusClientError as e:
-        print_error(f"Failed to find tool: {e.message}")
+        print_error(f"Tool call failed: {e.message}")
         raise typer.Exit(1) from None
 
-    # Tool invocation needs the MCP protocol (tools/call) — delegate to argus-mcp
-    # This sends an MCP tools/call request through the management API
-    print_info(
-        f"Tool '{name}' found on backend '{match.get('backend', 'unknown')}'. "
-        "Direct MCP tool invocation requires a running MCP session."
-    )
-    if arguments:
-        render_json_data({"tool": name, "arguments": arguments}, title="Call Request")
-    print_info("Use 'argus shell' for interactive tool invocation with live MCP sessions.")
+    if result.get("isError"):
+        print_error(f"Tool '{name}' returned an error.")
+    else:
+        print_info(f"Tool '{name}' on backend '{result.get('backend', 'unknown')}' succeeded.")
+
+    content = result.get("content", [])
+    for item in content:
+        if item.get("type") == "text":
+            render_json_data(item.get("text", ""), title=f"Tool: {name}")
+        else:
+            render_json_data(item, title=f"Tool: {name}")
 
 
 @app.command()

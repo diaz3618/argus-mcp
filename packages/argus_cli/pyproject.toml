@@ -52,8 +52,10 @@ dev = [
     "mypy>=1.15",
 ]
 
+## Entry points
 [project.scripts]
 argus = "argus_cli.main:app"
+argus-cli = "argus_cli.main:app"
 argus-tui = "argus_cli.tui:launch"
 
 [project.urls]

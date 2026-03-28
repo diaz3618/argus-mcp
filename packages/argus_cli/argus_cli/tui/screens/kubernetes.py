@@ -87,13 +87,21 @@ class KubernetesScreen(ArgusScreen):
         if self._daemon_client is not None:
             return
         try:
+            from argus_cli.config import get_config
             from argus_cli.daemon_client import DaemonClient
 
-            client = DaemonClient()
+            cfg = get_config()
+            client = DaemonClient(socket_path=cfg.argusd_socket)
             if not client.socket_exists:
-                logger.warning("argusd socket not found at %s", client.socket_path)
-                self._update_status_error("argusd not running")
-                return
+                if cfg.argusd_auto_start:
+                    started = client.auto_start(binary_hint=cfg.argusd_binary)
+                    if not started:
+                        self._update_status_error("argusd not running (auto-start failed)")
+                        return
+                else:
+                    logger.warning("argusd socket not found at %s", client.socket_path)
+                    self._update_status_error("argusd not running")
+                    return
             await client.connect()
             self._daemon_client = client
         except Exception:

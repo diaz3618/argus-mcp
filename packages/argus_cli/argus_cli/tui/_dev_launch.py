@@ -11,20 +11,29 @@ import importlib
 import os
 import sys
 
-# Add both the project root and the .venv site-packages to sys.path
-# so the Textual MCP server can resolve the package and its dependencies.
+# Add both the argus_cli package root and the workspace root to sys.path
+# so the Textual MCP server can resolve both packages and their dependencies.
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+# The workspace root is two levels above _project_root (packages/argus_cli/ -> argus-mcp/)
+_workspace_root = os.path.dirname(os.path.dirname(_project_root))
+if _workspace_root not in sys.path:
+    sys.path.insert(0, _workspace_root)
+
 # Also add the venv site-packages for dependencies like mcp, starlette, etc.
-_venv_sp = glob.glob(os.path.join(_project_root, ".venv", "lib", "python*", "site-packages"))
+_venv_sp = glob.glob(os.path.join(_workspace_root, ".venv", "lib", "python*", "site-packages"))
 for sp in _venv_sp:
     if sp not in sys.path:
         sys.path.insert(1, sp)
 
-# Purge cached argus_cli modules so the MCP server always uses fresh code.
-_stale = [k for k in sys.modules if k == "argus_cli" or k.startswith("argus_cli.")]
+# Purge cached argus_cli and argus_mcp modules so the MCP server always uses fresh code.
+_stale = [
+    k
+    for k in sys.modules
+    if k in ("argus_cli", "argus_mcp") or k.startswith(("argus_cli.", "argus_mcp."))
+]
 for _k in _stale:
     del sys.modules[_k]
 

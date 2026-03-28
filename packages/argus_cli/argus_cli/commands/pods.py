@@ -172,9 +172,6 @@ def logs(
                     else:
                         line = str(data)
                     console.print(_style_line(line))
-
-                    if not follow:
-                        break
         except DaemonError as e:
             console.print(f"[bold red]Error:[/] {e.message}")
             raise typer.Exit(1) from None
@@ -281,3 +278,22 @@ def rollout_restart(
             raise typer.Exit(1) from None
 
     _run_async(_restart())
+
+
+@app.command()
+def stats(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Pod name (or namespace/name).")],
+    live: Annotated[bool, typer.Option("--live", "-l", help="Live updating display.")] = False,
+) -> None:
+    """Show pod resource usage.
+
+    .. warning:: Not yet supported by argusd. This is a placeholder.
+    """
+    from argus_cli.output import print_error
+
+    print_error(
+        f"[stub] 'pods stats {name}' is not yet supported by the argusd daemon. "
+        "Use 'kubectl top pod' directly for now."
+    )
+    raise typer.Exit(1)

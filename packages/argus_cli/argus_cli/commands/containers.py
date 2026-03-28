@@ -159,9 +159,6 @@ def logs(
                     else:
                         line = str(data)
                     console.print(_style_line(line))
-
-                    if not follow:
-                        break
         except DaemonError as e:
             console.print(f"[bold red]Error:[/] {e.message}")
             raise typer.Exit(1) from None
@@ -374,3 +371,22 @@ def remove(
             raise typer.Exit(1) from None
 
     _run_async(_remove())
+
+
+@app.command()
+def exec(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Container name or ID.")],
+    command: Annotated[list[str], typer.Argument(help="Command to execute.")],
+) -> None:
+    """Execute a command inside a running container.
+
+    .. warning:: Not yet supported by argusd. This is a placeholder.
+    """
+    from argus_cli.output import print_error
+
+    print_error(
+        f"[stub] 'containers exec {name}' is not yet supported by the argusd daemon. "
+        "Use 'docker exec' directly for now."
+    )
+    raise typer.Exit(1)

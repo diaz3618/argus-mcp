@@ -63,6 +63,26 @@ poll_interval: 30
 
 # Max history entries shown by the `history` command
 history_limit: 50
+
+# ── argusd (Docker/Kubernetes sidecar daemon) ──────────────────────
+# argusd is required for `argus containers` and `argus pods` commands.
+# See: https://github.com/diaz3618/argus-mcp/blob/main/docs/architecture/07-argusd.md
+argusd:
+  # Automatically start argusd when a container/pod command needs it.
+  # When true, the CLI/TUI will spawn argusd in the background if the
+  # socket is not already present.
+  # env: ARGUSD_AUTO_START
+  auto_start: false
+
+  # Path to the argusd binary. Omit to auto-detect ($PATH, then
+  # the well-known build location packages/argusd/argusd).
+  # env: ARGUSD_BINARY
+  # binary: "/usr/local/bin/argusd"
+
+  # Custom Unix Domain Socket path. Omit to use the default:
+  # $XDG_RUNTIME_DIR/argusd.sock  (or /tmp/argusd.sock).
+  # env: ARGUSD_SOCKET
+  # socket: "/run/user/1000/argusd.sock"
 """
 
 

@@ -175,7 +175,6 @@ Header {
     width: auto;
     margin-left: 1;
 }
-}
 
 #tools-status-bar {
     height: 1;

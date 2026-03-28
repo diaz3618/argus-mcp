@@ -53,10 +53,10 @@ def configure(
 ) -> None:
     """Configure authentication settings.
 
-    .. note:: This is a stub — configuration is advisory only.
-       Actual token storage is not yet implemented (TODO).
+    Persists auth mode and token to ~/.config/argus-mcp/config.yaml.
     """
-    from argus_cli.output import print_error, print_info, print_success
+    from argus_cli.config import CONFIG_FILE, _load_yaml_config, _save_yaml_config
+    from argus_cli.output import print_error, print_success
 
     if not mode and not token:
         print_error("Provide --mode and/or --token.")
@@ -66,21 +66,29 @@ def configure(
         print_error(f"Unknown auth mode '{mode}'. Supported: none, bearer.")
         raise typer.Exit(1) from None
 
-    lines: list[str] = []
-    if mode == "none":
-        lines.append("Auth mode set to 'none'. Token will not be sent.")
-        print_info("Update your environment: unset ARGUS_TOKEN")
-    elif mode == "bearer":
-        lines.append("Auth mode set to 'bearer'.")
-        if not token:
-            print_info("Set token via: export ARGUS_TOKEN=<your-token> or use --token.")
-    if token:
-        lines.append("Token configured.")
-        print_info("Set in your environment: export ARGUS_TOKEN=<token>")
-        print_info("Or pass --token on each command.")
+    data = _load_yaml_config()
+    auth = data.get("auth") if isinstance(data.get("auth"), dict) else {}
 
-    for line in lines:
-        print_success(line)
+    if mode:
+        auth["mode"] = mode
+    if token:
+        auth["token"] = token
+    if mode == "none":
+        auth.pop("token", None)
+
+    data["auth"] = auth
+    _save_yaml_config(data)
+
+    # Restrict file permissions when a token is stored
+    if auth.get("token"):
+        CONFIG_FILE.chmod(0o600)
+
+    if mode:
+        print_success(f"Auth mode set to '{mode}'.")
+    if token:
+        print_success("Token saved to config.")
+    if mode == "none":
+        print_success("Token cleared from config.")
 
 
 @app.command()

@@ -23,9 +23,13 @@ __all__ = [
 ]
 
 import json
+import logging
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -38,6 +42,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # ── Configuration ──────────────────────────────────────────────────────
 
@@ -123,6 +129,71 @@ class DaemonClient:
     @property
     def socket_exists(self) -> bool:
         return Path(self._socket_path).exists()
+
+    # ── Auto-start ─────────────────────────────────────────────────
+
+    @staticmethod
+    def find_binary(hint: str | None = None) -> str | None:
+        """Locate the argusd binary.
+
+        Search order:
+        1. Explicit *hint* path (from config ``argusd.binary``)
+        2. ``$PATH`` via :func:`shutil.which`
+        3. Well-known build location relative to this repo
+        """
+        if hint:
+            p = Path(hint).expanduser()
+            if p.is_file() and os.access(p, os.X_OK):
+                return str(p)
+            return None
+
+        # Check PATH
+        found = shutil.which("argusd")
+        if found:
+            return found
+
+        # Check well-known repo build location
+        # daemon_client.py lives in packages/argus_cli/argus_cli/
+        repo_root = Path(__file__).resolve().parents[3]
+        candidate = repo_root / "packages" / "argusd" / "argusd"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+
+        return None
+
+    def auto_start(self, binary_hint: str | None = None) -> bool:
+        """Attempt to start argusd as a detached background process.
+
+        Returns ``True`` if the daemon was started and the socket appeared
+        within a short timeout, ``False`` otherwise.
+        """
+        binary = self.find_binary(binary_hint)
+        if binary is None:
+            logger.warning("argusd binary not found — cannot auto-start")
+            return False
+
+        logger.info("Auto-starting argusd: %s (socket: %s)", binary, self._socket_path)
+        try:
+            subprocess.Popen(  # noqa: S603
+                [binary, "-socket", self._socket_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            logger.warning("Failed to spawn argusd: %s", exc)
+            return False
+
+        # Wait for the socket to appear (up to 3 seconds)
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            if Path(self._socket_path).exists():
+                logger.info("argusd socket appeared at %s", self._socket_path)
+                return True
+            time.sleep(0.1)
+
+        logger.warning("argusd started but socket did not appear within 3 s")
+        return False
 
     # ── Internal helpers ───────────────────────────────────────────
 

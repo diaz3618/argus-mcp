@@ -103,8 +103,18 @@ def _load_yaml_config(config_path: Path) -> dict[str, Any]:
 
 
 def _validate_backends(backends: Any, errors: list[str], warnings: list[str]) -> None:
-    """Validate the backends list entries."""
-    if isinstance(backends, list):
+    """Validate the backends entries (dict keyed by name, or legacy list)."""
+    if isinstance(backends, dict):
+        for name, b in backends.items():
+            if not isinstance(b, dict):
+                errors.append(f"backends[{name!r}]: must be a mapping")
+                continue
+            if "type" not in b:
+                errors.append(f"backends[{name!r}]: missing required 'type'")
+            btype = b.get("type", "")
+            if btype not in ("stdio", "sse", "streamable_http", ""):
+                warnings.append(f"backends[{name!r}]: unknown type '{btype}'")
+    elif isinstance(backends, list):
         for i, b in enumerate(backends):
             if not isinstance(b, dict):
                 errors.append(f"backends[{i}]: must be a mapping")
@@ -117,7 +127,7 @@ def _validate_backends(backends: Any, errors: list[str], warnings: list[str]) ->
             if btype not in ("stdio", "sse", "streamable_http", ""):
                 warnings.append(f"backends[{i}] ({b.get('name', '?')}): unknown type '{btype}'")
     elif backends is not None:
-        errors.append("'backends' must be a list")
+        errors.append("'backends' must be a dict (name → config) or a list")
 
 
 @app.command()

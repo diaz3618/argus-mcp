@@ -28,7 +28,7 @@ from argus_cli.repl.handlers import (
     show_banner,
     show_help,
 )
-from argus_cli.repl.state import ReplState, ensure_history_dir
+from argus_cli.repl.state import ReplState, ensure_history_dir, load_aliases
 from argus_cli.repl.toolbar import make_prompt, make_toolbar
 
 if TYPE_CHECKING:
@@ -78,6 +78,7 @@ def start_repl(config: CliConfig) -> None:
     """Start the interactive REPL session."""
     console = get_console(no_color=config.no_color)
     state = ReplState(config=config)
+    state.session.aliases = load_aliases()
 
     # Initial connection & data fetch
     refresh_completions(state)

@@ -8,6 +8,8 @@ __all__ = [
     "ReplState",
     "SessionState",
     "ensure_history_dir",
+    "load_aliases",
+    "save_aliases",
 ]
 
 from dataclasses import dataclass, field
@@ -25,6 +27,34 @@ def ensure_history_dir() -> str:
     history_dir = Path(_HISTORY_DIR).expanduser()
     history_dir.mkdir(parents=True, exist_ok=True)
     return str(history_dir / "history")
+
+
+_ALIASES_FILE = Path(_HISTORY_DIR).expanduser() / "aliases.yaml"
+
+
+def load_aliases() -> dict[str, str]:
+    """Load aliases from ~/.config/argus-mcp/aliases.yaml."""
+    try:
+        import yaml
+
+        text = _ALIASES_FILE.read_text(encoding="utf-8")
+        data = yaml.safe_load(text)
+        if isinstance(data, dict):
+            return {str(k): str(v) for k, v in data.items()}
+    except (FileNotFoundError, ImportError):
+        pass
+    return {}
+
+
+def save_aliases(aliases: dict[str, str]) -> None:
+    """Write aliases to ~/.config/argus-mcp/aliases.yaml."""
+    import yaml
+
+    _ALIASES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _ALIASES_FILE.write_text(
+        yaml.dump(dict(aliases), default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 @dataclass

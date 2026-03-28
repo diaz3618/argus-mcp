@@ -20,7 +20,6 @@ from argus_cli.tui.widgets.module_container import ModuleContainer
 from argus_cli.tui.widgets.quick_actions import QuickAction, QuickActionBar
 from argus_cli.tui.widgets.server_info import ServerInfoWidget
 from argus_cli.tui.widgets.server_selector import ServerSelectorWidget
-from argus_cli.tui.widgets.tplot import UptimeChart
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -34,7 +33,6 @@ class DashboardScreen(ArgusScreen):
         "backends-module": "b",
         "main-area": "e",
         "cap-section": "c",
-        "dashboard-uptime-chart": "u",
     }
 
     def on_show(self) -> None:
@@ -58,8 +56,6 @@ class DashboardScreen(ArgusScreen):
                 yield EventLogWidget()
         with ModuleContainer(title="Capabilities", subtitle="[c]apabilities", id="cap-section"):
             yield CapabilitySection()
-        with ModuleContainer(title="Connection Uptime", subtitle="[u]ptime", id="uptime-section"):
-            yield UptimeChart(id="dashboard-uptime-chart")
         yield QuickActionBar(
             actions=[
                 QuickAction("x", "Export Config", lambda: self.app.action_export_client_config()),

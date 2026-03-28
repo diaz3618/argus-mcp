@@ -83,10 +83,15 @@ def optimizer_status(
 def _toggle_optimizer(cfg: CliConfig, *, enable: bool) -> None:
     """Enable or disable the optimizer via config reload."""
     from argus_cli.client import ArgusClient, ArgusClientError
-    from argus_cli.output import get_console, print_error, print_success
+    from argus_cli.output import get_console, print_error, print_success, print_warning
 
     action = "Enabling" if enable else "Disabling"
     past = "enabled" if enable else "disabled"
+    print_warning(
+        f"[stub] optimizer {past}: this command triggers a config reload but does not "
+        "actually toggle the optimizer flag. Edit the server config manually to change "
+        "optimizer state."
+    )
     try:
         with get_console().status(f"{action} optimizer..."), ArgusClient(cfg) as client:
             result = client.reload()
@@ -181,8 +186,13 @@ def telemetry_configure(
         print_info("No configuration changes specified. Use --endpoint or --service-name.")
         return
 
-    print_success(f"Telemetry configuration updated: {', '.join(changes)}")
-    print_info("Update the server config file and run 'argus config reload' to apply.")
+    from argus_cli.output import print_warning
+
+    print_warning(
+        "[stub] telemetry configure: this command does not persist changes. "
+        "Edit the server config file and run 'argus config reload' to apply."
+    )
+    print_success(f"Telemetry configuration noted: {', '.join(changes)}")
 
 
 app.add_typer(telemetry_app, name="telemetry")

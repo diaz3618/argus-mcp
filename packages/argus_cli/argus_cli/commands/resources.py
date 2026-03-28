@@ -47,26 +47,32 @@ def read(
     ctx: typer.Context,
     uri: Annotated[str, typer.Argument(help="Resource URI to read.")],
 ) -> None:
-    """Read the contents of an MCP resource."""
+    """Read the contents of an MCP resource via the server proxy."""
     from argus_cli.client import ArgusClient, ArgusClientError
-    from argus_cli.output import print_error, print_info
+    from argus_cli.output import get_console, print_error, print_info
 
     cfg = ctx.obj
-    # Verify resource exists first
     try:
         with ArgusClient(cfg) as client:
-            data = client.capabilities(type_filter="resources")
-        resources = data.get("resources", [])
-        match = next((r for r in resources if r.get("uri") == uri), None)
-        if match is None:
-            print_error(f"Resource '{uri}' not found.")
-            raise typer.Exit(1) from None
-        print_info(
-            f"Resource '{match.get('name', uri)}' on backend '{match.get('backend', 'unknown')}' "
-            f"(mime: {match.get('mime_type', 'unknown')}). "
-            "Direct MCP resource reading requires a running MCP session."
-        )
-        print_info("Use 'argus shell' for interactive resource access.")
+            result = client.read_resource(uri)
     except ArgusClientError as e:
         print_error(f"Failed to read resource: {e.message}")
         raise typer.Exit(1) from None
+
+    contents = result.get("contents", [])
+    if not contents:
+        print_info(f"Resource '{uri}' returned no content.")
+        return
+
+    console = get_console()
+    backend = result.get("backend", "unknown")
+    print_info(f"Resource from backend '{backend}':")
+    for item in contents:
+        text = item.get("text", "")
+        mime = item.get("mimeType", "")
+        if mime and cfg.output_format == "rich":
+            from rich.panel import Panel
+
+            console.print(Panel(text, title=f"{uri} ({mime})", expand=False))
+        else:
+            console.print(text)

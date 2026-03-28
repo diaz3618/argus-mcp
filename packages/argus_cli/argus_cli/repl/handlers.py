@@ -20,7 +20,7 @@ from pathlib import Path
 from rich.console import Console
 
 from argus_cli.repl.completions import refresh_completions
-from argus_cli.repl.state import ReplState, ensure_history_dir
+from argus_cli.repl.state import ReplState, ensure_history_dir, save_aliases
 
 
 def show_banner(console: Console, state: ReplState) -> None:
@@ -123,6 +123,7 @@ def handle_alias(console: Console, state: ReplState, args: list[str]) -> None:
         value = value.strip().strip("'\"")
         if name and value:
             state.session.aliases[name] = value
+            save_aliases(state.session.aliases)
             console.print(f"  [success]Alias set:[/] {name} = {value}")
             return
     console.print("  [muted]Usage: alias name=command[/]")
@@ -136,6 +137,7 @@ def handle_unalias(console: Console, state: ReplState, args: list[str]) -> None:
     name = args[0]
     if name in state.session.aliases:
         del state.session.aliases[name]
+        save_aliases(state.session.aliases)
         console.print(f"  [success]Alias removed:[/] {name}")
     else:
         console.print(f"  [warning]No alias:[/] {name}")
@@ -204,6 +206,27 @@ def handle_connect(console: Console, state: ReplState, args: list[str]) -> None:
         console.print("  [error]Connection failed[/]")
 
 
+_SET_KEY_MAP: dict[str, str] = {
+    "output": "output_format",
+    "no-color": "no_color",
+    "theme": "theme",
+    "show-toolbar": "show_toolbar",
+    "vi-mode": "vi_mode",
+}
+
+
+def _persist_setting(key: str, value: str, _bool: bool) -> None:
+    """Merge a single setting change into the on-disk YAML config."""
+    from argus_cli.config import _load_yaml_config, _save_yaml_config
+
+    yaml_key = _SET_KEY_MAP.get(key)
+    if yaml_key is None:
+        return
+    data = _load_yaml_config()
+    data[yaml_key] = value if key in ("output", "theme") else _bool
+    _save_yaml_config(data)
+
+
 def handle_set(console: Console, state: ReplState, args: list[str]) -> None:
     """Handle ``set <key> <value>`` — change REPL settings."""
     if len(args) < 2:
@@ -213,22 +236,26 @@ def handle_set(console: Console, state: ReplState, args: list[str]) -> None:
 
     key, value = args[0], args[1]
     _bool = value.lower() in ("true", "1", "yes")
+    changed = False
 
     if key == "output":
         if value in ("rich", "json", "table", "text"):
             state.config.output_format = value
             console.print(f"  [success]Output format set to:[/] {value}")
+            changed = True
         else:
             console.print(f"  [error]Invalid format:[/] {value}")
     elif key == "no-color":
         state.config.no_color = _bool
         console.print(f"  [success]No-color set to:[/] {state.config.no_color}")
+        changed = True
     elif key == "theme":
         from argus_cli.theme import THEME_NAMES, set_active_theme
 
         if set_active_theme(value):
             state.config.theme = value
             console.print(f"  [success]Theme set to:[/] {value}")
+            changed = True
         else:
             names = ", ".join(THEME_NAMES)
             console.print(f"  [error]Unknown theme:[/] {value}")
@@ -236,12 +263,17 @@ def handle_set(console: Console, state: ReplState, args: list[str]) -> None:
     elif key == "show-toolbar":
         state.config.show_toolbar = _bool
         console.print(f"  [success]Toolbar set to:[/] {state.config.show_toolbar}")
+        changed = True
     elif key == "vi-mode":
         state.config.vi_mode = _bool
         console.print(f"  [success]Vi-mode set to:[/] {state.config.vi_mode}")
         console.print("  [muted]Restart the REPL for key-binding changes to take effect.[/]")
+        changed = True
     else:
         console.print(f"  [warning]Unknown setting:[/] {key}")
+
+    if changed:
+        _persist_setting(key, value, _bool)
 
 
 def handle_history(console: Console, limit: int = 50) -> None:

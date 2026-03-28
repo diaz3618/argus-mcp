@@ -29,8 +29,13 @@ def list_audit(
     config = ctx.obj
     try:
         with ArgusClient(config) as client:
-            data = client.events(limit=limit, severity=type_filter)
+            data = client.events(limit=limit)
         events = data.get("events", data)
+
+        # Client-side type filter (--type)
+        if type_filter:
+            tf = type_filter.lower()
+            events = [e for e in events if tf in str(e.get("type", "")).lower()]
 
         # Client-side search filter
         if search:

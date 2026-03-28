@@ -9,7 +9,6 @@ from rich.text import Text
 from argus_cli.output import get_console
 from argus_cli.theme import COLORS
 
-# Block-character art matching internal/art/banner.txt style
 BANNER_ART = """\
  ▄▀█ █▀█ █▀▀ █ █ █▀   █▀▄▀█ █▀▀ █▀█
  █▀█ █▀▄ █▄█ █▄█ ▄█   █ ▀ █ █▄▄ █▀▀"""

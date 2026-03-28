@@ -63,6 +63,7 @@ def dispatch_command(console: Console, state: ReplState, text: str) -> None:
         def flush(self) -> None:
             old_stdout.flush()
 
+    saved_output_format = state.config.output_format
     set_repl_mode(True)
     sys.stdout = TeeWriter()
     try:
@@ -74,6 +75,7 @@ def dispatch_command(console: Console, state: ReplState, text: str) -> None:
     finally:
         sys.stdout = old_stdout
         set_repl_mode(False)
+        state.config.output_format = saved_output_format
 
     # Capture last result for $_ substitution
     captured = capture.getvalue()

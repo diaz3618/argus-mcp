@@ -23,10 +23,14 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def search(
     ctx: typer.Context,
-    query: Annotated[str | None, typer.Argument(help="Search query (filters by name).")] = None,
+    query: Annotated[str, typer.Argument(help="Search query for MCP server registries.")],
+    limit: Annotated[int, typer.Option("--limit", help="Maximum results.")] = 20,
+    registry: Annotated[
+        str | None, typer.Option("--registry", help="Search a specific registry by name.")
+    ] = None,
     output_fmt: OutputOption = None,
 ) -> None:
-    """Search the MCP server registry (backends + capabilities)."""
+    """Search external MCP server registries (Glama, Smithery, etc.)."""
     from argus_cli.client import ArgusClient, ArgusClientError
     from argus_cli.output import OutputSpec, apply_output_option, output, print_error, print_info
 
@@ -34,46 +38,34 @@ def search(
     cfg = ctx.obj
     try:
         with ArgusClient(cfg) as client:
-            data = client.backends()
-        backends = data.get("backends", [])
+            data = client.registry_search(query, limit=limit, registry=registry)
+        servers = data.get("servers", [])
 
-        if query:
-            q = query.lower()
-            backends = [
-                b
-                for b in backends
-                if q in b.get("name", "").lower() or q in b.get("type", "").lower()
-            ]
-
-        if not backends:
-            print_info("No registry entries found.")
+        if not servers:
+            print_info("No servers found in registries.")
             return
 
         rows = []
-        for b in backends:
-            caps = b.get("capabilities", {})
+        for s in servers:
             rows.append(
                 {
-                    "name": b.get("name", ""),
-                    "type": b.get("type", ""),
-                    "group": b.get("group", ""),
-                    "state": b.get("state", ""),
-                    "tools": caps.get("tools", 0) if isinstance(caps, dict) else 0,
-                    "resources": caps.get("resources", 0) if isinstance(caps, dict) else 0,
-                    "prompts": caps.get("prompts", 0) if isinstance(caps, dict) else 0,
+                    "name": s.get("name", ""),
+                    "description": (s.get("description", "") or "")[:60],
+                    "transport": s.get("transport", ""),
+                    "source": data.get("registry", ""),
                 }
             )
         output(
             rows,
             fmt=cfg.output_format,
             spec=OutputSpec(
-                title="Registry",
-                columns=["name", "type", "group", "state", "tools", "resources", "prompts"],
-                key_field="state",
+                title="Registry Search",
+                columns=["name", "description", "transport", "source"],
+                key_field="name",
             ),
         )
     except ArgusClientError as e:
-        print_error(f"Failed to search registry: {e.message}")
+        print_error(f"Registry search failed: {e.message}")
         raise typer.Exit(1) from None
 
 

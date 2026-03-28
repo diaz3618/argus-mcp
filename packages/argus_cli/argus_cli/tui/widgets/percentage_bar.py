@@ -52,9 +52,11 @@ class PercentageBar(Widget):
         **kwargs: object,
     ) -> None:
         super().__init__(**kwargs)
+        # _bar must exist before setting reactive `value` because
+        # Textual fires watch_value() immediately on assignment.
+        self._bar = _BarTrack()
         self.value = max(0.0, min(100.0, value))
         self.label_text = label
-        self._bar = _BarTrack()
 
     def compose(self):
         yield Label(self.label_text, classes="pbar-label")

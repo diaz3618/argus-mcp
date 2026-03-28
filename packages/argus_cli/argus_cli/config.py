@@ -64,13 +64,24 @@ def _save_yaml_config(data: dict[str, Any]) -> None:
 
 
 def _validate_server_url(url: str) -> None:
-    """Validate that the server URL uses http or https scheme."""
+    """Validate that the server URL uses http or https scheme and has no path suffix."""
     from urllib.parse import urlparse
 
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         msg = f"Invalid server URL scheme '{parsed.scheme}'. Only http and https are supported."
         raise ValueError(msg)
+    path = parsed.path.rstrip("/")
+    if path:
+        import warnings
+
+        warnings.warn(
+            f"Server URL '{url}' contains a path component ('{path}'). "
+            "--server expects the base URL only, e.g. 'http://127.0.0.1:9000'. "
+            "The management API prefix is appended automatically; "
+            "including '/mcp' or other path segments will cause connection failures.",
+            stacklevel=4,
+        )
 
 
 @dataclass
@@ -87,6 +98,9 @@ class CliConfig:
         vi_mode: Enable vi key bindings in the REPL.
         poll_interval: Seconds between background status polls.
         history_limit: Maximum REPL history entries to persist.
+        argusd_auto_start: Automatically start argusd when needed.
+        argusd_binary: Path to the argusd binary (auto-detected if not set).
+        argusd_socket: Custom argusd socket path (auto-detected if not set).
     """
 
     server_url: str = field(default_factory=lambda: DEFAULT_SERVER_URL)
@@ -100,6 +114,11 @@ class CliConfig:
     vi_mode: bool = False
     poll_interval: int = 30
     history_limit: int = 50
+
+    # argusd settings
+    argusd_auto_start: bool = False
+    argusd_binary: str | None = None
+    argusd_socket: str | None = None
 
     @property
     def base_url(self) -> str:
@@ -150,6 +169,18 @@ class CliConfig:
         poll_interval = yaml_cfg.get("poll_interval", 30)
         history_limit = yaml_cfg.get("history_limit", 50)
 
+        # argusd settings (config file and env vars)
+        argusd_cfg = yaml_cfg.get("argusd", {})
+        if not isinstance(argusd_cfg, dict):
+            argusd_cfg = {}
+        argusd_auto_start = os.environ.get("ARGUSD_AUTO_START", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ) or argusd_cfg.get("auto_start", False)
+        argusd_binary = os.environ.get("ARGUSD_BINARY") or argusd_cfg.get("binary")
+        argusd_socket = os.environ.get("ARGUSD_SOCKET") or argusd_cfg.get("socket")
+
         # Validate server URL scheme (SSRF prevention)
         _validate_server_url(resolved_server)
 
@@ -163,6 +194,9 @@ class CliConfig:
             vi_mode=bool(vi_mode),
             poll_interval=int(poll_interval),
             history_limit=int(history_limit),
+            argusd_auto_start=bool(argusd_auto_start),
+            argusd_binary=argusd_binary,
+            argusd_socket=argusd_socket,
         )
 
 

@@ -40,7 +40,7 @@ def main(
         typer.Option(
             "--server",
             "-s",
-            help="Argus server URL.",
+            help="Argus server base URL, e.g. http://127.0.0.1:9000 (no /mcp suffix).",
             envvar="ARGUS_SERVER_URL",
             rich_help_panel="Connection",
         ),

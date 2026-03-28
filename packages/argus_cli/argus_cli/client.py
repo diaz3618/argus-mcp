@@ -238,6 +238,38 @@ class ArgusClient:
     def shutdown(self, timeout_seconds: int = 30) -> dict[str, Any]:
         return self._request("post", "/shutdown", json={"timeout_seconds": timeout_seconds})
 
+    # ── Registry endpoints ─────────────────────────────────────────────
+
+    def registry_search(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+        registry: str | None = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"q": query, "limit": limit}
+        if registry:
+            params["registry"] = registry
+        return self._request("get", "/registry/search", params=params)
+
+    # ── Skills endpoints ───────────────────────────────────────────────
+
+    def skills_list(self) -> dict[str, Any]:
+        return self._request("get", "/skills")
+
+    def skills_enable(self, name: str) -> dict[str, Any]:
+        return self._request("post", f"/skills/{name}/enable")
+
+    def skills_disable(self, name: str) -> dict[str, Any]:
+        return self._request("post", f"/skills/{name}/disable")
+
+    def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = {"tool": name, "arguments": arguments or {}}
+        return self._request("post", "/tools/call", json=payload)
+
+    def read_resource(self, uri: str) -> dict[str, Any]:
+        return self._request("post", "/resources/read", json={"uri": uri})
+
 
 # ── Async client (REPL mode) ──────────────────────────────────────────
 
@@ -353,6 +385,38 @@ class AsyncArgusClient:
 
     async def shutdown(self, timeout_seconds: int = 30) -> dict[str, Any]:
         return await self._request("post", "/shutdown", json={"timeout_seconds": timeout_seconds})
+
+    # ── Registry endpoints ─────────────────────────────────────────────
+
+    async def registry_search(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+        registry: str | None = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"q": query, "limit": limit}
+        if registry:
+            params["registry"] = registry
+        return await self._request("get", "/registry/search", params=params)
+
+    # ── Skills endpoints ───────────────────────────────────────────────
+
+    async def skills_list(self) -> dict[str, Any]:
+        return await self._request("get", "/skills")
+
+    async def skills_enable(self, name: str) -> dict[str, Any]:
+        return await self._request("post", f"/skills/{name}/enable")
+
+    async def skills_disable(self, name: str) -> dict[str, Any]:
+        return await self._request("post", f"/skills/{name}/disable")
+
+    async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = {"tool": name, "arguments": arguments or {}}
+        return await self._request("post", "/tools/call", json=payload)
+
+    async def read_resource(self, uri: str) -> dict[str, Any]:
+        return await self._request("post", "/resources/read", json={"uri": uri})
 
     # ── SSE streaming ──────────────────────────────────────────────────
 
