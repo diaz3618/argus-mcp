@@ -52,9 +52,7 @@ class _InvalidStateTransition(Exception):
 
 
 class ArgusService:
-    """Manages the full lifecycle of the Argus MCP server.
-
-    State machine::
+    """State machine::
 
         PENDING ─► STARTING ─► RUNNING ─► STOPPING ─► STOPPED
                        │                                  │
@@ -76,6 +74,7 @@ class ArgusService:
         self._error_message: Optional[str] = None
         self._config_path: Optional[str] = None
         self._config_data: Optional[Dict[str, Any]] = None
+        self._full_config: Optional[Any] = None  # ArgusConfig, set during start()
 
         # Auto re-auth flag — set externally by lifespan after construction.
         self._auto_reauth: bool = False
@@ -162,6 +161,11 @@ class ArgusService:
     def config_data(self) -> Optional[Dict[str, Any]]:
         """Raw config data loaded from disk (read-only snapshot)."""
         return self._config_data
+
+    @property
+    def full_config(self) -> Optional[Any]:
+        """Full :class:`ArgusConfig` model (``None`` until :meth:`start`)."""
+        return self._full_config
 
     @property
     def started_at(self) -> Optional[datetime]:
@@ -319,6 +323,16 @@ class ArgusService:
             config = await asyncio.to_thread(load_and_validate_config, config_path)
             self._config_data = config
             self._backends_total = len(config)
+
+            # Load full config model for sub-features (skills, workflows, registries).
+            try:
+                self._full_config = await asyncio.to_thread(load_argus_config, config_path)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "Failed to load full ArgusConfig; sub-features will use defaults.",
+                    exc_info=True,
+                )
+
             logger.info("Configuration loaded: %d backend(s) defined.", self._backends_total)
             self.emit_event(
                 "config",

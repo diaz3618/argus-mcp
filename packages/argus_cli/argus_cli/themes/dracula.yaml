@@ -1,0 +1,18 @@
+# Dracula — dark theme with vibrant colors
+# https://draculatheme.com
+name: Dracula
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#50fa7b"
+  error: "#ff5555"
+  warning: "#f1fa8c"
+  highlight: "#6272a4"
+  info: "#8be9fd"
+  accent: "#ff79c6"
+  secondary: "#bd93f9"
+  surface: "#44475a"
+  text: "#f8f8f2"
+  subtext: "#6272a4"
+  overlay: "#44475a"

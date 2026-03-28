@@ -71,4 +71,5 @@ RUN (adduser --disabled-password --uid {{ container_uid }} --home {{ container_h
     && chown {{ container_user }}:{{ container_user }} {{ container_home }}
 ENV HOME={{ container_home }} TMPDIR=/tmp
 USER {{ container_user }}
+LABEL argus.image="true"
 ENTRYPOINT [{% for part in entrypoint %}"{{ part }}"{% if not loop.last %}, {% endif %}{% endfor %}]

@@ -7,22 +7,26 @@ recovery) without coupling them to business logic.
 
 ## Chain Architecture
 
+The actual chain is assembled in `_build_middleware_stack()` during server
+startup. Conditional middlewares are included only when their feature is
+configured.
+
 ```
      Client Request
            │
            ▼
 ┌──────────────────────┐
-│  AuthMiddleware      │  ◄── Validates tokens, injects UserIdentity
+│  AuthMiddleware      │  ◄── Validates tokens, injects UserIdentity (conditional)
 ├──────────────────────┤
-│  AuthzMiddleware     │  ◄── RBAC policy evaluation
+│  RecoveryMiddleware  │  ◄── Exception safety net (always)
 ├──────────────────────┤
-│  TelemetryMiddleware │  ◄── OTel spans + metrics
+│  PluginMiddleware    │  ◄── Pre/post plugin hooks (conditional)
 ├──────────────────────┤
-│  AuditMiddleware     │  ◄── Structured audit logging (NIST SP 800-53)
+│  TelemetryMiddleware │  ◄── OTel spans + metrics (conditional)
 ├──────────────────────┤
-│  RecoveryMiddleware  │  ◄── Exception safety net
+│  AuditMiddleware     │  ◄── Structured audit logging (always)
 ├──────────────────────┤
-│  RoutingMiddleware   │  ◄── Resolve capability → backend, forward
+│  RoutingMiddleware   │  ◄── Resolve capability → backend, forward (terminal)
 └──────────────────────┘
            │
            ▼
@@ -31,6 +35,10 @@ recovery) without coupling them to business logic.
 
 **Execution order:** outermost-first for requests, innermost-first for
 responses. The first middleware in the list wraps all others.
+
+> **Note:** `AuthzMiddleware` is implemented (`argus_mcp.bridge.middleware.authz`)
+> but is **not currently wired** into the default chain built by
+> `_build_middleware_stack()`. It can be added manually via `build_chain()`.
 
 ## Request Context
 
@@ -64,16 +72,29 @@ via the configured `AuthProviderRegistry`, and injects the resulting
 - In anonymous mode, injects a no-op anonymous identity
 - Skipped entirely when incoming auth is not configured
 
-### AuthzMiddleware
+### RecoveryMiddleware
 
-**Module:** `argus_mcp.bridge.middleware.authz`
+**Module:** `argus_mcp.bridge.middleware.recovery`
 
-Evaluates the authenticated user's roles against RBAC policies using the
-`PolicyEngine`. Resource identifiers follow the format `tool:<capability_name>`.
+Exception safety net that catches any unhandled error and returns a
+structured MCP error response so clients always get a well-formed reply.
 
-- Raises `AuthorizationError` (403) when the policy decision is DENY
-- First-match-wins evaluation (order matters in policy list)
-- Skipped when `authorization.enabled` is `false`
+- Sets `ctx.error` with the caught exception
+- Returns `CallToolResult(isError=True)` with a sanitized message
+- **Never leaks** internal details (file paths, SQL, stack traces)
+- Falls back to JSON-RPC error format if MCP types are unavailable
+
+### PluginMiddleware
+
+**Module:** `argus_mcp.plugins`
+
+Runs pre- and post-processing hooks from loaded plugins. Only added to
+the chain when `plugins.enabled` is `true` and at least one plugin entry
+is configured.
+
+- Invokes `plugin_manager.pre_process()` before forwarding
+- Invokes `plugin_manager.post_process()` after receiving a result
+- Bypassed entirely when no plugins are configured
 
 ### TelemetryMiddleware
 
@@ -99,18 +120,6 @@ audit file. Otherwise falls back to standard Python logging.
 - Events are NIST SP 800-53 AU-3 aligned
 - See [Audit & Observability](audit/) for the event format
 
-### RecoveryMiddleware
-
-**Module:** `argus_mcp.bridge.middleware.recovery`
-
-Exception safety net that catches any unhandled error and returns a
-structured MCP error response so clients always get a well-formed reply.
-
-- Sets `ctx.error` with the caught exception
-- Returns `CallToolResult(isError=True)` with a sanitized message
-- **Never leaks** internal details (file paths, SQL, stack traces)
-- Falls back to JSON-RPC error format if MCP types are unavailable
-
 ### RoutingMiddleware
 
 **Module:** `argus_mcp.bridge.middleware.routing`
@@ -126,25 +135,25 @@ to the backend's MCP session.
 
 ## Chain Construction
 
-The chain is built during server startup in the lifespan handler:
+The chain is built during server startup in `_build_middleware_stack()`:
 
 ```python
 from argus_mcp.bridge.middleware.chain import build_chain
 
-# Default chain (always active)
+# Minimal chain (auth disabled, no plugins, no telemetry)
 chain = build_chain(
     middlewares=[RecoveryMiddleware(), AuditMiddleware(audit_logger)],
     handler=RoutingMiddleware(registry, manager),
 )
 
-# Full chain (when auth + authz + telemetry are configured)
+# Full chain (auth + plugins + telemetry enabled)
 chain = build_chain(
     middlewares=[
         AuthMiddleware(auth_registry),
-        AuthzMiddleware(policy_engine),
+        RecoveryMiddleware(),
+        PluginMiddleware(plugin_manager),
         TelemetryMiddleware(),
         AuditMiddleware(audit_logger),
-        RecoveryMiddleware(),
     ],
     handler=RoutingMiddleware(registry, manager),
 )

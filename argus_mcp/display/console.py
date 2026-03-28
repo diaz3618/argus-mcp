@@ -97,7 +97,7 @@ def disp_console_status(stage: str, status_info: Dict[str, Any], is_final: bool 
         print(f"{header:-^{line_len}}")
         print(f"{sep_char * line_len}")
         if not is_final:
-            disp_console_status.header_printed = True  # type: ignore[attr-defined]
+            setattr(disp_console_status, "header_printed", True)
         else:
             if hasattr(disp_console_status, "header_printed"):
                 delattr(disp_console_status, "header_printed")

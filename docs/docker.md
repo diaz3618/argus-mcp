@@ -207,7 +207,7 @@ backends:
 Use a specific tag instead of `latest`:
 
 ```bash
-docker pull diaz3618/argus-mcp:0.7.0
+docker pull diaz3618/argus-mcp:0.8.0
 ```
 
 Tags follow the project version (semver) and are published on each release.

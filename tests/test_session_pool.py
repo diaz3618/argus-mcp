@@ -16,8 +16,6 @@ from argus_mcp.bridge.session_pool import (
     SessionPool,
 )
 
-# Helpers
-
 
 def _key(url: str = "http://backend:8080", identity: str = "abc", transport: str = "sse"):
     return SessionKey(url=url, identity_hash=identity, transport_type=transport)

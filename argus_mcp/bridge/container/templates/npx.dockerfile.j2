@@ -66,4 +66,5 @@ RUN (adduser -D -u {{ container_uid }} -h {{ container_home }} {{ container_user
     && chown {{ container_user }}:{{ container_user }} {{ container_home }}
 ENV HOME={{ container_home }} TMPDIR=/tmp
 USER {{ container_user }}
+LABEL argus.image="true"
 ENTRYPOINT ["/app/node_modules/.bin/__argus_entry"]

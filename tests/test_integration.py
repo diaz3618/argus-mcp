@@ -72,9 +72,6 @@ pytestmark = [
 ]
 
 
-# Helpers
-
-
 def _jsonrpc(method: str, params: dict | None = None, req_id: int | str | None = None) -> dict:
     """Build a JSON-RPC 2.0 request."""
     return {

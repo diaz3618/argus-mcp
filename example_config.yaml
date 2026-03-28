@@ -34,7 +34,7 @@ backends:
     type: stdio
     command: python
     args:
-      - mods/stdio_test_server.py
+      - tests/fixtures/stdio_test_server.py
     env:
       PYTHONUNBUFFERED: "1"
     group: default                  # logical server group
@@ -63,7 +63,7 @@ backends:
     url: "http://127.0.0.1:8021/mcp_sse"
     command: python                 # optional: launch the server process
     args:
-      - mods/sse_test_server.py
+      - tests/fixtures/sse_test_server.py
     env:
       PYTHONUNBUFFERED: "1"
     headers:                        # extra HTTP headers

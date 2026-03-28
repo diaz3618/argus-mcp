@@ -45,8 +45,6 @@ from argus_mcp.registry.catalog import (
     stage_catalog,
 )
 
-# Helpers
-
 
 def _make_config(**overrides: Any) -> ArgusConfig:
     """Create a minimal ArgusConfig for testing."""

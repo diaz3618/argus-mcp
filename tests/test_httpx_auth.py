@@ -9,8 +9,6 @@ import pytest
 
 from argus_mcp.bridge.auth.httpx_auth import _MAX_401_RETRIES, McpBearerAuth
 
-# Helpers
-
 
 def _make_provider(
     headers: dict[str, str] | None = None,

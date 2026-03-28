@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, List, Optional
 
@@ -42,6 +43,12 @@ class ServerState:
     telemetry_enabled: bool = False
     plugin_manager: Optional[PluginManager] = None
     composite_tools: List[Any] = field(default_factory=list)
+    background_tasks: set[asyncio.Task[None]] = field(default_factory=set)
+
+    def track_task(self, task: asyncio.Task[None]) -> None:
+        """Track a background task, auto-removing it when done."""
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard)
 
 
 def get_state(mcp_server: Any) -> ServerState:

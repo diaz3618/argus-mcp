@@ -1,0 +1,18 @@
+# Monokai — iconic dark theme with vivid colors
+# https://monokai.pro
+name: Monokai
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#a6e22e"
+  error: "#f92672"
+  warning: "#e6db74"
+  highlight: "#66d9ef"
+  info: "#66d9ef"
+  accent: "#ae81ff"
+  secondary: "#fd971f"
+  surface: "#3e3d32"
+  text: "#f8f8f2"
+  subtext: "#a59f85"
+  overlay: "#75715e"

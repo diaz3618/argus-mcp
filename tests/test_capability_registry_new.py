@@ -20,8 +20,6 @@ from argus_mcp.bridge.conflict import (
     PrefixStrategy,
 )
 
-# Helpers
-
 
 def _mock_tool(name: str, description: str = "") -> MagicMock:
     """Create a MagicMock that looks like an mcp_types.Tool."""

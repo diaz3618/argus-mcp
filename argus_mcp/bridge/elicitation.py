@@ -123,9 +123,7 @@ class ElicitationResponse:
 
 
 class ElicitationBridge:
-    """Manages elicitation request/response flow.
-
-    The bridge registers a callback (typically the TUI) that handles
+    """The bridge registers a callback (typically the TUI) that handles
     user interaction.  When a backend sends an elicitation request,
     the bridge invokes the callback and returns the response.
     """

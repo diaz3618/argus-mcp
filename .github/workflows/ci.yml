@@ -12,14 +12,14 @@ on:
       - main
     paths:
       - 'argus_mcp/**'
-      - 'mods/**'
+      - 'packages/**'
       - 'pyproject.toml'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'argus_mcp/**'
-      - 'mods/**'
+      - 'packages/**'
       - 'pyproject.toml'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
@@ -62,8 +62,8 @@ jobs:
       - name: Run ruff check
         run: uv run ruff check argus_mcp/
 
-      - name: Run ruff check (mods/)
-        run: uv run ruff check mods/
+      - name: Run ruff check (argus_cli)
+        run: uv run ruff check packages/argus_cli/argus_cli/
 
   # ──────────────────────────────────────────────
   # Ruff — code formatting verification
@@ -85,7 +85,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff format --check
-        run: uv run ruff format --check argus_mcp/ mods/
+        run: uv run ruff format --check argus_mcp/ packages/argus_cli/argus_cli/
 
   # ──────────────────────────────────────────────
   # Mypy — static type checking
@@ -133,6 +133,71 @@ jobs:
 
   # NOTE: tests/ is local-only (excluded from remote). Test suite runs
   # via pre-push git hook instead — see .pre-commit-config.yaml.
+
+  # ──────────────────────────────────────────────
+  # Rust — build PyO3 extensions
+  # ──────────────────────────────────────────────
+  rust-extensions:
+    name: Rust Extensions (maturin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            **/target
+          key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: rust-${{ runner.os }}-
+
+      - name: Install project + maturin
+        run: |
+          uv sync --group dev
+          uv pip install maturin
+
+      - name: Build all Rust extensions
+        run: uv run python scripts/build_rust.py
+
+  # ──────────────────────────────────────────────
+  # Go — build argusd daemon
+  # ──────────────────────────────────────────────
+  go-daemon:
+    name: Go Daemon (argusd)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/argusd/go.mod
+          cache-dependency-path: packages/argusd/go.sum
+
+      - name: Build argusd
+        run: make -C packages/argusd build
+
+      - name: Run Go vet
+        run: make -C packages/argusd vet
+
+      - name: Run Go tests
+        run: make -C packages/argusd test
 
   # ──────────────────────────────────────────────
   # Security — filesystem scan
@@ -211,6 +276,8 @@ jobs:
       - format
       - typecheck
       - import-boundaries
+      - rust-extensions
+      - go-daemon
       - security-scan
       - container-scan
     runs-on: ubuntu-latest

@@ -89,7 +89,6 @@ class CircuitBreakerPlugin(PluginBase):
 
     async def tool_post_invoke(self, ctx: PluginContext) -> PluginContext:
         breaker = self._get(ctx)
-        # If result metadata indicates error, record failure; else success.
         if ctx.metadata.get("error"):
             breaker.record_failure()
             ctx.metadata["circuit_state"] = breaker.state.value

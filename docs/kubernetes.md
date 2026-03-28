@@ -119,8 +119,8 @@ configMap:
         host: 0.0.0.0
         port: 9000
       backends:
-        - name: my-backend
-          transport: stdio
+        my-backend:
+          type: stdio
           command: npx
           args: ["-y", "@example/mcp-server"]
 ```
@@ -141,7 +141,7 @@ helm install argus-mcp ./charts/argus-mcp \
 helm install argus-mcp ./charts/argus-mcp \
   --namespace argus --create-namespace \
   --set replicaCount=3 \
-  --set image.tag=0.7.2
+  --set image.tag=0.8.0
 ```
 
 ## Upgrade

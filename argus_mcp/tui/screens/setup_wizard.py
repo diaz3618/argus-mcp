@@ -31,8 +31,8 @@ from textual.widgets import (
     TextArea,
 )
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.config.loader import find_config_file
+from argus_mcp.tui._error_utils import safe_query
 from argus_mcp.tui.screens.base import ArgusScreen
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,18 @@
+# Rosé Pine — soho vibes for dark terminals
+# https://rosepinetheme.com
+name: Rosé Pine
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#31748f"
+  error: "#eb6f92"
+  warning: "#f6c177"
+  highlight: "#9ccfd8"
+  info: "#9ccfd8"
+  accent: "#c4a7e7"
+  secondary: "#c4a7e7"
+  surface: "#1f1d2e"
+  text: "#e0def4"
+  subtext: "#908caa"
+  overlay: "#6e6a86"

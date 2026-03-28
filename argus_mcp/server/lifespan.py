@@ -64,8 +64,14 @@ _WORKFLOW_YAML_DIRS = ("workflows", "examples/workflows")
 _YAML_EXTS = (".yaml", ".yml")
 
 
-def _discover_workflow_yamls() -> list[dict]:
-    """Scan known directories for workflow YAML files and return parsed dicts."""
+def _discover_workflow_yamls(extra_dirs: tuple[str, ...] = ()) -> list[dict]:
+    """Scan known directories for workflow YAML files and return parsed dicts.
+
+    Parameters
+    ----------
+    extra_dirs:
+        Additional directories to scan (e.g. from config ``workflows.directory``).
+    """
     from pathlib import Path
 
     results: list[dict] = []
@@ -75,7 +81,15 @@ def _discover_workflow_yamls() -> list[dict]:
         logger.debug("pyyaml not installed — skipping YAML workflow discovery.")
         return results
 
-    for rel_dir in _WORKFLOW_YAML_DIRS:
+    # Build de-duplicated scan list: extra_dirs first, then defaults.
+    seen: set[str] = set()
+    scan_dirs: list[str] = []
+    for d in (*extra_dirs, *_WORKFLOW_YAML_DIRS):
+        if d not in seen:
+            seen.add(d)
+            scan_dirs.append(d)
+
+    for rel_dir in scan_dirs:
         d = Path(rel_dir)
         if not d.is_dir():
             d = Path(__file__).resolve().parents[2] / rel_dir
@@ -93,7 +107,9 @@ def _discover_workflow_yamls() -> list[dict]:
     return results
 
 
-def _load_composite_workflows(mcp_svr_instance: Any, chain: Any) -> None:
+def _load_composite_workflows(
+    mcp_svr_instance: Any, chain: Any, extra_dirs: tuple[str, ...] = ()
+) -> None:
     """Discover workflow YAML files and register them as composite tools.
 
     The ``invoke_tool`` callback delegates to the middleware chain so that
@@ -102,7 +118,7 @@ def _load_composite_workflows(mcp_svr_instance: Any, chain: Any) -> None:
     from argus_mcp.bridge.middleware.chain import RequestContext
     from argus_mcp.workflows.composite_tool import load_composite_tools
 
-    wf_defs = _discover_workflow_yamls()
+    wf_defs = _discover_workflow_yamls(extra_dirs=extra_dirs)
     if not wf_defs:
         mcp_svr_instance.composite_tools = []
         logger.debug("No composite workflow definitions found.")
@@ -385,12 +401,24 @@ async def _attach_to_mcp_server(
 
     from argus_mcp.skills.manager import SkillManager
 
-    skill_manager = SkillManager()
+    skills_dir = "skills"
+    if full_cfg is not None and hasattr(full_cfg, "skills"):
+        skills_dir = full_cfg.skills.directory
+    skill_manager = SkillManager(skills_dir=skills_dir)
     skill_manager.discover()
     mcp_svr_instance.skill_manager = skill_manager
-    logger.info("SkillManager attached: %d skill(s) discovered.", len(skill_manager.list_skills()))
+    logger.info(
+        "SkillManager attached (dir=%s): %d skill(s) discovered.",
+        skills_dir,
+        len(skill_manager.list_skills()),
+    )
 
-    _load_composite_workflows(mcp_svr_instance, chain)
+    wf_extra_dirs: tuple[str, ...] = ()
+    if full_cfg is not None and hasattr(full_cfg, "workflows"):
+        cfg_wf_dir = full_cfg.workflows.directory
+        if cfg_wf_dir not in _WORKFLOW_YAML_DIRS:
+            wf_extra_dirs = (cfg_wf_dir,)
+    _load_composite_workflows(mcp_svr_instance, chain, extra_dirs=wf_extra_dirs)
 
     # Attach a single typed object so consumers can access state with
     # proper typing instead of ad-hoc getattr(mcp_server, ...) calls.
@@ -571,11 +599,13 @@ def _propagate_to_mgmt_app(app_state: Any, service: "ArgusService") -> None:
     mgmt_app = getattr(app_state, "mgmt_app", None)
     if mgmt_app is None:
         return
-    mgmt_app.state.argus_service = service  # type: ignore[attr-defined]
-    mgmt_app.state.host = getattr(app_state, "host", "127.0.0.1")  # type: ignore[attr-defined]
-    mgmt_app.state.port = getattr(app_state, "port", 0)  # type: ignore[attr-defined]
-    mgmt_app.state.transport_type = getattr(  # type: ignore[attr-defined]
-        app_state, "transport_type", "streamable-http"
+    setattr(mgmt_app.state, "argus_service", service)
+    setattr(mgmt_app.state, "host", getattr(app_state, "host", "127.0.0.1"))
+    setattr(mgmt_app.state, "port", getattr(app_state, "port", 0))
+    setattr(
+        mgmt_app.state,
+        "transport_type",
+        getattr(app_state, "transport_type", "streamable-http"),
     )
 
 
@@ -658,7 +688,7 @@ async def app_lifespan(app: Starlette) -> AsyncIterator[None]:
     # Propagate CLI --parallel flag for concurrent container builds.
     service._parallel = getattr(app_state, "parallel", False)
     # Store service on app.state so management API can access it later (0.2).
-    app_state.argus_service = service  # type: ignore[attr-defined]
+    setattr(app_state, "argus_service", service)
 
     # Also propagate to the management sub-app so its request handlers see
     # argus_service on *their* request.app.state (the sub-app's state).

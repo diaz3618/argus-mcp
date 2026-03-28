@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from argus_mcp.config.schema_backends import (  # noqa: F401
     AuthConfig,
@@ -77,7 +77,6 @@ __all__ = [
     # schema_server
     "ManagementSettings",
     "ServerSettings",
-    # This file
     "ConflictResolutionConfig",
     "AuditConfig",
     "OptimizerConfig",
@@ -89,6 +88,8 @@ __all__ = [
     "SecretsConfig",
     "ArgusConfig",
     "PluginsConfig",
+    "SkillsConfig",
+    "WorkflowsConfig",
 ]
 
 
@@ -319,6 +320,32 @@ class SecretsConfig(BaseModel):
     )
 
 
+class SkillsConfig(BaseModel):
+    """Skills discovery configuration."""
+
+    directory: str = Field(
+        default="skills",
+        description="Directory where skills are installed.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Enable skill discovery and management.",
+    )
+
+
+class WorkflowsConfig(BaseModel):
+    """Workflow discovery configuration."""
+
+    directory: str = Field(
+        default="workflows",
+        description="Directory where workflow YAML files are stored.",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Enable workflow discovery.",
+    )
+
+
 class ArgusConfig(BaseModel):
     """Top-level validated configuration for Argus MCP.
 
@@ -332,6 +359,15 @@ class ArgusConfig(BaseModel):
             }
         }
     """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_none_to_default(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("registries", "backends"):
+                if key in data and data[key] is None:
+                    del data[key]
+        return data
 
     version: str = "1"
     server: ServerSettings = Field(default_factory=ServerSettings)
@@ -395,6 +431,14 @@ class ArgusConfig(BaseModel):
     plugins: PluginsConfig = Field(
         default_factory=PluginsConfig,
         description="Plugin framework configuration.",
+    )
+    skills: SkillsConfig = Field(
+        default_factory=SkillsConfig,
+        description="Skills discovery configuration.",
+    )
+    workflows: WorkflowsConfig = Field(
+        default_factory=WorkflowsConfig,
+        description="Workflow discovery configuration.",
     )
 
     @field_validator("backends")

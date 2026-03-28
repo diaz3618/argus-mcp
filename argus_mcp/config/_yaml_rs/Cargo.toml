@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies.pyo3]
 version = "0.28"
-features = ["extension-module", "abi3-py311"]
+features = ["extension-module", "abi3-py310"]
 
 [dependencies]
 serde_yaml = "0.9"

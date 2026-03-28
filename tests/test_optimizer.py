@@ -14,8 +14,6 @@ from argus_mcp.bridge.optimizer.meta_tools import (
 )
 from argus_mcp.bridge.optimizer.search import ToolIndex, _simple_score, _tokenize
 
-# Helper: fake MCP Tool objects
-
 
 class _FakeTool:
     """Minimal mock of mcp.types.Tool for testing."""

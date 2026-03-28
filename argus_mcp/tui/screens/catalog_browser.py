@@ -210,7 +210,6 @@ class CatalogBrowserScreen(ArgusScreen):
             )
             return
 
-        # Persist updated config
         try:
             path = find_config_file()
             cfg_dict = config.model_dump(exclude_none=True, exclude_defaults=False)

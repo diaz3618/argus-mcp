@@ -10,8 +10,6 @@ import pytest
 
 from argus_mcp.bridge.container.go_docker_adapter import GoDockerAdapter, is_available
 
-# Helpers
-
 
 def _make_adapter_with_mock_call(
     responses: list[Dict[str, Any]],
