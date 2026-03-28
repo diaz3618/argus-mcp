@@ -1,37 +1,56 @@
-"""Tests for Phase 6 — Rust crate conditional integration.
+"""Tests for Rust crate conditional integration.
 
 Verifies all four Rust bridge modules and their wiring into
-Python production code paths.  Since the compiled Rust extensions
-are not present in CI (requires ``maturin build``), we test:
+Python production code paths.
 
-1. The fallback path — Python pure implementations are used
-   when ``RUST_AVAILABLE`` is ``False``.
-2. The Rust-preference path — by patching the flags, we confirm
-   the code *would* select the Rust implementation.
-3. API compatibility of the bridge ``__init__.py`` exports.
+When Rust extensions are NOT compiled (CI), tests verify the
+fallback to pure-Python implementations.
+
+When Rust extensions ARE compiled (local dev), tests verify
+the Rust path is selected and functional.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 
-#  Filter bridge
+from argus_mcp.bridge._filter_rs import RUST_AVAILABLE as _FILTER_RUST
+from argus_mcp.bridge.auth._token_cache_rs import (
+    RUST_AVAILABLE as _TC_RUST_AVAIL,
+)
+from argus_mcp.bridge.health._circuit_breaker_rs import (
+    RUST_AVAILABLE as _CB_RUST_AVAIL,
+)
+from argus_mcp.plugins.builtins_rust import RUST_AVAILABLE as _SEC_RUST_AVAIL
+
+_no_rust_filter = pytest.mark.skipif(_FILTER_RUST, reason="Rust filter compiled")
+_has_rust_filter = pytest.mark.skipif(not _FILTER_RUST, reason="Rust filter not compiled")
+_no_rust_cb = pytest.mark.skipif(_CB_RUST_AVAIL, reason="Rust CB compiled")
+_has_rust_cb = pytest.mark.skipif(not _CB_RUST_AVAIL, reason="Rust CB not compiled")
+_no_rust_tc = pytest.mark.skipif(_TC_RUST_AVAIL, reason="Rust token cache compiled")
+_has_rust_tc = pytest.mark.skipif(not _TC_RUST_AVAIL, reason="Rust token cache not compiled")
+_no_rust_sec = pytest.mark.skipif(_SEC_RUST_AVAIL, reason="Rust security plugins compiled")
+_has_rust_sec = pytest.mark.skipif(not _SEC_RUST_AVAIL, reason="Rust security plugins not compiled")
+
+
 class TestFilterRsBridge:
     """argus_mcp.bridge._filter_rs — conditional import bridge."""
 
+    @_no_rust_filter
     def test_rust_not_available_by_default(self) -> None:
         from argus_mcp.bridge._filter_rs import RUST_AVAILABLE
 
-        # Native extension isn't compiled, so RUST_AVAILABLE should be False
         assert RUST_AVAILABLE is False
 
+    @_no_rust_filter
     def test_exports_rust_capability_filter_none(self) -> None:
         from argus_mcp.bridge._filter_rs import RustCapabilityFilter
 
         assert RustCapabilityFilter is None
 
-    def test_build_filter_returns_python_fallback(self) -> None:
+    def test_build_filter_returns_capability_filter(self) -> None:
         from argus_mcp.bridge.filter import CapabilityFilter, build_filter
 
         f = build_filter(allow=["echo*"], deny=["echo_bad"])
@@ -51,27 +70,36 @@ class TestFilterRsBridge:
             mock_rust_cls.assert_called_once_with(allow=["a"], deny=["b"])
             assert result is mock_rust_cls.return_value
 
+    @_has_rust_filter
+    def test_rust_filter_is_functional(self) -> None:
+        from argus_mcp.bridge.filter import build_filter
 
-#  Circuit Breaker bridge
+        f = build_filter(allow=["echo*"], deny=["echo_bad"])
+        assert f.is_allowed("echo_good") is True
+        assert f.is_allowed("echo_bad") is False
+        assert f.is_allowed("other") is False
+
+
 class TestCircuitBreakerRsBridge:
     """argus_mcp.bridge.health._circuit_breaker_rs — conditional import."""
 
+    @_no_rust_cb
     def test_rust_not_available_by_default(self) -> None:
         from argus_mcp.bridge.health._circuit_breaker_rs import RUST_AVAILABLE
 
         assert RUST_AVAILABLE is False
 
+    @_no_rust_cb
     def test_fallback_is_python_circuit_breaker(self) -> None:
         from argus_mcp.bridge.health._circuit_breaker_rs import CircuitBreaker
         from argus_mcp.bridge.health.circuit_breaker import (
             CircuitBreaker as PyCB,
         )
 
-        # The _rs bridge falls back to the same pure-Python class
         assert CircuitBreaker is PyCB
 
+    @_no_rust_cb
     def test_checker_uses_python_cb_by_default(self) -> None:
-        """Health checker should use pure-Python CB when Rust is unavailable."""
         from argus_mcp.bridge.health.checker import _CB_RUST
 
         assert _CB_RUST is False
@@ -87,26 +115,40 @@ class TestCircuitBreakerRsBridge:
             _CB = _RustCB if _CB_RUST and _RustCB is not None else None
             assert _CB is mock_rust_cb
 
+    @_no_rust_cb
     def test_session_pool_uses_python_cb_by_default(self) -> None:
         from argus_mcp.bridge.session_pool import _CB_RUST
 
         assert _CB_RUST is False
 
+    @_has_rust_cb
+    def test_rust_cb_returns_circuit_state_enum(self) -> None:
+        from argus_mcp.bridge.health._circuit_breaker_rs import CircuitBreaker
+        from argus_mcp.bridge.health.circuit_breaker import CircuitState
 
-#  Token Cache bridge
+        cb = CircuitBreaker("test", failure_threshold=2)
+        assert cb.state == CircuitState.CLOSED
+        cb.record_failure()
+        cb.record_failure()
+        assert cb.state == CircuitState.OPEN
+        cb.reset()
+        assert cb.state == CircuitState.CLOSED
+
+
 class TestTokenCacheRsBridge:
     """argus_mcp.bridge.auth._token_cache_rs — conditional import."""
 
+    @_no_rust_tc
     def test_rust_not_available_by_default(self) -> None:
         from argus_mcp.bridge.auth._token_cache_rs import RUST_AVAILABLE
 
         assert RUST_AVAILABLE is False
 
+    @_no_rust_tc
     def test_fallback_is_python_token_cache(self) -> None:
         from argus_mcp.bridge.auth._token_cache_rs import TokenCache
         from argus_mcp.bridge.auth.token_cache import TokenCache as PyTC
 
-        # The _rs bridge falls back to the same pure-Python class
         assert TokenCache is PyTC
 
     def test_provider_imports_from_bridge(self) -> None:
@@ -126,15 +168,16 @@ class TestTokenCacheRsBridge:
         assert TokenCache is BridgeTC
 
 
-#  Security Plugins bridge
 class TestSecurityPluginsRsBridge:
     """argus_mcp.plugins.builtins_rust — conditional import."""
 
+    @_no_rust_sec
     def test_rust_not_available_by_default(self) -> None:
         from argus_mcp.plugins.builtins_rust import RUST_AVAILABLE
 
         assert RUST_AVAILABLE is False
 
+    @_no_rust_sec
     def test_rust_classes_are_none(self) -> None:
         from argus_mcp.plugins.builtins_rust import (
             RustPiiFilter,
@@ -144,6 +187,7 @@ class TestSecurityPluginsRsBridge:
         assert RustPiiFilter is None
         assert RustSecretsScanner is None
 
+    @_no_rust_sec
     def test_pii_plugin_uses_python_fallback(self) -> None:
         """When Rust is unavailable, _rust_engine should be None."""
         from argus_mcp.plugins.builtins.pii_filter import PiiFilterPlugin
@@ -185,6 +229,7 @@ class TestSecurityPluginsRsBridge:
             mock_engine.mask_string.assert_called_once_with("test@email.com")
             assert result == ("masked", {"email": 1})
 
+    @_no_rust_sec
     def test_secrets_plugin_uses_python_fallback(self) -> None:
         from argus_mcp.plugins.builtins.secrets_detection import (
             SecretsDetectionPlugin,

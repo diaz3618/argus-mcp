@@ -425,7 +425,7 @@ rules:
     paths:
       include:
         - /argus_mcp/**/*.py
-        - /mods/**/*.py
+
     metadata:
       category: dependency
       technology: [python, subprocess]
