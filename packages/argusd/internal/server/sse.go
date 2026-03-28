@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 )
 
 // SSEWriter wraps an http.ResponseWriter for Server-Sent Events.
@@ -77,16 +76,6 @@ func respondJSON(w http.ResponseWriter, status int, v interface{}) {
 // respondError writes a JSON error response.
 func respondError(w http.ResponseWriter, status int, msg string) {
 	respondJSON(w, status, map[string]string{"error": msg})
-}
-
-// pathParam extracts a path segment by position from the request path.
-// For example, pathParam(r, 3) on "/v1/containers/abc123" returns "abc123".
-func pathParam(r *http.Request, pos int) string {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
-	if pos < len(parts) {
-		return parts[pos]
-	}
-	return ""
 }
 
 // clientDisconnected returns a context that cancels when the client disconnects.

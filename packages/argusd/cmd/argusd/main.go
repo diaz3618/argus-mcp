@@ -25,6 +25,9 @@ import (
 	"github.com/diaz3618/argus-mcp/packages/argusd/internal/server"
 )
 
+// version is set at build time via ldflags -X main.version=...
+var version = "dev"
+
 func defaultSocketPath() string {
 	if d := os.Getenv("XDG_RUNTIME_DIR"); d != "" {
 		return filepath.Join(d, "argusd.sock")
@@ -37,7 +40,7 @@ func main() {
 	flag.Parse()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	log.Printf("argusd starting — socket=%s", *socketPath)
+	log.Printf("argusd %s starting — socket=%s", version, *socketPath)
 
 	// Docker client (required)
 	dc, err := docker.NewClient()

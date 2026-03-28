@@ -54,6 +54,27 @@ func (c *Client) Ping(ctx context.Context) error {
 	return err
 }
 
+// safeShortID truncates an ID to 12 characters, or returns it as-is if shorter.
+func safeShortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
+// verifyManaged inspects a container and returns an error if it lacks the
+// Argus-managed label.  The caller must already hold at least an RLock.
+func (c *Client) verifyManaged(ctx context.Context, id string) error {
+	info, err := c.cli.ContainerInspect(ctx, id)
+	if err != nil {
+		return fmt.Errorf("inspect %s: %w", id, err)
+	}
+	if info.Config == nil || info.Config.Labels[labels.Managed] != labels.ManagedValue {
+		return fmt.Errorf("container %s is not Argus-managed", id)
+	}
+	return nil
+}
+
 // ContainerInfo is a simplified container representation.
 type ContainerInfo struct {
 	ID        string            `json:"id"`
@@ -105,7 +126,7 @@ func (c *Client) ListContainers(ctx context.Context) ([]ContainerInfo, error) {
 			})
 		}
 		result = append(result, ContainerInfo{
-			ID:      ctr.ID[:12],
+			ID:      safeShortID(ctr.ID),
 			Name:    name,
 			Image:   ctr.Image,
 			State:   ctr.State,
@@ -138,6 +159,9 @@ func (c *Client) InspectContainer(ctx context.Context, id string) (*types.Contai
 func (c *Client) StartContainer(ctx context.Context, id string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if err := c.verifyManaged(ctx, id); err != nil {
+		return err
+	}
 	return c.cli.ContainerStart(ctx, id, container.StartOptions{})
 }
 
@@ -145,6 +169,9 @@ func (c *Client) StartContainer(ctx context.Context, id string) error {
 func (c *Client) StopContainer(ctx context.Context, id string, timeoutSec int) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if err := c.verifyManaged(ctx, id); err != nil {
+		return err
+	}
 	timeout := timeoutSec
 	return c.cli.ContainerStop(ctx, id, container.StopOptions{Timeout: &timeout})
 }
@@ -153,6 +180,9 @@ func (c *Client) StopContainer(ctx context.Context, id string, timeoutSec int) e
 func (c *Client) RestartContainer(ctx context.Context, id string, timeoutSec int) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if err := c.verifyManaged(ctx, id); err != nil {
+		return err
+	}
 	timeout := timeoutSec
 	return c.cli.ContainerRestart(ctx, id, container.StopOptions{Timeout: &timeout})
 }
@@ -161,6 +191,9 @@ func (c *Client) RestartContainer(ctx context.Context, id string, timeoutSec int
 func (c *Client) RemoveContainer(ctx context.Context, id string) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if err := c.verifyManaged(ctx, id); err != nil {
+		return err
+	}
 	return c.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true})
 }
 
@@ -304,7 +337,7 @@ func (c *Client) StreamStats(ctx context.Context, id string, w io.Writer) error 
 func computeStats(id string, cur, prev *container.StatsResponse) StatsSnapshot {
 	snap := StatsSnapshot{
 		Timestamp:   time.Now(),
-		ContainerID: id[:12],
+		ContainerID: safeShortID(id),
 		MemoryUsage: cur.MemoryStats.Usage,
 		MemoryLimit: cur.MemoryStats.Limit,
 		PidsCurrent: cur.PidsStats.Current,
@@ -374,7 +407,7 @@ func (c *Client) StreamEvents(ctx context.Context, w io.Writer) error {
 			event := map[string]interface{}{
 				"type":      msg.Type,
 				"action":    msg.Action,
-				"actor_id":  msg.Actor.ID[:12],
+				"actor_id":  safeShortID(msg.Actor.ID),
 				"actor":     msg.Actor.Attributes,
 				"timestamp": time.Unix(msg.Time, msg.TimeNano),
 			}
