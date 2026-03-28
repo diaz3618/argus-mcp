@@ -30,18 +30,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Install build dependencies
+      - name: Build sdist for release asset
         run: |
-          python -m pip install --upgrade pip
           pip install build
-
-      - name: Build server distribution
-        run: python -m build .
-
-      - name: Build CLI distribution
-        run: python -m build packages/argus_cli
+          python -m build --sdist .
+          python -m build packages/argus_cli
 
       - name: Collect all artifacts
         run: |
@@ -94,8 +89,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # GITHUB_TOKEN releases do not trigger other workflows (anti-loop).
-      # Explicitly dispatch publish.yml so PyPI publishing is automatic.
-      - name: Trigger PyPI publish
-        run: gh workflow run publish.yml --ref "${{ github.ref }}"
+      # Explicitly dispatch build-wheels.yml for platform wheel builds + PyPI publish.
+      - name: Trigger wheel build & publish
+        run: gh workflow run build-wheels.yml --ref "${{ github.ref }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

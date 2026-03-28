@@ -1,8 +1,10 @@
 # ──────────────────────────────────────────────────────────────
-# Argus MCP — Multi-stage Docker build
+# Argus MCP — Multi-stage Docker build (Rust + Go + Python)
 # ──────────────────────────────────────────────────────────────
-# Stage 1: Build environment (install deps with uv)
-# Stage 2: Slim runtime image
+# Stage 1: Rust builder     — compile 7 PyO3 extension modules
+# Stage 2: Go builder       — compile docker-adapter + mcp-stdio-wrapper
+# Stage 3: Python builder   — assemble venv with native extensions
+# Stage 4: Slim runtime image
 #
 # Usage:
 #   docker build -t argus-mcp .
@@ -17,7 +19,48 @@
 #   The runtime image includes Node.js LTS for npx-based servers.
 # ──────────────────────────────────────────────────────────────
 
-# ── Stage 1: Builder ────────────────────────────────────────
+# ── Stage 1: Rust Builder ──────────────────────────────────
+# nosemgrep: docker-user-root (builder stage is discarded)
+FROM rust:1.85-slim AS rust-builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY argus_mcp/ ./argus_mcp/
+COPY pyproject.toml Cargo.lock* ./
+
+# Build each Rust extension with maturin (abi3 → single .so per crate)
+RUN pip install --break-system-packages maturin && \
+    for crate in \
+      argus_mcp/config/_yaml_rs \
+      argus_mcp/audit/_audit_rs \
+      argus_mcp/bridge/_filter_rs \
+      argus_mcp/bridge/auth/_token_cache_rs \
+      argus_mcp/bridge/health/_circuit_breaker_rs \
+      argus_mcp/plugins/_hash_rs \
+      argus_mcp/plugins/builtins_rust; \
+    do \
+      echo "=== Building $crate ===" && \
+      maturin build --release --manifest-path "$crate/Cargo.toml" --out /build/wheels || exit 1; \
+    done
+
+# ── Stage 2: Go Builder ───────────────────────────────────
+# nosemgrep: docker-user-root (builder stage is discarded)
+FROM golang:1.24-alpine AS go-builder
+
+WORKDIR /build
+
+COPY tools/docker-adapter/ ./tools/docker-adapter/
+COPY tools/mcp-stdio-wrapper/ ./tools/mcp-stdio-wrapper/
+
+RUN cd tools/docker-adapter && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter . && \
+    cd /build/tools/mcp-stdio-wrapper && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper .
+
+# ── Stage 3: Python Builder ───────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded; runtime uses USER argus)
 FROM python:3.13-slim AS builder
 
@@ -34,11 +77,20 @@ COPY argus_mcp/ ./argus_mcp/
 # nosemgrep: docker-pip-no-cache, dependency-docker-no-unpinned-pip-install
 RUN uv venv /opt/venv && \
     UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python .
+
+# Install pre-built Rust extension wheels into the venv
+COPY --from=rust-builder /build/wheels/ /tmp/wheels/
+RUN uv pip install --no-cache --python /opt/venv/bin/python /tmp/wheels/*.whl && \
+    rm -rf /tmp/wheels
+
+# Place Go binaries in the package's _bin/ directory
+COPY --from=go-builder /go-bin/ /opt/venv/lib/python3.13/site-packages/argus_mcp/_bin/
+
 RUN find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 
 
-# ── Stage 2: Runtime ───────────────────────────────────────
-# nosemgrep: docker-user-root (USER argus set below at line ~80)
+# ── Stage 4: Runtime ───────────────────────────────────────
+# nosemgrep: docker-user-root (USER argus set below)
 FROM python:3.13-slim AS runtime
 
 LABEL org.opencontainers.image.title="Argus MCP" \

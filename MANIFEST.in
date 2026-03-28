@@ -1,0 +1,7 @@
+# Include Rust source for sdist (build-from-source support)
+recursive-include argus_mcp *.rs Cargo.toml Cargo.lock
+
+# Include project metadata
+include pyproject.toml
+include README.md
+include LICENSE

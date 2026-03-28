@@ -1,0 +1,257 @@
+# =============================================================================
+# Build & Publish — Platform Wheels (Rust + Go) + sdist
+# =============================================================================
+#
+# Builds platform-specific wheels containing:
+#   - 7 Rust PyO3 extension modules (via setuptools-rust)
+#   - 2 Go binaries: docker-adapter, mcp-stdio-wrapper (as package_data)
+#
+# Also builds the pure-Python argus-cli wheel.
+#
+# Triggers:
+#   - Push tag v* (e.g. v0.8.1) → full build + publish to PyPI
+#   - Pull request (main, release/*) → build only (no publish)
+#   - Manual dispatch
+#
+# Wheel matrix (abi3-py310 → one wheel per platform):
+#   - manylinux_2_17_x86_64      (linux/amd64)
+#   - manylinux_2_17_aarch64     (linux/arm64)
+#   - macosx_10_14_x86_64        (darwin/amd64)
+#   - macosx_11_0_arm64          (darwin/arm64)
+#   - win_amd64                  (windows/amd64)
+# =============================================================================
+
+name: Build & Publish Wheels
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    branches: [main, 'release/*']
+  workflow_dispatch:
+
+concurrency:
+  group: wheels-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Job 1: Cross-compile Go binaries ─────────────────────────────────────
+  build-go-binaries:
+    name: Build Go binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false
+
+      - name: Build docker-adapter
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          SUFFIX=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then SUFFIX=".exe"; fi
+          mkdir -p dist/${{ matrix.goos }}_${{ matrix.goarch }}
+          cd tools/docker-adapter
+          go build -trimpath -ldflags="-s -w" -o "../../dist/${{ matrix.goos }}_${{ matrix.goarch }}/docker-adapter${SUFFIX}" .
+
+      - name: Build mcp-stdio-wrapper
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          SUFFIX=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then SUFFIX=".exe"; fi
+          cd tools/mcp-stdio-wrapper
+          go build -trimpath -ldflags="-s -w" -o "../../dist/${{ matrix.goos }}_${{ matrix.goarch }}/mcp-stdio-wrapper${SUFFIX}" .
+
+      - name: Build argusd
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          SUFFIX=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then SUFFIX=".exe"; fi
+          cd packages/argusd
+          go build -trimpath -ldflags="-s -w" -o "../../dist/${{ matrix.goos }}_${{ matrix.goarch }}/argusd${SUFFIX}" ./cmd/argusd
+
+      - name: Upload Go binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/${{ matrix.goos }}_${{ matrix.goarch }}/
+
+  # ── Job 2: Build platform wheels via cibuildwheel ────────────────────────
+  build-wheels:
+    name: Wheel (${{ matrix.os }})
+    needs: [build-go-binaries]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cibw_archs: x86_64
+            go_os: linux
+            go_arch: amd64
+          - os: ubuntu-24.04-arm
+            cibw_archs: aarch64
+            go_os: linux
+            go_arch: arm64
+          - os: macos-13
+            cibw_archs: x86_64
+            go_os: darwin
+            go_arch: amd64
+          - os: macos-latest
+            cibw_archs: arm64
+            go_os: darwin
+            go_arch: arm64
+          - os: windows-latest
+            cibw_archs: AMD64
+            go_os: windows
+            go_arch: amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Go binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: go-binaries-${{ matrix.go_os }}-${{ matrix.go_arch }}
+          path: go-binaries/${{ matrix.go_os }}_${{ matrix.go_arch }}
+
+      - name: Inject Go binaries into package
+        run: python scripts/ci_inject_go.py --os ${{ matrix.go_os }} --arch ${{ matrix.go_arch }}
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23
+        with:
+          output-dir: wheelhouse
+        env:
+          CIBW_ARCHS: ${{ matrix.cibw_archs }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.go_os }}-${{ matrix.go_arch }}
+          path: wheelhouse/*.whl
+
+  # ── Job 3: Source distribution ───────────────────────────────────────────
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build sdist
+        run: |
+          pip install build
+          python -m build --sdist .
+
+      - name: Build argus-cli sdist + wheel
+        run: python -m build packages/argus_cli
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: |
+            dist/*.tar.gz
+            packages/argus_cli/dist/*
+
+  # ── Job 4: Publish to PyPI ──────────────────────────────────────────────
+  publish:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/argus-mcp
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-all/
+
+      - name: Collect distributions
+        run: |
+          mkdir -p dist
+          find dist-all -name '*.whl' -exec cp {} dist/ \;
+          find dist-all -name '*.tar.gz' -exec cp {} dist/ \;
+          echo "=== Distributions ==="
+          ls -lh dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          skip-existing: true
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    permissions:
+      id-token: write
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/argus-mcp
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-all/
+
+      - name: Collect distributions
+        run: |
+          mkdir -p dist
+          find dist-all -name '*.whl' -exec cp {} dist/ \;
+          find dist-all -name '*.tar.gz' -exec cp {} dist/ \;
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.4
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true

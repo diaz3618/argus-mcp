@@ -7,7 +7,6 @@
 #   Docker               docker-build
 #   Utilities            clean, dev-install
 #
-# Release targets live in Makefile.release (not tracked in git).
 #
 # Prerequisites:
 #   uv, docker, semgrep, snyk
