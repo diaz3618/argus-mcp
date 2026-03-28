@@ -40,6 +40,31 @@ Liveness and readiness probe. **Always public** — no token required.
 
 ---
 
+## `GET /ready`
+
+Readiness probe. Returns 200 when the gateway is ready to serve traffic,
+503 while backends are still connecting. **Always public** — no token required.
+
+### Response (200)
+
+```json
+{
+  "ready": true,
+  "reason": "accepting traffic"
+}
+```
+
+### Response (503)
+
+```json
+{
+  "ready": false,
+  "reason": "backends not connected"
+}
+```
+
+---
+
 ## `GET /status`
 
 Full service status including config and transport info.
@@ -71,7 +96,9 @@ Full service status including config and transport info.
     "hot_reload": true,
     "outgoing_auth": true,
     "session_management": true,
-    "yaml_config": true
+    "yaml_config": true,
+    "container_isolation": true,
+    "build_on_startup": true
   }
 }
 ```
@@ -372,3 +399,241 @@ The server will:
 2. Complete in-flight requests
 3. Disconnect all backends
 4. Exit the process
+
+---
+
+## `GET /batch`
+
+Combined status, backends, capabilities, and events in one response.
+Eliminates per-poll multi-request overhead — one round-trip per cycle.
+
+### Query Parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `events_limit` | int | 20 | Maximum events to include |
+
+### Response
+
+```json
+{
+  "status": { ... },
+  "backends": { ... },
+  "capabilities": { ... },
+  "events": { ... }
+}
+```
+
+Each nested object matches the corresponding standalone endpoint response.
+
+---
+
+## `POST /reauth/{name}`
+
+Trigger interactive re-authentication for a backend. Useful when OAuth2
+tokens expire and the backend needs a fresh token flow.
+
+### Path Parameters
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `name` | string | Backend name (from config) |
+
+### Response
+
+```json
+{
+  "name": "my-server",
+  "reauth_initiated": true,
+  "error": null
+}
+```
+
+Returns 404 if the backend name is not found.
+
+---
+
+## `GET /registry/search`
+
+Search external MCP server registries (Glama, Smithery, etc.) configured
+under `registries:` in the config file.
+
+### Query Parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `q` | string | — | Search query (required) |
+| `limit` | int | 20 | Maximum results (1–100) |
+| `registry` | string | — | Filter to a specific registry name |
+
+### Response
+
+```json
+{
+  "servers": [
+    {
+      "name": "example-server",
+      "description": "An MCP server for examples",
+      "transport": "stdio",
+      "url": "",
+      "command": "npx",
+      "args": ["-y", "example-server"],
+      "version": "1.0.0",
+      "categories": ["tools"]
+    }
+  ],
+  "registry": "glama",
+  "total": 1
+}
+```
+
+Returns 404 if no registries are configured.
+
+---
+
+## `GET /skills`
+
+List all discovered skills with their status.
+
+### Response
+
+```json
+{
+  "skills": [
+    {
+      "name": "polyglot-guardian",
+      "version": "1.0.0",
+      "description": "Multi-language code analysis",
+      "status": "enabled",
+      "tools": 3,
+      "workflows": 1,
+      "author": "argus"
+    }
+  ]
+}
+```
+
+Returns 503 if the skill manager is not initialized.
+
+---
+
+## `POST /skills/{name}/enable`
+
+Enable a skill by name.
+
+### Path Parameters
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `name` | string | Skill name |
+
+### Response
+
+```json
+{
+  "name": "polyglot-guardian",
+  "action": "enabled",
+  "ok": true
+}
+```
+
+Returns 404 if the skill is not found.
+
+---
+
+## `POST /skills/{name}/disable`
+
+Disable a skill by name.
+
+### Path Parameters
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `name` | string | Skill name |
+
+### Response
+
+```json
+{
+  "name": "polyglot-guardian",
+  "action": "disabled",
+  "ok": true
+}
+```
+
+Returns 404 if the skill is not found.
+
+---
+
+## `POST /tools/call`
+
+Proxy an MCP `tools/call` request to the correct backend. Resolves
+the tool name via the capability registry and forwards to the owning
+backend session.
+
+### Request Body
+
+```json
+{
+  "tool": "search_web",
+  "arguments": { "query": "hello world" }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tool` | string | Yes | Tool name (as exposed by Argus) |
+| `arguments` | object | No | Tool arguments (default: `{}`) |
+
+### Response
+
+```json
+{
+  "tool": "search_web",
+  "backend": "browser-server",
+  "content": [
+    { "type": "text", "text": "Search results..." }
+  ],
+  "isError": false
+}
+```
+
+Returns 404 if the tool is not found, 503 if the backend session is
+unavailable.
+
+---
+
+## `POST /resources/read`
+
+Proxy an MCP `resources/read` request to the correct backend.
+
+### Request Body
+
+```json
+{
+  "uri": "docs://readme"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uri` | string | Yes | Resource URI (as exposed by Argus) |
+
+### Response
+
+```json
+{
+  "uri": "docs://readme",
+  "backend": "docs-server",
+  "contents": [
+    {
+      "uri": "docs://readme",
+      "text": "# README\n...",
+      "mimeType": "text/markdown"
+    }
+  ]
+}
+```
+
+Returns 404 if the resource is not found, 503 if the backend session is
+unavailable.

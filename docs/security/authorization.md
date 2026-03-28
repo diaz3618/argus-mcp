@@ -120,7 +120,12 @@ authorization:
 
 ## Middleware Integration
 
-The `AuthzMiddleware` sits after `AuthMiddleware` in the chain:
+The `AuthzMiddleware` is implemented in `argus_mcp.bridge.middleware.authz`
+but is **not currently wired** into the default middleware chain built by
+`_build_middleware_stack()`. To enable it, add it to the chain manually
+via `build_chain()` after `AuthMiddleware`.
+
+When activated, it sits after `AuthMiddleware` in the chain:
 
 1. Reads `UserIdentity` from `ctx.metadata["user"]`
 2. Builds the resource identifier (e.g., `tool:search_web`)

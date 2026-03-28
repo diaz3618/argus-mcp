@@ -262,25 +262,60 @@ See [CLI Reference](cli/README.md) for all 20 command groups and
 
 ### 7. Run argusd (optional)
 
-If you need Docker container or Kubernetes pod management from the CLI,
-start the `argusd` daemon. Download the binary from
+If you need Docker container or Kubernetes pod management from the CLI or
+TUI, you need the `argusd` daemon running. Download the binary from
 [GitHub Releases](https://github.com/diaz3618/argus-mcp/releases) or
 build from source:
 
 ```bash
-# From a cloned repo
-cd packages/argusd && make run
+# From a cloned repo — build the binary
+cd packages/argusd && make build && cd ../..
 
-# Or run a pre-built binary directly
-./argusd
+# Start it (runs in the foreground by default)
+./packages/argusd/argusd
+
+# Or build and run in one step
+cd packages/argusd && make run
 ```
 
-The daemon exposes a local HTTP API over a Unix Domain Socket. The `argus`
-client commands `argus containers` and `argus pods` communicate with it
-automatically when the socket is available.
+> **Important**: Building argusd only compiles the binary — you must also
+> **run** it. The daemon creates a Unix Domain Socket at
+> `$XDG_RUNTIME_DIR/argusd.sock` (or `/tmp/argusd.sock`). The CLI and TUI
+> check for this socket to determine if argusd is available.
 
-See [Architecture — argusd](architecture/07-argusd.md) for configuration
-and deployment options.
+#### Auto-starting argusd
+
+Instead of running argusd manually, you can configure the CLI to start it
+automatically when a container or pod command needs it. Add an `argusd`
+section to your CLI config at `~/.config/argus-mcp/config.yaml`:
+
+```yaml
+argusd:
+  auto_start: true
+  # binary: "/path/to/argusd"   # optional — auto-detected from $PATH or build dir
+  # socket: "/custom/path.sock" # optional — uses default XDG path
+```
+
+Or set the environment variable:
+
+```bash
+export ARGUSD_AUTO_START=true
+```
+
+When `auto_start` is enabled, the TUI and CLI will spawn argusd in the
+background the first time a Containers or Kubernetes screen is opened and
+the socket is not found. The daemon runs as a detached process that
+persists after the CLI exits.
+
+To stop a running argusd:
+
+```bash
+# Find and stop the process
+pkill argusd
+```
+
+See [Architecture — argusd](architecture/07-argusd.md) for full
+configuration and deployment details.
 
 ## Multi-Server TUI
 

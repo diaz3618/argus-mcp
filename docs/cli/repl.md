@@ -91,7 +91,19 @@ argus» bl               # runs: backends list
 argus» unalias bl       # remove alias
 ```
 
-Aliases persist for the duration of the REPL session.
+Aliases persist across REPL sessions. They are saved to
+`~/.config/argus-mcp/aliases.yaml` and loaded automatically on startup.
+
+### Settings Persistence
+
+Changes made with the `set` command are written to
+`~/.config/argus-mcp/config.yaml` so they survive across sessions:
+
+```
+argus» set theme dracula        # persisted
+argus» set output json          # persisted
+argus» set vi-mode true         # persisted (restart for keybindings)
+```
 
 ## Features
 
@@ -139,4 +151,16 @@ packages/argus_cli/argus_cli/repl/
 ├── handlers.py      # REPL-only command implementations
 ├── state.py         # Session state (connection, aliases, completions)
 └── toolbar.py       # Prompt formatting and bottom toolbar
+```
+
+## Configuration Directory
+
+The REPL stores persistent data in `~/.config/argus-mcp/`:
+
+```
+~/.config/argus-mcp/
+├── aliases.yaml   # User-defined command aliases
+├── config.yaml    # Persisted REPL settings (theme, output format, etc.)
+├── history        # prompt-toolkit command history
+└── skills.txt     # Cached skill completions
 ```

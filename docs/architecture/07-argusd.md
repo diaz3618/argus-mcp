@@ -31,6 +31,54 @@ argusd requires Docker to be available. Kubernetes support is optional — if
 no kubeconfig or in-cluster config is detected, K8s endpoints are not
 registered.
 
+> **Note**: Building argusd (`make build`) only compiles the binary.
+> You must also start it — either manually or via auto-start (see below).
+
+## CLI Configuration
+
+The `argus` CLI config file (`~/.config/argus-mcp/config.yaml`) supports
+an `argusd` section for daemon-related settings:
+
+```yaml
+argusd:
+  # Automatically start argusd when the CLI/TUI needs it and the
+  # socket is not found. Default: false
+  auto_start: false
+
+  # Explicit path to the argusd binary. If omitted, the CLI searches:
+  #   1. $PATH
+  #   2. packages/argusd/argusd (repo build directory)
+  # binary: "/usr/local/bin/argusd"
+
+  # Custom socket path. If omitted, uses the daemon default:
+  #   $XDG_RUNTIME_DIR/argusd.sock  or  /tmp/argusd.sock
+  # socket: "/run/user/1000/argusd.sock"
+```
+
+Environment variables override config file values:
+
+| Variable | Description |
+|----------|-------------|
+| `ARGUSD_AUTO_START` | Set to `true`, `1`, or `yes` to enable auto-start |
+| `ARGUSD_BINARY` | Path to the argusd binary |
+| `ARGUSD_SOCKET` | Custom socket path |
+
+### Auto-start behavior
+
+When `auto_start: true` is set and a CLI/TUI command needs argusd:
+
+1. The `DaemonClient` checks if the socket file exists.
+2. If missing, it locates the argusd binary (explicit path → `$PATH` →
+   repo build dir).
+3. Spawns argusd as a detached background process with the configured
+   socket path.
+4. Waits up to 3 seconds for the socket to appear.
+5. If the socket appears, the client connects normally. If not, an error
+   is displayed.
+
+The auto-started daemon runs independently — it persists after the CLI
+exits. Stop it with `pkill argusd` or by sending SIGTERM.
+
 ## API Reference
 
 All endpoints are served over the Unix Domain Socket. The `DaemonClient` in

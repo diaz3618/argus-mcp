@@ -311,5 +311,11 @@ The management API is mounted at `/manage/v1/` and provides:
 | `/manage/v1/reconnect/{name}` | POST | Reconnect a specific backend |
 | `/manage/v1/reauth/{name}` | POST | Trigger interactive re-authentication for a backend |
 | `/manage/v1/shutdown` | POST | Graceful server shutdown |
+| `/manage/v1/registry/search` | GET | Search external MCP server registries |
+| `/manage/v1/skills` | GET | List all discovered skills with status |
+| `/manage/v1/skills/{name}/enable` | POST | Enable a skill by name |
+| `/manage/v1/skills/{name}/disable` | POST | Disable a skill by name |
+| `/manage/v1/tools/call` | POST | Proxy an MCP tools/call to the correct backend |
+| `/manage/v1/resources/read` | POST | Proxy an MCP resources/read to the correct backend |
 
 When `ARGUS_MGMT_TOKEN` is set, include `Authorization: Bearer <token>` in requests.

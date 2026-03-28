@@ -46,6 +46,6 @@ Backend MCP Server
 | Management API auth | disabled (no token) | Set `ARGUS_MGMT_TOKEN` |
 | RBAC | disabled | Enable with `default_effect: deny` |
 | Audit logging | enabled | Keep enabled |
-| Secret provider | `file` (Fernet) | `file` or `keyring` |
+| Secret provider | `file` (Fernet) | `env`, `file`, or `keyring` |
 | Log redaction | automatic | Automatic when secrets are resolved |
 | Container isolation | auto (when runtime available) | Pre-build images; keep enabled |
