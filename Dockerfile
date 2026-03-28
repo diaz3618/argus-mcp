@@ -73,12 +73,13 @@ WORKDIR /build
 COPY pyproject.toml ./
 COPY argus_mcp/ ./argus_mcp/
 
-# Install the package and all runtime dependencies into a virtual env
+# Install the package and all runtime dependencies into a virtual env.
+# setuptools-rust extensions are optional=true, so no Rust toolchain needed here.
 # nosemgrep: docker-pip-no-cache, dependency-docker-no-unpinned-pip-install
 RUN uv venv /opt/venv && \
     UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python .
 
-# Install pre-built Rust extension wheels into the venv
+# Install pre-built Rust extension wheels from Stage 1
 COPY --from=rust-builder /build/wheels/ /tmp/wheels/
 RUN uv pip install --no-cache --python /opt/venv/bin/python /tmp/wheels/*.whl && \
     rm -rf /tmp/wheels

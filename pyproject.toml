@@ -33,41 +33,50 @@ include = ["argus_mcp*"]
 "argus_mcp._bin" = ["*"]
 
 # ── setuptools-rust: 7 PyO3 extension modules ───────────────────────────
+# optional=true: build succeeds without Rust (Python fallbacks exist);
+# pre-built wheels are used in Docker and CI wheel builds.
 
 [[tool.setuptools-rust.ext-modules]]
 target = "yaml_rs"
 path = "argus_mcp/config/_yaml_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "audit_rs"
 path = "argus_mcp/audit/_audit_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "filter_rs"
 path = "argus_mcp/bridge/_filter_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "token_cache_rs"
 path = "argus_mcp/bridge/auth/_token_cache_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "circuit_breaker_rs"
 path = "argus_mcp/bridge/health/_circuit_breaker_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "hash_rs"
 path = "argus_mcp/plugins/_hash_rs/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 [[tool.setuptools-rust.ext-modules]]
 target = "security_plugins_rs"
 path = "argus_mcp/plugins/builtins_rust/Cargo.toml"
 binding = "PyO3"
+optional = true
 
 # ── uv Workspace ────────────────────────────────────────────────────────
 
