@@ -31,10 +31,7 @@ from argus_mcp.api.schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Default timeout for regular API calls (seconds).
 _DEFAULT_TIMEOUT = 10.0
-
-# Timeout for mutating operations that may take longer.
 _MUTATING_TIMEOUT = 30.0
 
 _M = TypeVar("_M", bound=BaseModel)

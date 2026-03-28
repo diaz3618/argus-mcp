@@ -1,7 +1,7 @@
 """Braille progress bar rendering for the installer display.
 
-Extracted from internal/art/shard_rain_variants/common.py — provides the minimum
-braille animation logic needed for parallel deployment progress bars.
+Provides the minimum braille animation logic needed for parallel
+deployment progress bars.
 """
 
 from __future__ import annotations

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from argus_mcp.config.schema_backends import (  # noqa: F401
     AuthConfig,
@@ -359,6 +359,15 @@ class ArgusConfig(BaseModel):
             }
         }
     """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_none_to_default(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for key in ("registries", "backends"):
+                if key in data and data[key] is None:
+                    del data[key]
+        return data
 
     version: str = "1"
     server: ServerSettings = Field(default_factory=ServerSettings)
