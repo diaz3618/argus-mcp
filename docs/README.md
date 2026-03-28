@@ -118,6 +118,6 @@ docs/
 
 ## Version
 
-Current version: **0.8.0**
+Current version: **0.8.1**
 
 License: GPL-3.0-only

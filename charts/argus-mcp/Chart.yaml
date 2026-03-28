@@ -3,7 +3,7 @@ name: argus-mcp
 description: A Helm chart for Argus MCP — Multi-backend MCP proxy/gateway
 type: application
 version: 0.1.0
-appVersion: "0.8.0"
+appVersion: "0.8.1"
 keywords:
   - mcp
   - gateway

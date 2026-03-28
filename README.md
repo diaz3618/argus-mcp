@@ -111,7 +111,7 @@ argus-mcp --help
 ```text
 usage: argus-mcp [-h] {server,build,stop,status,tui,secret,clean} ...
 
-Argus MCP v0.8.0
+Argus MCP v0.8.1
 
 positional arguments:
   {server,build,stop,status,tui,secret,clean}
