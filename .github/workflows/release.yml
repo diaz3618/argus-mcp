@@ -86,6 +86,7 @@ jobs:
           bodyFile: "release_notes.md"
           generateReleaseNotes: true
           makeLatest: true
+          allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # GITHUB_TOKEN releases do not trigger other workflows (anti-loop).

@@ -32,7 +32,7 @@ COPY argus_mcp/ ./argus_mcp/
 COPY pyproject.toml Cargo.lock* ./
 
 # Build each Rust extension with maturin (abi3 → single .so per crate)
-RUN pip install --break-system-packages maturin && \
+RUN pip install --no-cache-dir --break-system-packages maturin && \
     for crate in \
       argus_mcp/config/_yaml_rs \
       argus_mcp/audit/_audit_rs \
@@ -55,10 +55,8 @@ WORKDIR /build
 COPY tools/docker-adapter/ ./tools/docker-adapter/
 COPY tools/mcp-stdio-wrapper/ ./tools/mcp-stdio-wrapper/
 
-RUN cd tools/docker-adapter && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter . && \
-    cd /build/tools/mcp-stdio-wrapper && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter ./tools/docker-adapter && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper ./tools/mcp-stdio-wrapper
 
 # ── Stage 3: Python Builder ───────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded; runtime uses USER argus)

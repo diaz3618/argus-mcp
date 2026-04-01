@@ -29,6 +29,8 @@ jobs:
     name: Trigger wheel build & publish
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Dispatch build-wheels workflow
         run: gh workflow run build-wheels.yml --ref "${{ github.ref }}"
         env:
