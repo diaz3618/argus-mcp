@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-mcp"
-version = "0.8.1"
+version = "0.8.2"
 description = "A central server for MCP servers"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "GPL-3.0-only"
+license = "MIT"
 authors = [{ name = "Daniel Diaz Santiago" }]
 dependencies = [
     "mcp>=1.23.0",
@@ -31,6 +31,7 @@ include = ["argus_mcp*"]
 
 [tool.setuptools.package-data]
 "argus_mcp._bin" = ["*"]
+"argus_mcp.bridge.container.templates" = ["*.j2"]
 
 # ── setuptools-rust: 7 PyO3 extension modules ───────────────────────────
 # optional=true: build succeeds without Rust (Python fallbacks exist);

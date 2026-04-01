@@ -97,7 +97,7 @@ FROM python:3.13-slim AS runtime
 LABEL org.opencontainers.image.title="Argus MCP" \
       org.opencontainers.image.description="Central aggregation server for MCP (Model Context Protocol) backends" \
       org.opencontainers.image.source="https://github.com/diaz3618/argus-mcp" \
-      org.opencontainers.image.licenses="GPL-3.0-only"
+      org.opencontainers.image.licenses="MIT"
 
 # Install Node.js 22 LTS via NodeSource APT repo (GPG-verified, no pipe-to-bash)
 # Supply-chain hardening: pinned versions, GPG-verified packages

@@ -5,7 +5,8 @@
 # Targets:
 #   Testing & Quality    test, lint, typecheck, security, quality
 #   Docker               docker-build
-#   Utilities            clean, dev-install
+#   Install              dev-install, install-all
+#   Uninstall            uninstall, uninstall-cli, uninstall-all
 #
 #
 # Prerequisites:
@@ -122,6 +123,48 @@ dev-install:
 	@echo "══ Building native extensions (optional) ══"
 	@python scripts/build_rust.py || echo "  Skipping Rust extensions (toolchain not available)"
 	@python scripts/build_go.py || echo "  Skipping Go daemon (toolchain not available)"
+
+.PHONY: install-all
+install-all: ## Install argus-mcp + argus-cli + all Rust/Go extensions
+	@echo "══ Step 1/5: Installing dependencies ══"
+	uv sync --group dev --no-install-project
+	@echo ""
+	@echo "══ Step 2/5: Building Rust PyO3 extensions ══"
+	@python scripts/build_rust.py || echo "  ⚠ Skipping Rust extensions (toolchain not available)"
+	@echo ""
+	@echo "══ Step 3/5: Building Go binaries (argusd + docker-adapter) ══"
+	@python scripts/build_go.py || echo "  ⚠ Skipping Go binaries (toolchain not available)"
+	@echo ""
+	@echo "══ Step 4/5: Installing argus-mcp (editable) ══"
+	uv pip install setuptools setuptools-rust
+	uv pip install -e . --no-build-isolation
+	@echo ""
+	@echo "══ Step 5/5: Installing argus-cli (editable) ══"
+	uv pip install -e packages/argus_cli
+	@echo ""
+	@echo "══ All done ══"
+	@echo "  argus-mcp:  $$(which argus-mcp 2>/dev/null || echo 'not on PATH')"
+	@echo "  argus-cli:  $$(python -c 'import argus_cli; print(argus_cli.__file__)' 2>/dev/null || echo 'installed')"
+	@echo "  Rust exts:  $$(python -c 'from argus_mcp.config._yaml_rs import yaml_rs; print("available")' 2>/dev/null || echo 'not built')"
+	@echo "  argusd:     $$(ls packages/argusd/argusd 2>/dev/null || echo 'not built')"
+
+.PHONY: uninstall
+uninstall:
+	uv pip uninstall argus-mcp 2>/dev/null || pip uninstall -y argus-mcp 2>/dev/null || true
+	@echo "argus-mcp uninstalled"
+
+.PHONY: uninstall-cli
+uninstall-cli:
+	uv pip uninstall argus-cli 2>/dev/null || pip uninstall -y argus-cli 2>/dev/null || true
+	@echo "argus-cli uninstalled"
+
+.PHONY: uninstall-all
+uninstall-all:
+	uv pip uninstall argus-mcp argus-cli 2>/dev/null || pip uninstall -y argus-mcp argus-cli 2>/dev/null || true
+	rm -f packages/argusd/argusd
+	rm -rf packages/argusd/dist/
+	rm -f tools/docker-adapter/docker-adapter
+	@echo "argus-mcp, argus-cli, and built binaries removed"
 
 .PHONY: clean
 clean:
