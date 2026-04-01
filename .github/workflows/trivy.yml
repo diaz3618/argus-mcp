@@ -22,7 +22,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Pull published image (Docker Hub)
         run: docker pull diaz3618/argus-mcp:latest
@@ -50,7 +50,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Pull published image (GHCR)
         run: docker pull ghcr.io/diaz3618/argus-mcp:latest
