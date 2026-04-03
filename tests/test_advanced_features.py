@@ -668,7 +668,7 @@ class TestSkillManifest:
                 "config": {"key": "val"},
                 "dependencies": ["other"],
                 "author": "Me",
-                "license": "MIT",
+                "license": "GPL-3.0-only",
             }
         )
         assert m.version == "1.2.3"
