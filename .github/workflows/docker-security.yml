@@ -195,9 +195,8 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy SARIF results
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
           category: docker-security-trivy
