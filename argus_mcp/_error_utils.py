@@ -2,11 +2,6 @@
 
 Provides helpers that replace overly broad ``except Exception: pass`` patterns
 with narrower, type-safe alternatives.
-
-.. note::
-   ``safe_query`` and other TUI-specific helpers have moved to
-   ``argus_mcp.tui._error_utils``.  This module re-exports them for
-   backward compatibility.
 """
 
 from __future__ import annotations
@@ -46,12 +41,3 @@ def log_on_exception(
         return cast(_F, wrapper)
 
     return decorator
-
-
-def __getattr__(name: str) -> object:
-    """Lazy re-export TUI helpers from the new location."""
-    if name == "safe_query":
-        from argus_mcp.tui._error_utils import safe_query
-
-        return safe_query
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
