@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Triage issues, summarise pull requests, and automate GitHub workflows",
   "author": "Argus MCP",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "tools": [
     {
       "name": "list_issues",
