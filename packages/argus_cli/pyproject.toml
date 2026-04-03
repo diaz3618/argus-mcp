@@ -7,7 +7,7 @@ name = "argus-cli"
 version = "0.1.0"
 description = "Interactive CLI for Argus MCP — dual-mode REPL + one-shot commands"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-only"
 requires-python = ">=3.10"
 authors = [{ name = "Daniel Diaz Santiago" }]
 keywords = ["argus", "mcp", "cli", "repl"]
@@ -15,7 +15,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

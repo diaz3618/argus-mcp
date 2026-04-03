@@ -8,7 +8,7 @@ version = "0.8.2"
 description = "A central server for MCP servers"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "GPL-3.0-only"
 authors = [{ name = "Daniel Diaz Santiago" }]
 dependencies = [
     "mcp>=1.23.0",
