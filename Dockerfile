@@ -60,7 +60,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter 
 
 # ── Stage 3: Python Builder ───────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded; runtime uses USER argus)
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Install uv for fast dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /usr/local/bin/uv
@@ -90,7 +90,7 @@ RUN find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
 
 # ── Stage 4: Runtime ───────────────────────────────────────
 # nosemgrep: docker-user-root (USER argus set below)
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="Argus MCP" \
       org.opencontainers.image.description="Central aggregation server for MCP (Model Context Protocol) backends" \
