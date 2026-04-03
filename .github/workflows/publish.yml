@@ -58,7 +58,7 @@ jobs:
         run: make -C packages/argusd build-all
 
       - name: Upload argusd binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: argusd-binaries
           path: packages/argusd/dist/

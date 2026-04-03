@@ -102,7 +102,7 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o "../../dist/${{ matrix.goos }}_${{ matrix.goarch }}/argusd${SUFFIX}" ./cmd/argusd
 
       - name: Upload Go binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: go-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/${{ matrix.goos }}_${{ matrix.goarch }}/
@@ -157,7 +157,7 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.go_os }}-${{ matrix.go_arch }}
           path: wheelhouse/*.whl
@@ -184,7 +184,7 @@ jobs:
         run: python -m build packages/argus_cli
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: |
