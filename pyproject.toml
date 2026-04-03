@@ -19,6 +19,7 @@ dependencies = [
     "starlette>=0.47.2",
     "uvicorn[standard]>=0.23.0",
     "httpx>=0.24.0",
+    "rich>=14.0.0",
 ]
 
 [project.optional-dependencies]
