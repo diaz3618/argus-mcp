@@ -213,7 +213,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: fs
           scan-ref: .
@@ -249,7 +249,7 @@ jobs:
         run: docker build -t diaz3618/argus-mcp:ci-test .
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: diaz3618/argus-mcp:ci-test
           format: sarif
