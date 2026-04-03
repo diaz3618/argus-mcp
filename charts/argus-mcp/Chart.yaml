@@ -4,6 +4,7 @@ description: A Helm chart for Argus MCP — Multi-backend MCP proxy/gateway
 type: application
 version: 0.1.0
 appVersion: "0.8.2"
+license: "GPL-3.0-only"
 keywords:
   - mcp
   - gateway
