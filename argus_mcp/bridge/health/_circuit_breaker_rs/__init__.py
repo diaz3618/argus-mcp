@@ -56,6 +56,6 @@ try:
 
     RUST_AVAILABLE = True
 except ImportError:
-    from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
+    from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker  # type: ignore[assignment]
 
 __all__ = ["CircuitBreaker", "RUST_AVAILABLE"]
