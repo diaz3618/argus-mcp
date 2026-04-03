@@ -210,6 +210,8 @@ dependencies = [
     { name = "rich" },
     { name = "shellingham" },
     { name = "tabulate" },
+    { name = "textual" },
+    { name = "textual-plotext" },
     { name = "typer" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
@@ -221,10 +223,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
-]
-tui = [
-    { name = "textual" },
-    { name = "textual-plotext" },
 ]
 
 [package.metadata]
@@ -244,8 +242,8 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.0" },
     { name = "shellingham", specifier = ">=1.5.4" },
     { name = "tabulate", specifier = ">=0.9" },
-    { name = "textual", marker = "extra == 'tui'", specifier = ">=1.0.0" },
-    { name = "textual-plotext", marker = "extra == 'tui'", specifier = ">=1.0.0" },
+    { name = "textual", specifier = ">=1.0.0" },
+    { name = "textual-plotext", specifier = ">=1.0.0" },
     { name = "typer", specifier = ">=0.15.0" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.12.0" },
 ]
@@ -262,6 +260,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-multipart" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -298,6 +297,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=14.0.0" },
     { name = "starlette", specifier = ">=0.47.2" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=1.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.23.0" },
