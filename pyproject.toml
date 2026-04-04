@@ -98,7 +98,7 @@ dev = [
     "import-linter>=2.1",
     "maturin>=1.7.0",
     "mypy>=1.17.1",
-    "ruff>=0.14.13",
+    "ruff>=0.15.7",
     "textual-dev>=1.0.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
