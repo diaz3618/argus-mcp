@@ -3,7 +3,7 @@ module github.com/diaz3618/argus-mcp/packages/argusd
 go 1.25.0
 
 require (
-	github.com/docker/docker v28.3.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
