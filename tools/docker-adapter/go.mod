@@ -1,4 +1,4 @@
-module github.com/hack23/argus-mcp/tools/docker-adapter
+module github.com/diaz3618/argus-mcp/tools/docker-adapter
 
 go 1.25.0
 
