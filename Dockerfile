@@ -50,13 +50,11 @@ RUN pip install --no-cache-dir --break-system-packages maturin && \
 # nosemgrep: docker-user-root (builder stage is discarded)
 FROM golang:1.26-alpine AS go-builder
 
-WORKDIR /build
+COPY tools/docker-adapter/ /src/docker-adapter/
+COPY tools/mcp-stdio-wrapper/ /src/mcp-stdio-wrapper/
 
-COPY tools/docker-adapter/ ./tools/docker-adapter/
-COPY tools/mcp-stdio-wrapper/ ./tools/mcp-stdio-wrapper/
-
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter ./tools/docker-adapter && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper ./tools/mcp-stdio-wrapper
+RUN cd /src/docker-adapter && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter . && \
+    cd /src/mcp-stdio-wrapper && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper .
 
 # ── Stage 3: Python Builder ───────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded; runtime uses USER argus)
