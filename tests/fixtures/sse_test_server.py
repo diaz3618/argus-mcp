@@ -3,6 +3,7 @@ import asyncio
 import logging
 import signal
 import sys
+from contextlib import asynccontextmanager
 from typing import Optional
 
 import uvicorn
@@ -124,21 +125,25 @@ async def handle_sse_connection(request: Request) -> None:
     logger.info("SSE connection from %s:%s closed.", client_host, client_port)
 
 
+@asynccontextmanager
+async def _sse_app_lifespan(app):
+    logger.info(
+        "SseTestServer Starlette app starting up. SSE GET on http://%s:%s%s",
+        SSE_SERVER_HOST,
+        SSE_SERVER_PORT,
+        SSE_ENDPOINT_PATH,
+    )
+    yield
+    logger.info("SseTestServer Starlette app shutting down.")
+
+
 sse_app = Starlette(
     debug=False,
     routes=[
         Route(SSE_ENDPOINT_PATH, endpoint=handle_sse_connection),
         Mount(SSE_POST_MESSAGES_PATH, app=sse_transport.handle_post_message),
     ],
-    on_startup=[
-        lambda: logger.info(
-            "SseTestServer Starlette app starting up. SSE GET on http://%s:%s%s",
-            SSE_SERVER_HOST,
-            SSE_SERVER_PORT,
-            SSE_ENDPOINT_PATH,
-        )
-    ],
-    on_shutdown=[lambda: logger.info("SseTestServer Starlette app shutting down.")],
+    lifespan=_sse_app_lifespan,
 )
 
 uvicorn_server_instance: Optional[uvicorn.Server] = None
