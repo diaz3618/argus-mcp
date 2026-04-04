@@ -1,6 +1,6 @@
 module github.com/diaz3618/argus-mcp/packages/argusd
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/docker/docker v28.3.3+incompatible
