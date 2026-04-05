@@ -43,7 +43,7 @@ docker run -d \
   --name argus \
   -p 9000:9000 \
   -v ./config.yaml:/app/config.yaml \
-  -e ARGUS_MGMT_TOKEN=my-secret-token \
+  -e ARGUS_MGMT_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
   -e MY_API_KEY=sk-xxx \
   diaz3618/argus-mcp:latest
 ```
