@@ -137,18 +137,13 @@ def register_handlers(mcp_server: McpServer) -> None:
 
         if optimizer_enabled and optimizer is not None:
             if name == FIND_TOOL_NAME:
-                query = arguments.get("query", "")
-                limit = int(arguments.get("limit", 5))
-                results = optimizer.search(query, limit=limit)
-                return mcp_types.CallToolResult(
-                    content=[
-                        mcp_types.TextContent(
-                            type="text",
-                            text=json.dumps(results, indent=2),
-                        )
-                    ],
-                    isError=False,
-                )
+                # Route through _dispatch() so middleware chain (auth, rate
+                # limiting, audit) is applied — never bypass to optimizer
+                # index directly.  See SEC-02.
+                result = await _dispatch(mcp_server, name, "call_tool", arguments)
+                if isinstance(result, mcp_types.CallToolResult):
+                    return result
+                raise BackendServerError(f"Backend returned invalid type for tool call '{name}'.")
 
             if name == CALL_TOOL_NAME:
                 # Delegate to the real tool via dispatch

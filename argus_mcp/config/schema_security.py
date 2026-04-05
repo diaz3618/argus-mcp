@@ -1,4 +1,4 @@
-"""Security configuration models (incoming auth + authorization)."""
+"""Security configuration models (incoming auth + authorization + headers + payload limits)."""
 
 from __future__ import annotations
 
@@ -60,4 +60,47 @@ class AuthorizationConfig(BaseModel):
     policies: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="List of authorization policy rules.",
+    )
+
+
+class SecurityHeadersConfig(BaseModel):
+    """Configuration for security response headers."""
+
+    enabled: bool = Field(default=True, description="Enable security headers middleware.")
+    hsts_max_age: int = Field(
+        default=63072000,
+        ge=0,
+        le=63072000,
+        description="Strict-Transport-Security max-age in seconds (default 2 years). Only sent over TLS.",
+    )
+
+
+class PayloadLimitsConfig(BaseModel):
+    """Configuration for request payload size and depth limits."""
+
+    enabled: bool = Field(default=True, description="Enable payload limits middleware.")
+    max_body_bytes: int = Field(
+        default=1_048_576,
+        ge=1024,
+        le=104_857_600,
+        description="Maximum request body size in bytes (default 1 MB).",
+    )
+    max_json_depth: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum JSON nesting depth allowed (default 20).",
+    )
+
+
+class SecurityConfig(BaseModel):
+    """Top-level security configuration aggregating headers and payload limits."""
+
+    headers: SecurityHeadersConfig = Field(
+        default_factory=SecurityHeadersConfig,
+        description="Security response header configuration.",
+    )
+    payload_limits: PayloadLimitsConfig = Field(
+        default_factory=PayloadLimitsConfig,
+        description="Request payload size and depth limits.",
     )
