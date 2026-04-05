@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from argus_mcp.server.management.router import _redact_status_response, _redact_backends_response
+from argus_mcp.server.management.router import _redact_backends_response, _redact_status_response
 
 pytestmark = [pytest.mark.security]
 

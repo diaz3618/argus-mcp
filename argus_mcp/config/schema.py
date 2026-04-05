@@ -40,11 +40,11 @@ from argus_mcp.config.schema_backends import (  # noqa: F401
     ToolOverrideEntry,
 )
 from argus_mcp.config.schema_client import ClientConfig  # noqa: F401
-from argus_mcp.config.schema_registry import RegistryEntryConfig  # noqa: F401
 from argus_mcp.config.schema_rate_limits import (  # noqa: F401
     RateLimitRouteConfig,
     RateLimitsConfig,
 )
+from argus_mcp.config.schema_registry import RegistryEntryConfig  # noqa: F401
 from argus_mcp.config.schema_security import (  # noqa: F401
     AuthorizationConfig,
     IncomingAuthConfig,

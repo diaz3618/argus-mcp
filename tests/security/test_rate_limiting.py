@@ -13,11 +13,11 @@ Covers:
 from __future__ import annotations
 
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
-from argus_mcp.config.schema_rate_limits import RateLimitsConfig, RateLimitRouteConfig
+from argus_mcp.config.schema_rate_limits import RateLimitRouteConfig, RateLimitsConfig
 from argus_mcp.server.rate_limit import RateLimitMiddleware
 
 pytestmark = [pytest.mark.security]

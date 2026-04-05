@@ -69,9 +69,9 @@ def validate_token_entropy(
     # Known placeholders are always rejected, even with allow_weak
     if token.lower() in _KNOWN_PLACEHOLDERS:
         raise ValueError(
-            f"Refusing to use a known placeholder token. "
-            f"Generate a secure token (e.g. 'python -c \"import secrets; "
-            f"print(secrets.token_urlsafe(32))\"')."
+            "Refusing to use a known placeholder token. "
+            "Generate a secure token (e.g. 'python -c \"import secrets; "
+            "print(secrets.token_urlsafe(32))\"')."
         )
 
     if not allow_weak and len(token) < _MIN_TOKEN_LENGTH:
