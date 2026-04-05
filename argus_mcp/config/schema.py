@@ -41,9 +41,16 @@ from argus_mcp.config.schema_backends import (  # noqa: F401
 )
 from argus_mcp.config.schema_client import ClientConfig  # noqa: F401
 from argus_mcp.config.schema_registry import RegistryEntryConfig  # noqa: F401
+from argus_mcp.config.schema_rate_limits import (  # noqa: F401
+    RateLimitRouteConfig,
+    RateLimitsConfig,
+)
 from argus_mcp.config.schema_security import (  # noqa: F401
     AuthorizationConfig,
     IncomingAuthConfig,
+    PayloadLimitsConfig,
+    SecurityConfig,
+    SecurityHeadersConfig,
 )
 from argus_mcp.config.schema_server import (  # noqa: F401
     ManagementSettings,
@@ -74,6 +81,12 @@ __all__ = [
     # schema_security
     "AuthorizationConfig",
     "IncomingAuthConfig",
+    "PayloadLimitsConfig",
+    "SecurityConfig",
+    "SecurityHeadersConfig",
+    # schema_rate_limits
+    "RateLimitRouteConfig",
+    "RateLimitsConfig",
     # schema_server
     "ManagementSettings",
     "ServerSettings",
@@ -417,6 +430,14 @@ class ArgusConfig(BaseModel):
     sse_resilience: SseResilienceConfig = Field(
         default_factory=SseResilienceConfig,
         description="SSE stream resilience settings.",
+    )
+    security: SecurityConfig = Field(
+        default_factory=SecurityConfig,
+        description="Security middleware configuration (response headers, payload limits).",
+    )
+    rate_limits: RateLimitsConfig = Field(
+        default_factory=RateLimitsConfig,
+        description="Per-IP rate limiting with auth lockout.",
     )
     feature_flags: Dict[str, bool] = Field(
         default_factory=dict,
