@@ -94,7 +94,7 @@ class PayloadLimitsConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
-    """Top-level security configuration aggregating headers and payload limits."""
+    """Top-level security configuration aggregating headers, payload limits, and hardening flags."""
 
     headers: SecurityHeadersConfig = Field(
         default_factory=SecurityHeadersConfig,
@@ -103,4 +103,27 @@ class SecurityConfig(BaseModel):
     payload_limits: PayloadLimitsConfig = Field(
         default_factory=PayloadLimitsConfig,
         description="Request payload size and depth limits.",
+    )
+    allow_weak_tokens: bool = Field(
+        default=False,
+        description=(
+            "When True, accept management tokens shorter than 16 characters. "
+            "Not recommended for production (SEC-06)."
+        ),
+    )
+    require_origin: Literal["strict", "permissive"] = Field(
+        default="permissive",
+        description=(
+            "Origin validation mode for MCP transport requests. "
+            "'strict': reject requests without an Origin header (SEC-13). "
+            "'permissive': allow missing Origin headers (for CLI/SDK clients)."
+        ),
+    )
+    redact_status: bool = Field(
+        default=False,
+        description=(
+            "When True, strip sensitive internal details (config paths, "
+            "transport URLs, error messages) from /status and /backends "
+            "management API responses (SEC-17)."
+        ),
     )
