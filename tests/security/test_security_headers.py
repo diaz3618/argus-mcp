@@ -1,8 +1,10 @@
-"""Tests for security headers middleware.
+"""Regression tests for SEC-14 (VULN-018).
 
 Verifies that ``SecurityHeadersMiddleware`` injects the required
 security response headers on HTTP responses and conditionally includes
 HSTS for TLS connections.
+
+See: internal/reports/security/p2/VULN-018-security-headers.md
 """
 
 from __future__ import annotations

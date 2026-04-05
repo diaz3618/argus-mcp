@@ -1,4 +1,12 @@
-"""Tests for rate limiting middleware with sliding window and auth lockout.
+"""Regression tests for SEC-01 (VULN-024), SEC-10 (VULN-023), SEC-15 (VULN-019).
+
+Rate limiting middleware with sliding window and auth lockout.
+These tests verify that brute-force auth attempts, find_tool flooding,
+and session-level abuse are throttled correctly.
+
+See: internal/reports/security/p1/VULN-024-mgmt-brute-force.md
+     internal/reports/security/p1/VULN-023-find-tool-flooding.md
+     internal/reports/security/p2/VULN-019-session-rate-limit.md
 
 Covers:
 1. Requests within limit pass through

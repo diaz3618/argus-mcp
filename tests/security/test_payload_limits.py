@@ -1,4 +1,10 @@
-"""Tests for payload limits middleware.
+"""Regression tests for SEC-20 (VULN-020).
+
+Payload limits middleware preventing oversized and deeply nested JSON payloads.
+These tests verify that resource exhaustion via large or complex request bodies
+is no longer possible.
+
+See: internal/reports/security/p2/VULN-020-payload-limits.md
 
 Covers:
 1. Requests within body size limit pass through
