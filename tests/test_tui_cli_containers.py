@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("argus_cli")
+
 
 def _import_containers():
     return __import__("argus_cli.tui.screens.containers", fromlist=["ContainersScreen"])

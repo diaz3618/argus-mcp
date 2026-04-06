@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import pytest
+
+pytest.importorskip("argus_cli")
 
 
 def _import_dashboard():

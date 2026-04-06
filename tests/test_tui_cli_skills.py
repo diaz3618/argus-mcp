@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("argus_cli")
+
 
 def _import_skills():
     return __import__("argus_cli.tui.screens.skills", fromlist=["SkillsScreen", "_trunc"])

@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from argus_cli.repl.state import (
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+from argus_cli.repl.state import (  # noqa: E402
     CompletionData,
     ConnectionState,
     ReplState,
@@ -126,8 +128,8 @@ def test_refresh_completions_success(MockClient):
 
 @patch("argus_cli.client.ArgusClient")
 def test_refresh_completions_health_failure(MockClient):
-    from argus_cli.repl.completions import refresh_completions
     from argus_cli.client import ArgusClientError
+    from argus_cli.repl.completions import refresh_completions
 
     client = MagicMock()
     MockClient.return_value.__enter__ = MagicMock(return_value=client)
@@ -144,8 +146,8 @@ def test_refresh_completions_health_failure(MockClient):
 
 @patch("argus_cli.client.ArgusClient")
 def test_refresh_completions_client_error(MockClient):
-    from argus_cli.repl.completions import refresh_completions
     from argus_cli.client import ArgusClientError
+    from argus_cli.repl.completions import refresh_completions
 
     MockClient.return_value.__enter__ = MagicMock(
         side_effect=ArgusClientError(500, "error", "connection refused")

@@ -5,8 +5,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from rich.panel import Panel
-from rich.table import Table
+
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+from rich.panel import Panel  # noqa: E402
+from rich.table import Table  # noqa: E402
 
 # Mock color palette used by all widget modules
 _MOCK_COLORS = {
@@ -152,9 +155,8 @@ def test_live_status_context_manager(mock_console_fn):
 @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS)
 @patch("argus_cli.widgets.spinners.get_console")
 def test_progress_bar_returns_progress(mock_console_fn):
-    from rich.progress import Progress
-
     from argus_cli.widgets.spinners import progress_bar
+    from rich.progress import Progress
 
     console = MagicMock()
     mock_console_fn.return_value = console

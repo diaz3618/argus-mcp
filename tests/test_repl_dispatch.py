@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from argus_cli.repl.state import (
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+from argus_cli.repl.state import (  # noqa: E402
     CompletionData,
     ConnectionState,
     ReplState,
@@ -126,10 +128,9 @@ def test_dispatch_handles_exception(mock_set_repl, mock_app):
 @patch("argus_cli.config.set_repl_mode")
 def test_dispatch_captures_json_result(mock_set_repl, mock_app):
     """JSON stdout output should be captured as last_result dict."""
-    from argus_cli.repl.dispatch import dispatch_command
-
-    import io
     import sys
+
+    from argus_cli.repl.dispatch import dispatch_command
 
     expected = {"status": "ok"}
 
@@ -147,9 +148,9 @@ def test_dispatch_captures_json_result(mock_set_repl, mock_app):
 @patch("argus_cli.config.set_repl_mode")
 def test_dispatch_captures_plain_text_result(mock_set_repl, mock_app):
     """Non-JSON stdout should be captured as a stripped string."""
-    from argus_cli.repl.dispatch import dispatch_command
-
     import sys
+
+    from argus_cli.repl.dispatch import dispatch_command
 
     def fake_app(args, standalone_mode=False):
         sys.stdout.write("plain text output\n")

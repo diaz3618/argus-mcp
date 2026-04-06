@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from argus_cli.repl.state import (
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+from argus_cli.repl.state import (  # noqa: E402
     CompletionData,
     ConnectionState,
     ReplState,
@@ -16,7 +18,6 @@ from argus_cli.repl.state import (
     load_aliases,
     save_aliases,
 )
-
 
 # ── ConnectionState defaults ──────────────────────────────────────────
 

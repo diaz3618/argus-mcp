@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from argus_cli.repl.state import (
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+from argus_cli.repl.state import (  # noqa: E402
     CompletionData,
     ConnectionState,
     ReplState,
