@@ -35,8 +35,9 @@ def _find_go_binary() -> Optional[str]:
 
     Search order:
     1. ``ARGUS_DOCKER_ADAPTER`` environment variable
-    2. ``tools/docker-adapter/docker-adapter`` relative to project root
-    3. System PATH
+    2. Bundled in ``argus_mcp/_bin/`` (wheel installs)
+    3. ``tools/docker-adapter/docker-adapter`` relative to project root
+    4. System PATH
     """
     global _go_binary, _binary_checked  # noqa: PLW0603
     if _binary_checked:
@@ -53,7 +54,16 @@ def _find_go_binary() -> Optional[str]:
         logger.info("Using Go docker adapter from ARGUS_DOCKER_ADAPTER: %s", _go_binary)
         return _go_binary
 
-    # 2. Relative to project root.
+    # 2. Bundled in wheel package (argus_mcp/_bin/).
+    bin_dir = Path(__file__).resolve().parents[2] / "_bin"
+    for name in ("docker-adapter", "docker-adapter.exe"):
+        candidate = bin_dir / name
+        if candidate.is_file() and os.access(str(candidate), os.X_OK):
+            _go_binary = str(candidate)
+            logger.info("Using Go docker adapter from package: %s", _go_binary)
+            return _go_binary
+
+    # 3. Relative to project root.
     project_root = Path(__file__).resolve().parents[3]
     for name in ("docker-adapter", "docker-adapter.exe"):
         candidate = project_root / "tools" / "docker-adapter" / name
@@ -62,7 +72,7 @@ def _find_go_binary() -> Optional[str]:
             logger.info("Using Go docker adapter from project: %s", _go_binary)
             return _go_binary
 
-    # 3. System PATH.
+    # 4. System PATH.
     found = shutil.which("docker-adapter")
     if found:
         _go_binary = found
@@ -106,7 +116,8 @@ class GoDockerAdapter:
     async def stop(self) -> None:
         """Stop the Go adapter subprocess."""
         if self._proc and self._proc.returncode is None:
-            self._proc.stdin.close()  # type: ignore[union-attr]
+            assert self._proc.stdin is not None
+            self._proc.stdin.close()
             try:
                 await asyncio.wait_for(self._proc.wait(), timeout=STACK_CLOSE_TIMEOUT)
             except asyncio.TimeoutError:
@@ -122,10 +133,12 @@ class GoDockerAdapter:
         req = json.dumps({"op": op, "args": args or {}}) + "\n"
 
         async with self._lock:
-            self._proc.stdin.write(req.encode())  # type: ignore[union-attr]
-            await self._proc.stdin.drain()  # type: ignore[union-attr]
+            assert self._proc.stdin is not None
+            assert self._proc.stdout is not None
+            self._proc.stdin.write(req.encode())
+            await self._proc.stdin.drain()
 
-            line = await self._proc.stdout.readline()  # type: ignore[union-attr]
+            line = await self._proc.stdout.readline()
             if not line:
                 raise RuntimeError("Go docker adapter closed stdout")
 
@@ -190,7 +203,11 @@ class GoDockerAdapter:
         if build_args:
             args["build_args"] = json.dumps(build_args)
         resp = await self._call("build", args)
-        return resp.get("ok", False)
+        if not resp.get("ok", False):
+            error_msg = resp.get("error", "unknown error")
+            logger.warning("Go adapter build failed for '%s': %s", image_tag, error_msg)
+            return False
+        return True
 
     async def create(
         self,
@@ -206,6 +223,7 @@ class GoDockerAdapter:
         volumes: Optional[List[str]] = None,
         read_only: bool = False,
         cap_drop: Optional[List[str]] = None,
+        labels: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """Create a container and return its ID (or None on failure)."""
         args: Dict[str, str] = {"image": image, "name": name}
@@ -227,6 +245,8 @@ class GoDockerAdapter:
             args["read_only"] = "true"
         if cap_drop:
             args["cap_drop"] = json.dumps(cap_drop)
+        if labels:
+            args["labels"] = json.dumps(labels)
         resp = await self._call("create", args)
         if not resp.get("ok"):
             logger.error("Go adapter create failed: %s", resp.get("error", "unknown"))

@@ -39,6 +39,8 @@ permissions:
 env:
   IMAGE_DOCKERHUB: diaz3618/argus-mcp
   IMAGE_GHCR: ghcr.io/diaz3618/argus-mcp
+  IMAGE_DOCKERHUB_DHI: diaz3618/argus-mcp-dhi
+  IMAGE_GHCR_DHI: ghcr.io/diaz3618/argus-mcp-dhi
 
 jobs:
   build-and-push:
@@ -47,10 +49,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -156,3 +158,82 @@ jobs:
           echo "**Supply Chain:**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Cosign keyless signature (Sigstore/Fulcio)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ SBOM attestation (SPDX JSON)" >> $GITHUB_STEP_SUMMARY
+
+  # ── DHI (Docker Hardened Image) variant ──────────────────
+  build-and-push-dhi:
+    name: Build & Push DHI (multi-arch)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags + labels)
+        id: meta-dhi
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.IMAGE_DOCKERHUB_DHI }}
+            ${{ env.IMAGE_GHCR_DHI }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,prefix=sha-
+
+      - name: Build and push DHI
+        id: build-push-dhi
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dhi
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta-dhi.outputs.tags }}
+          labels: ${{ steps.meta-dhi.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign Docker Hub DHI image
+        env:
+          DIGEST: ${{ steps.build-push-dhi.outputs.digest }}
+        run: cosign sign --yes "${{ env.IMAGE_DOCKERHUB_DHI }}@${DIGEST}"
+
+      - name: Sign GHCR DHI image
+        env:
+          DIGEST: ${{ steps.build-push-dhi.outputs.digest }}
+        run: cosign sign --yes "${{ env.IMAGE_GHCR_DHI }}@${DIGEST}"
+
+      - name: Summary
+        run: |
+          echo "## Published DHI Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Hub:** \`${{ env.IMAGE_DOCKERHUB_DHI }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**GHCR:** \`${{ env.IMAGE_GHCR_DHI }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build-push-dhi.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Supply Chain:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Cosign keyless signature (Sigstore/Fulcio)" >> $GITHUB_STEP_SUMMARY

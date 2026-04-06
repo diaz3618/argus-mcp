@@ -1,0 +1,18 @@
+# Catppuccin Macchiato — rich dark theme
+# https://github.com/catppuccin/catppuccin
+name: Catppuccin Macchiato
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#a6da95"
+  error: "#ed8796"
+  warning: "#eed49f"
+  highlight: "#8aadf4"
+  info: "#91d7e3"
+  accent: "#c6a0f6"
+  secondary: "#c6a0f6"
+  surface: "#363a4f"
+  text: "#cad3f5"
+  subtext: "#a5adcb"
+  overlay: "#6e738d"

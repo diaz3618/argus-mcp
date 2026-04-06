@@ -74,7 +74,6 @@ class OperationsScreen(ArgusScreen):
         status = self.app.last_status
         if status is not None:
             ff: Dict[str, Any] = getattr(status, "feature_flags", {}) or {}
-            # OTel is enabled if there's an otel exporter configured
             otel_enabled = ff.get("otel", False)
             panel.update_otel_status(enabled=otel_enabled)
 

@@ -11,8 +11,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import DataTable, Static
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.tui._constants import PHASE_ICON, PHASE_STYLE
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 

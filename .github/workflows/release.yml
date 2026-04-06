@@ -23,22 +23,26 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Install build dependencies
+      - name: Build sdist for release asset
         run: |
-          python -m pip install --upgrade pip
           pip install build
+          python -m build --sdist .
+          python -m build packages/argus_cli
 
-      - name: Build distribution packages
-        run: python -m build
+      - name: Collect all artifacts
+        run: |
+          mkdir -p all-dist
+          cp dist/* all-dist/ 2>/dev/null || true
+          cp packages/argus_cli/dist/* all-dist/ 2>/dev/null || true
 
       - name: Generate release notes
         id: release_notes
@@ -63,24 +67,31 @@ jobs:
 
           echo "" >> release_notes.md
           echo "" >> release_notes.md
-          echo "## Installation" >> release_notes.md
+          echo "## Packages" >> release_notes.md
           echo "" >> release_notes.md
+          echo "### argus-mcp (Server)" >> release_notes.md
           echo "\`\`\`bash" >> release_notes.md
           echo "pip install argus-mcp==$VERSION" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### argus-cli (Client)" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "pip install argus-cli" >> release_notes.md
           echo "\`\`\`" >> release_notes.md
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "dist/*"
+          artifacts: "all-dist/*"
           bodyFile: "release_notes.md"
           generateReleaseNotes: true
           makeLatest: true
+          allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # GITHUB_TOKEN releases do not trigger other workflows (anti-loop).
-      # Explicitly dispatch publish.yml so PyPI publishing is automatic.
-      - name: Trigger PyPI publish
-        run: gh workflow run publish.yml --ref "${{ github.ref }}"
+      # Explicitly dispatch build-wheels.yml for platform wheel builds + PyPI publish.
+      - name: Trigger wheel build & publish
+        run: gh workflow run build-wheels.yml --ref "${{ github.ref }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -224,3 +224,27 @@ def multi_backend_config() -> Dict[str, Any]:
             },
         },
     }
+
+
+# ── CLI Command Test Fixtures (ArgusClient-based) ─────────────────────
+
+
+def make_cli_config() -> MagicMock:
+    """Create a MagicMock config object suitable for ArgusClient CLI commands.
+
+    Provides all attributes accessed by CLI commands: output_format,
+    server_url, token, no_color, theme, show_toolbar, vi_mode,
+    poll_interval, history_limit.
+    """
+    cfg = MagicMock()
+    cfg.output_format = "rich"
+    cfg.server_url = "http://localhost:8080"
+    cfg.token = "test-token"
+    cfg.no_color = False
+    cfg.theme = "dark"
+    cfg.show_toolbar = True
+    cfg.vi_mode = False
+    cfg.poll_interval = 5
+    cfg.history_limit = 100
+    cfg.config_file = "/tmp/argus-test-config.yaml"
+    return cfg

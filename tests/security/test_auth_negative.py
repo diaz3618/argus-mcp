@@ -24,9 +24,6 @@ from argus_mcp.server.management.auth import (
 pytestmark = [pytest.mark.security]
 
 
-# Helpers
-
-
 def _make_scope(
     path: str = "/manage/v1/reload",
     *,

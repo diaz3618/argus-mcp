@@ -1,0 +1,18 @@
+# Catppuccin Frappé — muted dark theme
+# https://github.com/catppuccin/catppuccin
+name: Catppuccin Frappé
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#a6d189"
+  error: "#e78284"
+  warning: "#e5c890"
+  highlight: "#8caaee"
+  info: "#81c8be"
+  accent: "#ca9ee6"
+  secondary: "#ca9ee6"
+  surface: "#414559"
+  text: "#c6d0f5"
+  subtext: "#a5adce"
+  overlay: "#737994"

@@ -43,7 +43,7 @@ docker run -d \
   --name argus \
   -p 9000:9000 \
   -v ./config.yaml:/app/config.yaml \
-  -e ARGUS_MGMT_TOKEN=my-secret-token \
+  -e ARGUS_MGMT_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
   -e MY_API_KEY=sk-xxx \
   diaz3618/argus-mcp:latest
 ```
@@ -207,7 +207,7 @@ backends:
 Use a specific tag instead of `latest`:
 
 ```bash
-docker pull diaz3618/argus-mcp:0.7.0
+docker pull diaz3618/argus-mcp:0.8.1
 ```
 
 Tags follow the project version (semver) and are published on each release.

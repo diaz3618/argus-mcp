@@ -633,7 +633,7 @@ client:
 |-------|------|---------|-------------|
 | `server_url` | string | `"http://127.0.0.1:9000"` | URL of the Argus server to connect to |
 | `token` | string | — | Authentication token (optional, supports `${ENV_VAR}`) |
-| `theme` | string | `"textual-dark"` | Textual theme name for the TUI |
+| `theme` | string | `"textual-dark"` | Textual theme name for the TUI (also syncs REPL color palette) |
 | `poll_interval` | float | `2.0` | Polling interval in seconds (range: 0.5–60.0) |
 | `servers_config` | string | — | Path to `servers.json` for multi-server mode |
 

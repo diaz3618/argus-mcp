@@ -36,16 +36,18 @@ from mcp import ClientSession
 from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
 from argus_mcp.constants import STACK_CLOSE_TIMEOUT
 
+_CB_RUST: bool = False
+_RustCB: type[CircuitBreaker] | None = None
+
 try:
     from argus_mcp.bridge.health._circuit_breaker_rs import (
         RUST_AVAILABLE as _CB_RUST,
     )
-    from argus_mcp.bridge.health._circuit_breaker_rs import (
+    from argus_mcp.bridge.health._circuit_breaker_rs import (  # type: ignore[assignment]
         CircuitBreaker as _RustCB,
     )
 except ImportError:
-    _CB_RUST = False
-    _RustCB = None
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -275,11 +277,16 @@ class SessionPool:
     def _get_circuit_breaker(self, key: SessionKey) -> CircuitBreaker:
         cb = self._circuit_breakers.get(key)
         if cb is None:
-            _CB = _RustCB if _CB_RUST and _RustCB is not None else CircuitBreaker
-            cb = _CB(
-                name=f"pool:{key.url}",
-                failure_threshold=self._cb_threshold,
-            )
+            if _CB_RUST and _RustCB is not None:
+                cb = _RustCB(
+                    name=f"pool:{key.url}",
+                    failure_threshold=self._cb_threshold,
+                )
+            else:
+                cb = CircuitBreaker(
+                    name=f"pool:{key.url}",
+                    failure_threshold=self._cb_threshold,
+                )
             self._circuit_breakers[key] = cb
         return cb
 

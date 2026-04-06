@@ -1,0 +1,18 @@
+# Rosé Pine Moon — medium contrast dark variant
+# https://rosepinetheme.com
+name: Rosé Pine Moon
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#3e8fb0"
+  error: "#eb6f92"
+  warning: "#f6c177"
+  highlight: "#9ccfd8"
+  info: "#9ccfd8"
+  accent: "#c4a7e7"
+  secondary: "#c4a7e7"
+  surface: "#2a273f"
+  text: "#e0def4"
+  subtext: "#908caa"
+  overlay: "#6e6a86"

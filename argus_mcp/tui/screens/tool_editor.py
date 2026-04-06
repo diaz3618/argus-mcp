@@ -18,8 +18,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, Static
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.tui._config_ops import resolve_config_path, trigger_reload
+from argus_mcp.tui._error_utils import safe_query
 from argus_mcp.tui.screens.base import ArgusScreen
 from argus_mcp.tui.widgets.param_editor import ParamEditorWidget
 from argus_mcp.tui.widgets.tool_preview import ToolPreviewWidget
@@ -143,7 +143,6 @@ class ToolEditorScreen(ArgusScreen):
         for tool in tools:
             name = tool.get("name", "unknown")
             backend = tool.get("backend", "")
-            # Check modifications for include status
             mods = self._modifications.get(name, {})
             included = mods.get("included", tool.get("included", True))
             status = "✓" if included else "✗"
@@ -156,8 +155,6 @@ class ToolEditorScreen(ArgusScreen):
     def _select_tool(self, tool_name: str) -> None:
         """Update editor and preview for the selected tool."""
         self._selected_tool = tool_name
-
-        # Find tool info
         tool_info = next(
             (t for t in self._tools if t.get("name") == tool_name),
             None,
@@ -171,13 +168,11 @@ class ToolEditorScreen(ArgusScreen):
         rename = self.query_one("#rename-input", Input)
         rename.value = display_name
 
-        # Update parameter editor with tool's input schema
         if param_editor := safe_query(self, "#param-editor", ParamEditorWidget):
             schema = tool_info.get("inputSchema", {})
             defaults = mods.get("defaults", {})
             param_editor.load_schema(schema, defaults)
 
-        # Update preview
         preview = self.query_one("#tool-preview", ToolPreviewWidget)
         preview.update_preview(
             {
@@ -193,7 +188,6 @@ class ToolEditorScreen(ArgusScreen):
                 self._modifications[self._selected_tool] = {}
             self._modifications[self._selected_tool]["rename"] = event.value
 
-            # Update preview
             tool_info = next(
                 (t for t in self._tools if t.get("name") == self._selected_tool),
                 None,
@@ -274,7 +268,6 @@ class ToolEditorScreen(ArgusScreen):
                 title="Saved",
             )
 
-            # Trigger hot-reload
             self._trigger_reload()
 
         except (OSError, yaml.YAMLError) as exc:

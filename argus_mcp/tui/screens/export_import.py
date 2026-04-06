@@ -366,7 +366,6 @@ class _ImportPanel(Static):
             )
             return
 
-        # Persist updated config to disk
         try:
             path = find_config_file()
             cfg_dict = config.model_dump(exclude_none=True, exclude_defaults=False)

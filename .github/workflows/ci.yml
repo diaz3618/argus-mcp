@@ -12,14 +12,14 @@ on:
       - main
     paths:
       - 'argus_mcp/**'
-      - 'mods/**'
+      - 'packages/**'
       - 'pyproject.toml'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'argus_mcp/**'
-      - 'mods/**'
+      - 'packages/**'
       - 'pyproject.toml'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
@@ -47,7 +47,7 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -62,8 +62,8 @@ jobs:
       - name: Run ruff check
         run: uv run ruff check argus_mcp/
 
-      - name: Run ruff check (mods/)
-        run: uv run ruff check mods/
+      - name: Run ruff check (argus_cli)
+        run: uv run ruff check packages/argus_cli/argus_cli/
 
   # ──────────────────────────────────────────────
   # Ruff — code formatting verification
@@ -72,7 +72,7 @@ jobs:
     name: Format (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -85,7 +85,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff format --check
-        run: uv run ruff format --check argus_mcp/ mods/
+        run: uv run ruff format --check argus_mcp/ packages/argus_cli/argus_cli/
 
   # ──────────────────────────────────────────────
   # Mypy — static type checking
@@ -94,7 +94,7 @@ jobs:
     name: Type Check (mypy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -116,7 +116,7 @@ jobs:
     name: Import Boundaries (import-linter)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -135,6 +135,71 @@ jobs:
   # via pre-push git hook instead — see .pre-commit-config.yaml.
 
   # ──────────────────────────────────────────────
+  # Rust — build PyO3 extensions
+  # ──────────────────────────────────────────────
+  rust-extensions:
+    name: Rust Extensions (maturin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            **/target
+          key: rust-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: rust-${{ runner.os }}-
+
+      - name: Install project + maturin
+        run: |
+          uv sync --group dev
+          uv pip install maturin
+
+      - name: Build all Rust extensions
+        run: uv run python scripts/build_rust.py
+
+  # ──────────────────────────────────────────────
+  # Go — build argusd daemon
+  # ──────────────────────────────────────────────
+  go-daemon:
+    name: Go Daemon (argusd)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/argusd/go.mod
+          cache-dependency-path: packages/argusd/go.sum
+
+      - name: Build argusd
+        run: make -C packages/argusd build
+
+      - name: Run Go vet
+        run: make -C packages/argusd vet
+
+      - name: Run Go tests
+        run: make -C packages/argusd test
+
+  # ──────────────────────────────────────────────
   # Security — filesystem scan
   # ──────────────────────────────────────────────
   security-scan:
@@ -145,10 +210,10 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: fs
           scan-ref: .
@@ -157,9 +222,8 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
+        if: always() && hashFiles('trivy-fs-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs-results.sarif
 
@@ -179,13 +243,13 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build image
         run: docker build -t diaz3618/argus-mcp:ci-test .
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: diaz3618/argus-mcp:ci-test
           format: sarif
@@ -193,9 +257,8 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
+        if: always() && hashFiles('trivy-image-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image-results.sarif
           category: container-scan
@@ -211,6 +274,8 @@ jobs:
       - format
       - typecheck
       - import-boundaries
+      - rust-extensions
+      - go-daemon
       - security-scan
       - container-scan
     runs-on: ubuntu-latest

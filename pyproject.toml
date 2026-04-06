@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = ["setuptools>=68.0", "setuptools-rust>=1.10.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-mcp"
-version = "0.7.2"
+version = "0.8.2"
 description = "A central server for MCP servers"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,9 +16,14 @@ dependencies = [
     "python-multipart>=0.0.22",
     "pyyaml>=6.0",
     "jinja2>=3.0.0",
-    "starlette>=0.47.2",
+    "starlette>=1.0.0",
     "uvicorn[standard]>=0.23.0",
     "httpx>=0.24.0",
+    "rich>=14.0.0",
+]
+
+[project.optional-dependencies]
+tui = [
     "textual>=1.0.0",
 ]
 
@@ -26,25 +31,82 @@ dependencies = [
 include = ["argus_mcp*"]
 
 [tool.setuptools.package-data]
+"argus_mcp._bin" = ["*"]
 "argus_mcp.bridge.container.templates" = ["*.j2"]
 "argus_mcp.tui" = ["*.tcss"]
+
+# ── setuptools-rust: 7 PyO3 extension modules ───────────────────────────
+# optional=true: build succeeds without Rust (Python fallbacks exist);
+# pre-built wheels are used in Docker and CI wheel builds.
+
+[[tool.setuptools-rust.ext-modules]]
+target = "yaml_rs"
+path = "argus_mcp/config/_yaml_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "audit_rs"
+path = "argus_mcp/audit/_audit_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "filter_rs"
+path = "argus_mcp/bridge/_filter_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "token_cache_rs"
+path = "argus_mcp/bridge/auth/_token_cache_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "circuit_breaker_rs"
+path = "argus_mcp/bridge/health/_circuit_breaker_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "hash_rs"
+path = "argus_mcp/plugins/_hash_rs/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+[[tool.setuptools-rust.ext-modules]]
+target = "security_plugins_rs"
+path = "argus_mcp/plugins/builtins_rust/Cargo.toml"
+binding = "PyO3"
+optional = true
+
+# ── uv Workspace ────────────────────────────────────────────────────────
+
+[tool.uv.workspace]
+members = ["packages/*"]
+exclude = ["packages/argusd"]
+
+[tool.uv.sources]
+argus-mcp = { workspace = true }
 
 [project.scripts]
 argus-mcp = "argus_mcp.cli:main"
 
 [dependency-groups]
 dev = [
-    "black>=24.4.2",
+    "black>=26.3.1",
     "import-linter>=2.1",
+    "maturin>=1.7.0",
     "mypy>=1.17.1",
-    "ruff>=0.14.13",
+    "ruff>=0.15.7",
     "textual-dev>=1.0.0",
     "types-pyyaml>=6.0.12.20250915",
 ]
 test = [
     "pytest>=9.0.0",
     "pytest-asyncio>=1.0.0",
-    "pytest-cov>=7.0.0",
+    "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.5.0",
     "hypothesis>=6.100.0",
@@ -63,7 +125,6 @@ exclude = '''
   | logs
   | img
   | internal
-  | memory-bank
 )/
 '''
 
@@ -78,7 +139,6 @@ extend-exclude = [
     "logs",
     "img",
     "internal",
-    "memory-bank",
 ]
 
 [tool.ruff.lint]
@@ -101,7 +161,6 @@ extend-exclude = [
     "*.jsonl",
     "logs/",
     "internal/",
-    "memory-bank/",
     ".venv*",
     "*.egg-info",
 ]
@@ -110,9 +169,8 @@ extend-exclude = [
 python_version = "3.10"
 files = [
     "argus_mcp/",
-    "mods/*.py",
 ]
-exclude = "(^logs/|^img/|^internal/|^memory-bank/|^\\.venv/|^__pycache__/)"
+exclude = "(^logs/|^img/|^internal/|^\\.venv/|^__pycache__/)"
 pretty = true
 show_error_codes = true
 warn_unused_configs = true
@@ -136,10 +194,6 @@ disable_error_code = ["attr-defined"]
 module = ["argus_mcp.tui.*"]
 ignore_errors = true
 
-[[tool.mypy.overrides]]
-module = ["mods.debug_focus"]
-disable_error_code = ["method-assign", "assignment"]
-
 # ── import-linter ────────────────────────────────────────────────────────
 # Layered architecture enforcement.  Higher layers may depend on lower,
 # but not the reverse.  Run: uv run lint-imports
@@ -157,6 +211,7 @@ layers = [
     "bridge : runtime : plugins : registry : skills : workflows",  # L3 — business
     "config : telemetry",                          # L2 — config
     "display : audit : secrets : sessions",        # L1 — core services
+    "api",                                         # L0.5 — shared API layer (client-safe)
     "constants : errors : _task_utils : _error_utils",  # L0 — foundation
 ]
 containers = ["argus_mcp"]
@@ -212,6 +267,25 @@ exclude_lines = [
 show_missing = true
 skip_empty = true
 fail_under = 50
+
+# ── cibuildwheel ─────────────────────────────────────────────────────────
+# Platform wheel config. abi3-py310 = one wheel per platform.
+
+[tool.cibuildwheel]
+build = "cp310-*"
+skip = "cp310-{manylinux_i686,musllinux_*,win32,*-universal2}"
+build-verbosity = 1
+
+[tool.cibuildwheel.linux]
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
+environment = { PATH = "$HOME/.cargo/bin:$PATH" }
+
+[tool.cibuildwheel.macos]
+before-all = "curl -sSf https://sh.rustup.rs | sh -s -- -y"
+environment = { PATH = "$HOME/.cargo/bin:$PATH", MACOSX_DEPLOYMENT_TARGET = "12.0" }
+
+[tool.cibuildwheel.windows]
+before-all = "rustup show"
 
 # ── python-semantic-release ──────────────────────────────────────────────
 

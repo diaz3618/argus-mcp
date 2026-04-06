@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import fnmatch
 import logging
+from abc import ABC
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class CapabilityFilter:
+class CapabilityFilter(ABC):
     """Evaluate allow/deny glob patterns against capability names.
 
     Evaluation order (deny takes precedence over allow):
@@ -39,20 +40,14 @@ class CapabilityFilter:
 
     @property
     def is_active(self) -> bool:
-        """Return True if any filter patterns are configured."""
         return bool(self.allow or self.deny)
 
     def is_allowed(self, name: str) -> bool:
-        """Return True if *name* passes the filter."""
-        # Deny overrides allow.
         if self.deny and any(fnmatch.fnmatch(name, pat) for pat in self.deny):
             return False
 
-        # If allow list is set, name must match at least one pattern.
         if self.allow:
             return any(fnmatch.fnmatch(name, pat) for pat in self.allow)
-
-        # No filters configured — allow everything.
         return True
 
 
@@ -62,6 +57,9 @@ try:
 except ImportError:
     _FILTER_RUST = False
     _RustFilter = None
+
+if _FILTER_RUST and _RustFilter is not None:
+    CapabilityFilter.register(_RustFilter)
 
 
 def build_filter(
@@ -74,5 +72,5 @@ def build_filter(
     available, otherwise falls back to the pure-Python implementation.
     """
     if _FILTER_RUST and _RustFilter is not None:
-        return _RustFilter(allow=allow or [], deny=deny or [])  # type: ignore[return-value]
+        return _RustFilter(allow=allow or [], deny=deny or [])
     return CapabilityFilter(allow=allow, deny=deny)

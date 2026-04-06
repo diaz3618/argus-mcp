@@ -9,49 +9,11 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional, TypeVar, overload
+from typing import TypeVar, cast
 
-if TYPE_CHECKING:
-    from textual.widget import Widget
-
-T = TypeVar("T", bound="Widget")
 _F = TypeVar("_F", bound=Callable[..., object])
 
 _logger = logging.getLogger(__name__)
-
-
-@overload
-def safe_query(
-    host: Widget,
-    selector: str,
-    expect_type: type[T],
-) -> Optional[T]: ...
-
-
-@overload
-def safe_query(
-    host: Widget,
-    selector: str,
-) -> Optional[Widget]: ...
-
-
-def safe_query(
-    host: Widget,
-    selector: str,
-    expect_type: type[T] | None = None,
-) -> Optional[T] | Optional[Widget]:
-    """Query a single widget, returning *None* instead of raising.
-
-    Catches only ``textual.css.query.NoMatches`` — anything else propagates.
-    """
-    from textual.css.query import NoMatches
-
-    try:
-        if expect_type is not None:
-            return host.query_one(selector, expect_type)
-        return host.query_one(selector)
-    except NoMatches:
-        return None
 
 
 def log_on_exception(
@@ -76,6 +38,6 @@ def log_on_exception(
                 logger.log(level, "%s in %s", message, fn.__qualname__, exc_info=True)
                 return default
 
-        return wrapper  # type: ignore[return-value]
+        return cast(_F, wrapper)
 
     return decorator

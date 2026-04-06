@@ -1,0 +1,18 @@
+# One Dark — Atom editor's iconic dark theme
+# https://github.com/atom/one-dark-syntax
+name: One Dark
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#98c379"
+  error: "#e06c75"
+  warning: "#e5c07b"
+  highlight: "#61afef"
+  info: "#56b6c2"
+  accent: "#c678dd"
+  secondary: "#c678dd"
+  surface: "#2c313a"
+  text: "#abb2bf"
+  subtext: "#828997"
+  overlay: "#5c6370"

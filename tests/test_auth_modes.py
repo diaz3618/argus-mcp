@@ -25,8 +25,6 @@ from argus_mcp.server.auth.providers import (
 )
 from argus_mcp.server.auth_context import current_auth_mode
 
-# Helpers
-
 
 def _make_ctx(token: str | None = None) -> RequestContext:
     """Build a minimal RequestContext with optional token in metadata."""

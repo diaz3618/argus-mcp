@@ -1,3 +1,3 @@
-module github.com/hack23/argus-mcp/tools/mcp-stdio-wrapper
+module github.com/diaz3618/argus-mcp/tools/mcp-stdio-wrapper
 
-go 1.22
+go 1.26

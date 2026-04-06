@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
-from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._error_utils import safe_query
 from argus_mcp.tui.widgets.toolbar import ToolbarWidget
 
 

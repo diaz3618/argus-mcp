@@ -27,8 +27,78 @@ MGMT_TOKEN_ENV_VAR = "ARGUS_MGMT_TOKEN"
 PUBLIC_PATH_SUFFIXES = frozenset({"/health", "/ready"})
 
 
-def resolve_token() -> Optional[str]:
+_KNOWN_PLACEHOLDERS = frozenset(
+    {
+        "my-secret-token",
+        "changeme",
+        "changeme-changeme",
+        "secret",
+        "password",
+        "token",
+        "replace-me",
+        "your-token-here",
+    }
+)
+
+_MIN_TOKEN_LENGTH = 16
+
+
+def validate_token_entropy(
+    token: Optional[str],
+    *,
+    allow_weak: bool = False,
+) -> Optional[str]:
+    """Validate that a management API token meets minimum entropy requirements.
+
+    Returns the token unchanged when valid, ``None`` for empty/missing
+    tokens (auth disabled), or raises ``ValueError`` for weak or
+    placeholder tokens.
+
+    Args:
+        token: Raw token string (may be ``None`` or empty).
+        allow_weak: When ``True``, skip the minimum-length check but
+            still reject known placeholder tokens.
+
+    Raises:
+        ValueError: Token is a known placeholder or too short (when
+            ``allow_weak`` is ``False``).
+    """
+    if token is None or token.strip() == "":
+        return None
+
+    # Known placeholders are always rejected, even with allow_weak
+    if token.lower() in _KNOWN_PLACEHOLDERS:
+        raise ValueError(
+            "Refusing to use a known placeholder token. "
+            "Generate a secure token (e.g. 'python -c \"import secrets; "
+            "print(secrets.token_urlsafe(32))\"')."
+        )
+
+    if not allow_weak and len(token) < _MIN_TOKEN_LENGTH:
+        raise ValueError(
+            f"Management API token is too short ({len(token)} chars, "
+            f"minimum {_MIN_TOKEN_LENGTH}). Use a token with at least "
+            f"{_MIN_TOKEN_LENGTH} characters or set allow_weak_tokens: true "
+            f"in security config."
+        )
+
+    if allow_weak and len(token) < _MIN_TOKEN_LENGTH:
+        logger.warning(
+            "Management API token is short (%d chars, recommended >=%d). "
+            "Running with allow_weak_tokens enabled.",
+            len(token),
+            _MIN_TOKEN_LENGTH,
+        )
+
+    return token
+
+
+def resolve_token(*, config_token: Optional[str] = None) -> Optional[str]:
     """Resolve the management API token from available sources.
+
+    Priority order:
+    1. ``ARGUS_MGMT_TOKEN`` environment variable
+    2. ``config_token`` parameter (from config file)
 
     Returns ``None`` if no token is configured (auth disabled).
     """
@@ -39,8 +109,15 @@ def resolve_token() -> Optional[str]:
         logger.debug("Management API token resolved from %s env var.", MGMT_TOKEN_ENV_VAR)
         return env_token
 
-    # 2. Config file (future — will be populated when config restructure lands)
-    # For now, return None if env var is not set.
+    # 2. Config file token (passed in by caller)
+    if config_token and config_token.strip():
+        logger.info(
+            "Management API token resolved from config file. "
+            "Consider using %s env var or $secret: references instead.",
+            MGMT_TOKEN_ENV_VAR,
+        )
+        return config_token.strip()
+
     return None
 
 
@@ -176,7 +253,8 @@ class BearerAuthMiddleware:
         provided_token = auth_header[7:]  # Strip "Bearer " prefix
 
         # Constant-time comparison to prevent timing attacks
-        if not hmac.compare_digest(provided_token, self._token):  # type: ignore[arg-type]
+        assert self._token is not None  # guaranteed by auth_enabled check above
+        if not hmac.compare_digest(provided_token, self._token):
             client = scope.get("client")
             client_host = client[0] if client else "unknown"
             logger.warning(

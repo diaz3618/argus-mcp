@@ -425,7 +425,7 @@ rules:
     paths:
       include:
         - /argus_mcp/**/*.py
-        - /mods/**/*.py
+
     metadata:
       category: dependency
       technology: [python, subprocess]
@@ -497,7 +497,7 @@ rules:
   - id: httpx-missing-timeout
     message: >
       `httpx.AsyncClient` should be initialized with an explicit `timeout`.
-      The default timeout is 5.0 seconds. For critical production services, you should explicitly define 
+      The default timeout is 5.0 seconds. For critical production services, you should explicitly define
       connect, read, and write timeouts to prevent hangs or premature failures.
     languages: [python]
     severity: WARNING
@@ -538,7 +538,7 @@ rules:
   - id: starlette-basehttpmiddleware-pitfalls
     message: >
       `BaseHTTPMiddleware` has known performance overhead and issues with `ContextVars` propagation.
-      Official Starlette documentation and maintainers suggest using pure ASGI middleware (implementing `__call__(scope, receive, send)`) 
+      Official Starlette documentation and maintainers suggest using pure ASGI middleware (implementing `__call__(scope, receive, send)`)
       for production applications and complex logic.
     languages: [python]
     severity: WARNING
@@ -549,7 +549,7 @@ rules:
   - id: starlette-middleware-request-url-path
     message: >
       Using `request.url.path` in middleware can be misleading when the application is mounted under a prefix (e.g., `Mount("/api", app)`).
-      `request.url.path` returns the full path including the prefix. 
+      `request.url.path` returns the full path including the prefix.
       For route-relative logic, consider `request.scope.get("root_path")` or checking the ASGI scope directly.
     languages: [python]
     severity: WARNING
@@ -563,7 +563,7 @@ rules:
   - id: textual-worker-exit-on-error
     message: >
       By default, Textual `@work` workers exit the entire application on an unhandled exception (`exit_on_error=True`).
-      For production applications, it is recommended to set `exit_on_error=False` and handle errors via `Worker.StateChanged` 
+      For production applications, it is recommended to set `exit_on_error=False` and handle errors via `Worker.StateChanged`
       or `try/except` blocks to prevent the TUI from crashing unexpectedly.
     languages: [python]
     severity: WARNING

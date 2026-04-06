@@ -3,8 +3,6 @@ use pyo3::types::PyDict;
 use serde::Serialize;
 use serde_json;
 
-// ── Audit event structs matching Python AuditEvent model ──
-
 #[derive(Serialize)]
 struct AuditSource<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -51,9 +49,7 @@ fn pydict_to_json(py: Python<'_>, dict: &Bound<'_, PyDict>) -> PyResult<serde_js
     // Use Python's json.dumps for reliable dict → JSON conversion,
     // then parse into serde_json::Value.
     let json_mod = py.import("json")?;
-    let json_str: String = json_mod
-        .call_method("dumps", (dict,), None)?
-        .extract()?;
+    let json_str: String = json_mod.call_method("dumps", (dict,), None)?.extract()?;
     serde_json::from_str(&json_str).map_err(|e| {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("JSON parse error: {e}"))
     })
@@ -145,16 +141,14 @@ fn serialize_audit_event(
 fn serialize_audit_dict(py: Python<'_>, data: &Bound<'_, PyDict>) -> PyResult<String> {
     let val = pydict_to_json(py, data)?;
     serde_json::to_string(&val).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-            "dict serialization failed: {e}"
-        ))
+        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("dict serialization failed: {e}"))
     })
 }
 
 #[pymodule]
 mod audit_rs {
     #[pymodule_export]
-    use super::serialize_audit_event;
-    #[pymodule_export]
     use super::serialize_audit_dict;
+    #[pymodule_export]
+    use super::serialize_audit_event;
 }

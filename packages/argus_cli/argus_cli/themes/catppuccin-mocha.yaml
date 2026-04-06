@@ -1,0 +1,18 @@
+# Catppuccin Mocha — warm dark theme
+# https://github.com/catppuccin/catppuccin
+name: Catppuccin Mocha
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#a6e3a1"
+  error: "#f38ba8"
+  warning: "#f9e2af"
+  highlight: "#89b4fa"
+  info: "#94e2d5"
+  accent: "#cba6f7"
+  secondary: "#cba6f7"
+  surface: "#313244"
+  text: "#cdd6f4"
+  subtext: "#a6adc8"
+  overlay: "#6c7086"

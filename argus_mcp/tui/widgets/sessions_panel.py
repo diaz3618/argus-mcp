@@ -15,7 +15,7 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, Static
 
-from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 

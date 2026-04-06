@@ -9,8 +9,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.constants import SERVER_NAME, SERVER_VERSION
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 

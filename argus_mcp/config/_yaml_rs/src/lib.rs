@@ -14,10 +14,9 @@ use pyo3::types::PyAnyMethods;
 /// is still faster than Python's pure-Python YAML parser for large files.
 #[pyfunction]
 fn parse_yaml<'py>(py: Python<'py>, yaml_str: &str) -> PyResult<Bound<'py, PyAny>> {
-    let value: serde_yaml::Value =
-        serde_yaml::from_str(yaml_str).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("YAML parse error: {e}"))
-        })?;
+    let value: serde_yaml::Value = serde_yaml::from_str(yaml_str).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("YAML parse error: {e}"))
+    })?;
 
     let json_str = serde_json::to_string(&value).map_err(|e| {
         PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(

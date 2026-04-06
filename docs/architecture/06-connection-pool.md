@@ -147,12 +147,12 @@ sse_resilience:
 ## Integration with the Bridge
 
 The session pool and HTTP pool are instantiated during server startup and
-injected into the bridge layer. The bridge's `BackendManager` uses them
+injected into the bridge layer. The bridge's `ClientManager` uses them
 when routing requests:
 
 ```
 1. Incoming request arrives at RoutingMiddleware
-2. BackendManager resolves the target backend
+2. ClientManager resolves the target backend
 3. SessionPool provides an MCP session (or HttpPool for HTTP calls)
 4. RetryManager wraps the call for transient failure recovery
 5. Response flows back through the middleware chain

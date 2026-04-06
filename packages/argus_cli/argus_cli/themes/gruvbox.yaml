@@ -1,0 +1,18 @@
+# Gruvbox — retro groove color scheme
+# https://github.com/morhetz/gruvbox
+name: Gruvbox
+
+# ── Semantic color roles ──────────────────────────────────────────────
+
+colors:
+  success: "#b8bb26"
+  error: "#fb4934"
+  warning: "#fabd2f"
+  highlight: "#83a598"
+  info: "#8ec07c"
+  accent: "#d3869b"
+  secondary: "#d3869b"
+  surface: "#3c3836"
+  text: "#ebdbb2"
+  subtext: "#a89984"
+  overlay: "#504945"

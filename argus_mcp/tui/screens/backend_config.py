@@ -15,8 +15,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select, Static, Switch
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +200,6 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                         id="bcm-headers",
                     )
 
-                # Advanced
                 yield Label("Advanced", classes="bcm-section")
 
                 yield Label("Timeout (seconds)", classes="bcm-field-label")
@@ -227,7 +226,6 @@ class BackendConfigModal(ModalScreen[Optional[Tuple[str, Dict[str, Any]]]]):
                 # Preview
                 yield Static("", id="bcm-preview")
 
-            # Actions
             with Horizontal(id="bcm-actions"):
                 yield Button(
                     "Install" if self._mode == "registry" else "Add Backend",

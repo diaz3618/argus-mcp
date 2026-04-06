@@ -22,9 +22,6 @@ from argus_mcp.server.sse_resilience import (
 pytestmark = [pytest.mark.stress]
 
 
-# Helpers
-
-
 def _mock_send_stream(delay: float = 0.0) -> AsyncMock:
     """Build a mock MemoryObjectSendStream with optional per-send delay."""
     stream = AsyncMock()

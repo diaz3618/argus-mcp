@@ -245,20 +245,31 @@ func doListImages(ctx context.Context, cli *client.Client, prefix string) Respon
 	return Response{OK: true, Data: result}
 }
 
-// --- Validation regexes for build and create ops ---
-
 var (
-	imageTagRe    = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-z0-9._-]+$`)
-	buildArgKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
-	volumeRe      = regexp.MustCompile(`^[a-zA-Z0-9/._:-]+$`)
-	networkNameRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+	imageTagRe        = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-z0-9._-]+$`)
+	buildArgKeyRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+	volumeRe          = regexp.MustCompile(`^[a-zA-Z0-9/._:-]+$`)
+	networkNameRe     = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+	syntaxDirectiveRe = regexp.MustCompile(`(?m)^#\s*syntax\s*=\s*\S+\s*\n?`)
 )
+
+// stripSyntaxDirective removes "# syntax=..." lines from a Dockerfile.
+// BuildKit's built-in frontend already supports all features we use.
+func stripSyntaxDirective(content string) string {
+	return syntaxDirectiveRe.ReplaceAllString(content, "")
+}
 
 func doBuild(ctx context.Context, cli *client.Client, args map[string]string) Response {
 	dockerfileContent := args["dockerfile_content"]
 	if dockerfileContent == "" {
 		return Response{Error: "missing 'dockerfile_content' arg"}
 	}
+
+	// Strip "# syntax=..." directive — BuildKit's built-in frontend already
+	// supports all features we use (e.g. --mount).  The directive triggers a
+	// pull of the syntax image which requires a session that the raw API
+	// doesn't provide.
+	dockerfileContent = stripSyntaxDirective(dockerfileContent)
 	imageTag := args["image_tag"]
 	if imageTag == "" {
 		return Response{Error: "missing 'image_tag' arg"}
@@ -307,6 +318,7 @@ func doBuild(ctx context.Context, cli *client.Client, args map[string]string) Re
 		BuildArgs:   buildArgs,
 		Remove:      true,
 		ForceRemove: true,
+		Version:     build.BuilderBuildKit,
 	})
 	if err != nil {
 		return Response{Error: fmt.Sprintf("build failed: %v", err)}
@@ -427,10 +439,19 @@ func doCreate(ctx context.Context, cli *client.Client, args map[string]string) R
 
 	readOnly := args["read_only"] == "true"
 
+	// Parse labels from JSON object string (optional).
+	var labelMap map[string]string
+	if l := args["labels"]; l != "" {
+		if err := json.Unmarshal([]byte(l), &labelMap); err != nil {
+			return Response{Error: fmt.Sprintf("invalid labels JSON: %v", err)}
+		}
+	}
+
 	config := &container.Config{
 		Image:        img,
 		Cmd:          cmd,
 		Env:          envList,
+		Labels:       labelMap,
 		OpenStdin:    true,
 		StdinOnce:    true,
 		AttachStdin:  true,

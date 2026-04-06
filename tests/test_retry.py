@@ -22,8 +22,6 @@ from argus_mcp.bridge.retry import (
 )
 from argus_mcp.config.schema import RetryConfig
 
-# Helpers
-
 
 def _mock_response(status: int, headers: dict[str, str] | None = None) -> httpx.Response:
     """Create a minimal httpx.Response with the given status code."""

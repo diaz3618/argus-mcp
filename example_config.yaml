@@ -34,7 +34,7 @@ backends:
     type: stdio
     command: python
     args:
-      - mods/stdio_test_server.py
+      - tests/fixtures/stdio_test_server.py
     env:
       PYTHONUNBUFFERED: "1"
     group: default                  # logical server group
@@ -63,7 +63,7 @@ backends:
     url: "http://127.0.0.1:8021/mcp_sse"
     command: python                 # optional: launch the server process
     args:
-      - mods/sse_test_server.py
+      - tests/fixtures/sse_test_server.py
     env:
       PYTHONUNBUFFERED: "1"
     headers:                        # extra HTTP headers
@@ -207,3 +207,9 @@ feature_flags:
   # outgoing_auth: true             # default: true
   # session_management: true        # default: true
   # yaml_config: true               # default: true
+  # use_dhi_images: false
+  #   Use Docker Hardened Images (Chainguard) as base images for
+  #   container-isolated backends. High-risk flag — requires registry
+  #   access to cgr.dev. When enabled, all container-isolated backends
+  #   use Chainguard base images instead of standard upstream images.
+  #   Per-backend container.builder_image overrides take precedence.

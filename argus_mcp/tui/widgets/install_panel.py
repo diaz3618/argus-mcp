@@ -17,8 +17,8 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Button, Label, Static
 
-from argus_mcp._error_utils import safe_query
 from argus_mcp.registry.models import ServerEntry
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 

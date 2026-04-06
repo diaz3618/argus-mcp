@@ -16,9 +16,7 @@ _DEFAULT_CLEANUP_INTERVAL: float = 60.0  # seconds between cleanup sweeps
 
 
 class SessionManager:
-    """Manages per-client MCP sessions.
-
-    Each session captures a snapshot of the routing table at creation
+    """Each session captures a snapshot of the routing table at creation
     time.  A background task periodically removes expired sessions.
 
     Parameters

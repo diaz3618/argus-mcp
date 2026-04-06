@@ -27,8 +27,8 @@ try:
     logger.debug("Rust audit serializer loaded")
 except ImportError:
     _USE_RUST = False
-    _rust_serialize_event = None  # type: ignore[assignment]
-    _rust_serialize_dict = None  # type: ignore[assignment]
+    _rust_serialize_event = None
+    _rust_serialize_dict = None
 
 logger = logging.getLogger(__name__)
 

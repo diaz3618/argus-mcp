@@ -59,7 +59,7 @@ Every skill directory must contain a `manifest.json`:
   "version": "1.0.0",            // semver, default "0.0.0"
   "description": "What this skill does",
   "author": "Your Name",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
 
   // ── Tools ─────────────────────────────────
   "tools": [
@@ -210,7 +210,7 @@ mkdir -p skills/my-awesome-skill
   "version": "1.0.0",
   "description": "Does awesome things",
   "author": "you",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "tools": [
     {
       "name": "do_awesome_thing",

@@ -213,7 +213,6 @@ class RegistryScreen(ArgusScreen):
         """Shared install logic for both panel and modal flows."""
         logger.info("Install confirmed: %s → %s", name, json.dumps(config))
 
-        # Write to config file
         config_path = self._resolve_config_path()
         if config_path is None:
             self.notify(
@@ -234,7 +233,6 @@ class RegistryScreen(ArgusScreen):
         )
         self._set_status(f"Installed '{name}' — triggering reload…")
 
-        # Trigger config hot-reload via the management API
         self._trigger_reload()
 
     def _resolve_config_path(self) -> Optional[str]:

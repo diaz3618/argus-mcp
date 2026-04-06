@@ -16,16 +16,18 @@ from typing import Any, Callable, Dict, Optional
 from argus_mcp._task_utils import _log_task_exception
 from argus_mcp.bridge.health.circuit_breaker import CircuitBreaker
 
+_CB_RUST: bool = False
+_RustCB: type[CircuitBreaker] | None = None
+
 try:
     from argus_mcp.bridge.health._circuit_breaker_rs import (
         RUST_AVAILABLE as _CB_RUST,
     )
-    from argus_mcp.bridge.health._circuit_breaker_rs import (
+    from argus_mcp.bridge.health._circuit_breaker_rs import (  # type: ignore[assignment]
         CircuitBreaker as _RustCB,
     )
 except ImportError:
-    _CB_RUST = False
-    _RustCB = None
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -182,12 +184,18 @@ class HealthChecker:
         """Probe a single backend and update state."""
         health = self._health.get(name)
         if health is None:
-            _CB = _RustCB if _CB_RUST and _RustCB is not None else CircuitBreaker
-            cb = _CB(
-                name,
-                failure_threshold=self._failure_threshold,
-                cooldown_seconds=self._cooldown,
-            )
+            if _CB_RUST and _RustCB is not None:
+                cb = _RustCB(
+                    name,
+                    failure_threshold=self._failure_threshold,
+                    cooldown_seconds=self._cooldown,
+                )
+            else:
+                cb = CircuitBreaker(
+                    name,
+                    failure_threshold=self._failure_threshold,
+                    cooldown_seconds=self._cooldown,
+                )
             health = BackendHealth(circuit=cb)
             self._health[name] = health
 

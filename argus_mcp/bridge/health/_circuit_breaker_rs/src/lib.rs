@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 const CLOSED: u8 = 0;
@@ -30,7 +30,7 @@ impl Inner {
             CLOSED => "closed",
             OPEN => "open",
             HALF_OPEN => "half-open",
-            _ => unreachable!(),
+            _ => "unknown",
         }
     }
 }
@@ -41,6 +41,14 @@ struct RustCircuitBreaker {
     failure_threshold: u32,
     cooldown_secs: f64,
     inner: Mutex<Inner>,
+}
+
+impl RustCircuitBreaker {
+    fn lock_inner(&self) -> PyResult<MutexGuard<'_, Inner>> {
+        self.inner.lock().map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+        })
+    }
 }
 
 #[pymethods]
@@ -77,33 +85,34 @@ impl RustCircuitBreaker {
     }
 
     #[getter]
-    fn state(&self) -> &'static str {
-        let mut g = self.inner.lock().unwrap();
+    fn state(&self) -> PyResult<&'static str> {
+        let mut g = self.lock_inner()?;
         g.check_transition(self.cooldown_secs);
-        g.state_str()
+        Ok(g.state_str())
     }
 
     #[getter]
-    fn consecutive_failures(&self) -> u32 {
-        self.inner.lock().unwrap().consecutive_failures
+    fn consecutive_failures(&self) -> PyResult<u32> {
+        Ok(self.lock_inner()?.consecutive_failures)
     }
 
     #[getter]
-    fn allows_request(&self) -> bool {
-        let mut g = self.inner.lock().unwrap();
+    fn allows_request(&self) -> PyResult<bool> {
+        let mut g = self.lock_inner()?;
         g.check_transition(self.cooldown_secs);
-        g.state != OPEN
+        Ok(g.state != OPEN)
     }
 
-    fn record_success(&self) {
-        let mut g = self.inner.lock().unwrap();
+    fn record_success(&self) -> PyResult<()> {
+        let mut g = self.lock_inner()?;
         g.state = CLOSED;
         g.consecutive_failures = 0;
         g.last_success = Some(Instant::now());
+        Ok(())
     }
 
-    fn record_failure(&self) {
-        let mut g = self.inner.lock().unwrap();
+    fn record_failure(&self) -> PyResult<()> {
+        let mut g = self.lock_inner()?;
         g.consecutive_failures += 1;
         g.last_failure = Some(Instant::now());
         if (g.state == CLOSED || g.state == HALF_OPEN)
@@ -111,16 +120,18 @@ impl RustCircuitBreaker {
         {
             g.state = OPEN;
         }
+        Ok(())
     }
 
-    fn reset(&self) {
-        let mut g = self.inner.lock().unwrap();
+    fn reset(&self) -> PyResult<()> {
+        let mut g = self.lock_inner()?;
         g.state = CLOSED;
         g.consecutive_failures = 0;
+        Ok(())
     }
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.lock_inner()?;
         g.check_transition(self.cooldown_secs);
         let dict = PyDict::new(py);
         dict.set_item("state", g.state_str())?;

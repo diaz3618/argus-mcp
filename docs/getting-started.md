@@ -4,13 +4,31 @@
 
 - **Python 3.10+** (3.12 or 3.13 recommended)
 - **[uv](https://docs.astral.sh/uv/)** (recommended) or pip
+- **Go 1.25+** — only needed if you want to build the `argusd` daemon
+
+## Package Overview
+
+Argus ships as three packages that can be installed independently:
+
+| Package | Language | Description |
+|---------|----------|-------------|
+| **argus-mcp** | Python | The MCP gateway server — aggregates backends, exposes SSE / Streamable HTTP transports, management API, and a built-in TUI. |
+| **argus-cli** | Python | Interactive client CLI and REPL for managing a running Argus server. Ships the `argus` and `argus-tui` commands. |
+| **argusd** | Go | Lightweight sidecar daemon for Docker and Kubernetes management over a Unix Domain Socket. |
+
+Only `argus-mcp` is required. Install the other packages when you need them.
 
 ## Installation
 
 ### From PyPI (recommended)
 
+Both Python packages are published to PyPI and can be installed without
+cloning the repository.
+
+#### argus-mcp (server)
+
 ```bash
-# uv tool install — isolated, auto-managed (recommended)
+# uv — isolated, auto-managed (recommended)
 uv tool install argus-mcp
 
 # pipx — same isolation, more established
@@ -26,19 +44,58 @@ Verify:
 argus-mcp --help
 ```
 
-### From Source
+#### argus-cli (client)
 
 ```bash
-# Clone and enter the repository
+# uv
+uv tool install argus-cli
+
+# With the optional TUI
+uv tool install "argus-cli[tui]"
+
+# pipx
+pipx install argus-cli
+
+# pip
+pip install argus-cli
+```
+
+Verify:
+
+```bash
+argus --help
+```
+
+#### argusd (Go daemon)
+
+`argusd` is a Go binary — download a pre-built release from
+[GitHub Releases](https://github.com/diaz3618/argus-mcp/releases), or
+build from source (see below).
+
+### From Source
+
+Clone the repository to install everything together, or to work on
+development:
+
+```bash
 git clone https://github.com/diaz3618/argus-mcp.git
 cd argus-mcp
 
-# Install all runtime + dev dependencies
+# Install argus-mcp with all dev dependencies
 uv sync --group dev
 
-# Or just runtime dependencies
-uv sync
+# Install argus-cli from its sub-package
+uv pip install -e packages/argus_cli
+
+# With TUI support
+uv pip install -e "packages/argus_cli[tui]"
+
+# Build argusd (requires Go 1.25+)
+cd packages/argusd && make build && cd ../..
 ```
+
+See [Architecture — argusd](architecture/07-argusd.md) for argusd
+configuration and deployment details.
 
 ## Quick Start
 
@@ -47,12 +104,13 @@ uv sync
 Argus looks for config files in this order:
 `config.yaml` → `config.yml`
 
-Copy and edit the example:
+If you cloned the repository, copy the example:
 
 ```bash
 cp example_config.yaml config.yaml
 ```
 
+Otherwise, create a `config.yaml` in your working directory.
 A minimal config with one stdio backend:
 
 ```yaml
@@ -171,6 +229,93 @@ If a management token is configured, include the `Authorization` header:
 curl -H "Authorization: Bearer $ARGUS_MGMT_TOKEN" \
      http://127.0.0.1:9000/manage/v1/status
 ```
+
+### 6. Use the argus Client CLI
+
+With the server running, use the `argus` client for one-shot commands or an
+interactive REPL session:
+
+```bash
+# One-shot commands
+argus backends list
+argus tools list --output json
+argus health status
+
+# Connect to a specific server
+argus -s http://192.168.1.100:9000 backends list
+```
+
+Start the interactive REPL (tab completion, history, status toolbar):
+
+```bash
+argus
+```
+
+Or launch the enhanced TUI directly:
+
+```bash
+argus-tui
+```
+
+See [CLI Reference](cli/README.md) for all 20 command groups and
+[REPL Guide](cli/repl.md) for REPL details.
+
+### 7. Run argusd (optional)
+
+If you need Docker container or Kubernetes pod management from the CLI or
+TUI, you need the `argusd` daemon running. Download the binary from
+[GitHub Releases](https://github.com/diaz3618/argus-mcp/releases) or
+build from source:
+
+```bash
+# From a cloned repo — build the binary
+cd packages/argusd && make build && cd ../..
+
+# Start it (runs in the foreground by default)
+./packages/argusd/argusd
+
+# Or build and run in one step
+cd packages/argusd && make run
+```
+
+> **Important**: Building argusd only compiles the binary — you must also
+> **run** it. The daemon creates a Unix Domain Socket at
+> `$XDG_RUNTIME_DIR/argusd.sock` (or `/tmp/argusd.sock`). The CLI and TUI
+> check for this socket to determine if argusd is available.
+
+#### Auto-starting argusd
+
+Instead of running argusd manually, you can configure the CLI to start it
+automatically when a container or pod command needs it. Add an `argusd`
+section to your CLI config at `~/.config/argus-mcp/config.yaml`:
+
+```yaml
+argusd:
+  auto_start: true
+  # binary: "/path/to/argusd"   # optional — auto-detected from $PATH or build dir
+  # socket: "/custom/path.sock" # optional — uses default XDG path
+```
+
+Or set the environment variable:
+
+```bash
+export ARGUSD_AUTO_START=true
+```
+
+When `auto_start` is enabled, the TUI and CLI will spawn argusd in the
+background the first time a Containers or Kubernetes screen is opened and
+the socket is not found. The daemon runs as a detached process that
+persists after the CLI exits.
+
+To stop a running argusd:
+
+```bash
+# Find and stop the process
+pkill argusd
+```
+
+See [Architecture — argusd](architecture/07-argusd.md) for full
+configuration and deployment details.
 
 ## Multi-Server TUI
 

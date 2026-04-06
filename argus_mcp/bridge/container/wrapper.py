@@ -38,6 +38,7 @@ from argus_mcp.bridge.container.image_builder import (
     ensure_image,
     is_already_containerised,
 )
+from argus_mcp.bridge.container.labels import default_labels
 from argus_mcp.bridge.container.network import effective_network
 from argus_mcp.bridge.container.runtime import RuntimeFactory
 from argus_mcp.bridge.container.templates.models import CONTAINER_HOME
@@ -284,6 +285,9 @@ async def wrap_backend(
     # Validate volume mount source paths exist on the host.
     volumes = _validate_volume_sources(svr_name, volumes)
 
+    # Generate Argus resource labels for this container.
+    container_labels = default_labels(svr_name)
+
     # Try Go adapter first for container creation, fall back to subprocess.
     container_id: Optional[str] = None
     if _go_adapter_available():
@@ -296,6 +300,7 @@ async def wrap_backend(
             memory=mem,
             cpus=cpu,
             volumes=volumes,
+            labels=container_labels,
         )
 
     if container_id is None:
@@ -308,6 +313,7 @@ async def wrap_backend(
             cpus=cpu,
             volumes=volumes,
             extra_args=extra_args,
+            labels=container_labels,
         )
         container_id = await _create_container(
             container_runtime, create_args, timeout=create_timeout
@@ -353,6 +359,7 @@ async def _go_adapter_create(
     memory: str,
     cpus: str,
     volumes: Optional[List[str]] = None,
+    labels: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Try creating a container via the Go adapter.
 
@@ -389,6 +396,7 @@ async def _go_adapter_create(
             volumes=all_volumes,
             read_only=True,
             cap_drop=_DEFAULT_CAP_DROP,
+            labels=labels,
         )
         return cid
     except Exception:  # noqa: BLE001
@@ -412,6 +420,7 @@ def _build_create_args(
     cpus: str,
     volumes: Optional[List[str]] = None,
     extra_args: Optional[List[str]] = None,
+    labels: Optional[Dict[str, str]] = None,
 ) -> List[str]:
     """Build the complete ``docker create`` argument list.
 
@@ -472,6 +481,11 @@ def _build_create_args(
     if volumes:
         for vol in volumes:
             args.extend(["-v", vol])
+
+    # Argus resource labels
+    if labels:
+        for key, value in sorted(labels.items()):
+            args.extend(["--label", f"{key}={value}"])
 
     # Environment variables — passed via -e flags so they're inside
     # the container.
@@ -572,7 +586,7 @@ async def _remove_stale_named_container(runtime: str, name: str) -> None:
         except asyncio.TimeoutError:
             # Kill the hung process before retrying.
             with contextlib.suppress(ProcessLookupError):
-                proc.kill()  # type: ignore[union-attr]
+                proc.kill()
             if attempt == 0:
                 logger.debug(
                     "[%s] docker rm -f timed out, retrying after 2 s…",

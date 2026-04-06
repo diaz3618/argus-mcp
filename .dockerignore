@@ -42,3 +42,33 @@ CHANGELOG.md
 Dockerfile
 .dockerignore
 docker-compose*.yml
+
+# ── Security-sensitive files ──
+*.env
+.env*
+secrets.enc
+config.yaml
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+.snyk
+
+# ── Planning & AI tooling ──
+.planning/
+.opencode/
+.copilot/
+.claude/
+.agents/
+
+# ── Test artifacts ──
+tests/
+htmlcov/
+coverage.xml
+.coverage
+
+# ── Build archives ──
+*.tar
+*.tar.gz
+Makefile*

@@ -17,7 +17,17 @@ The project has a **server/client architecture**:
 - **`argus-mcp build`** — Pre-build container images for stdio backends.
 - **`argus-mcp tui`** — Textual-based terminal UI that connects to a running server over HTTP.
 - **`argus-mcp secret`** — Manage encrypted secrets (set, get, list, delete).
-- **`argus-mcp clean`** — Remove containers, images, and networks created by Argus MCP.
+- **`argus-mcp clean`** — Remove containers and images created by Argus MCP.
+
+### Companion Packages
+
+| Package | Entry Point | Description |
+|---------|-------------|-------------|
+| `argus-cli` | `argus` | Client CLI with 20 command groups and an interactive REPL for managing a running server |
+| `argus-cli` | `argus-tui` | Alternative TUI launcher from the client package |
+| `argusd` | `argusd` | Go sidecar daemon for Docker container and Kubernetes pod management (Unix Domain Socket API) |
+
+See the [CLI Reference](docs/cli/) and [REPL Guide](docs/cli/repl.md) for details.
 
 **Core Advantages:**
 
@@ -114,17 +124,18 @@ argus-mcp --help
 ```text
 usage: argus-mcp [-h] {server,build,stop,status,tui,secret,clean} ...
 
-Argus MCP v0.7.2
+Argus MCP v0.8.1
 
 positional arguments:
   {server,build,stop,status,tui,secret,clean}
-    server       Run the headless Argus server (Uvicorn + MCP bridge)
-    build        Pre-build container images for stdio backends
+    server       Run the headless Argus server (Uvicorn + MCP bridge,
+                 with container isolation)
+    build        Pre-build container images for all stdio backends
     stop         Stop a detached Argus server
     status       List all running Argus server sessions
     tui          Launch the Textual TUI connected to a running Argus server
     secret       Manage encrypted secrets (set, get, list, delete)
-    clean        Remove containers, images, and networks created by argus-mcp
+    clean        Remove containers and images created by argus-mcp
 
 options:
   -h, --help     show this help message and exit
@@ -300,6 +311,7 @@ The management API is mounted at `/manage/v1/` and provides:
 | Endpoint | Method | Description |
 | -------- | ------ | ----------- |
 | `/manage/v1/health` | GET | Health check (uptime, backend health summary) |
+| `/manage/v1/ready` | GET | Readiness probe (returns 503 until backends connect) |
 | `/manage/v1/status` | GET | Server status (version, config, endpoints, feature flags) |
 | `/manage/v1/backends` | GET | List all backends with connection state and capabilities |
 | `/manage/v1/groups` | GET | List logical server groups |
@@ -307,8 +319,16 @@ The management API is mounted at `/manage/v1/` and provides:
 | `/manage/v1/sessions` | GET | Active MCP client sessions |
 | `/manage/v1/events` | GET | Recent event log entries |
 | `/manage/v1/events/stream` | GET | Live SSE event stream |
+| `/manage/v1/batch` | GET | Combined status, backends, capabilities, and events in one response |
 | `/manage/v1/reload` | POST | Hot-reload configuration |
 | `/manage/v1/reconnect/{name}` | POST | Reconnect a specific backend |
+| `/manage/v1/reauth/{name}` | POST | Trigger interactive re-authentication for a backend |
 | `/manage/v1/shutdown` | POST | Graceful server shutdown |
+| `/manage/v1/registry/search` | GET | Search external MCP server registries |
+| `/manage/v1/skills` | GET | List all discovered skills with status |
+| `/manage/v1/skills/{name}/enable` | POST | Enable a skill by name |
+| `/manage/v1/skills/{name}/disable` | POST | Disable a skill by name |
+| `/manage/v1/tools/call` | POST | Proxy an MCP tools/call to the correct backend |
+| `/manage/v1/resources/read` | POST | Proxy an MCP resources/read to the correct backend |
 
 When `ARGUS_MGMT_TOKEN` is set, include `Authorization: Bearer <token>` in requests.

@@ -1,0 +1,7 @@
+# Build output
+/argusd
+/argusd_bin
+/dist/
+
+# OS
+.DS_Store

@@ -481,7 +481,6 @@ class TestEnvProvider:
 
     def test_set_and_list(self, monkeypatch):
         prov = EnvProvider()
-        # Clear any existing SECRET_ vars
         for k in list(os.environ):
             if k.startswith("SECRET_"):
                 monkeypatch.delenv(k)

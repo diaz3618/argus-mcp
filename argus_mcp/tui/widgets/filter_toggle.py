@@ -13,7 +13,7 @@ from textual.containers import Vertical
 from textual.message import Message
 from textual.widgets import Label, Static, Switch
 
-from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._error_utils import safe_query
 
 
 class FilterToggleWidget(Static):

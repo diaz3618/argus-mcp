@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class ClientManager:
-    """Manages connections and sessions for all backend MCP servers."""
-
     def __init__(self) -> None:
         self._sessions: Dict[str, ClientSession] = {}
         self._pending_tasks: Dict[str, asyncio.Task[Any]] = {}

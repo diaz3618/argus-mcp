@@ -69,17 +69,30 @@ def _is_localhost_origin(origin: str) -> bool:
 class OriginValidationMiddleware:
     """Pure ASGI middleware that validates the ``Origin`` header on MCP routes.
 
-    * Requests **without** an ``Origin`` header are allowed through (many
-      CLI / SDK clients do not send ``Origin``).
     * Requests from localhost origins are always accepted.
     * Requests from any origin listed in ``ARGUS_ALLOWED_ORIGINS`` are accepted.
     * All other origins receive a ``403 Forbidden`` response.
 
-    Non-MCP paths (e.g. ``/manage/…``) are not checked.
+    Behaviour for **missing** Origin headers depends on ``require_origin``:
+
+    * ``"permissive"`` (default) — requests without an ``Origin`` header are
+      allowed through.  This accommodates CLI / SDK clients that do not send
+      ``Origin``.
+    * ``"strict"`` — requests on MCP transport paths **must** include an
+      ``Origin`` header.  Missing headers result in a ``403 Forbidden``
+      response (SEC-13).
+
+    Non-MCP paths (e.g. ``/manage/…``) are never checked.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        require_origin: str = "permissive",
+    ) -> None:
         self.app = app
+        self._require_origin = require_origin.lower()
         self._allowed_origins = _parse_allowed_origins()
         if self._allowed_origins:
             logger.info(
@@ -91,6 +104,11 @@ class OriginValidationMiddleware:
                 "Origin validation: only localhost origins allowed on MCP routes. "
                 "Set %s to allow additional origins.",
                 _ALLOWED_ORIGINS_ENV,
+            )
+        if self._require_origin == "strict":
+            logger.info(
+                "Origin validation: strict mode ENABLED — "
+                "MCP requests without an Origin header will be rejected."
             )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -111,8 +129,29 @@ class OriginValidationMiddleware:
                 origin = value.decode("latin-1")
                 break
 
-        # No Origin header → allow (CLI clients, curl, SDK direct calls).
+        # No Origin header — behaviour depends on require_origin mode.
         if not origin:
+            if self._require_origin == "strict":
+                client = scope.get("client")
+                client_host = client[0] if client else "unknown"
+                logger.warning(
+                    "Rejected MCP request without Origin header (strict mode, client=%s, path=%s).",
+                    client_host,
+                    path,
+                )
+                response = JSONResponse(
+                    {
+                        "error": "forbidden",
+                        "message": (
+                            "Origin header is required on MCP transport requests "
+                            "(strict mode). Include a valid Origin header."
+                        ),
+                    },
+                    status_code=403,
+                )
+                await response(scope, receive, send)
+                return
+            # Permissive mode — allow through (CLI clients, curl, SDK direct calls).
             await self.app(scope, receive, send)
             return
 
@@ -123,7 +162,6 @@ class OriginValidationMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # Check against explicitly allowed origins.
         if origin_lower in self._allowed_origins:
             await self.app(scope, receive, send)
             return

@@ -13,21 +13,33 @@ spec:
     - Ingress
     - Egress
   ingress:
-    - from:
-        - namespaceSelector: {}
-      ports:
+    {{- if .Values.networkPolicy.ingress.enabled }}
+    - ports:
         - protocol: TCP
           port: {{ .Values.gateway.port | default 9000 }}
+      {{- with .Values.networkPolicy.allowFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- else }}
+    - {}
+    {{- end }}
   egress:
-    # Allow DNS resolution
-    - to: []
-      ports:
+    {{- if .Values.networkPolicy.egress.allowDNS }}
+    # Allow DNS resolution (kube-dns)
+    - ports:
         - protocol: UDP
           port: 53
         - protocol: TCP
           port: 53
-    # Allow outbound HTTP/HTTPS to backends
-    - to: []
+    {{- end }}
+    {{- if .Values.networkPolicy.egress.cidrs }}
+    # Allow egress to configured backend CIDRs
+    - to:
+        {{- range .Values.networkPolicy.egress.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: 80
@@ -39,11 +51,11 @@ spec:
           port: 8443
         - protocol: TCP
           port: 9000
+    {{- end }}
     {{- if .Values.networkPolicy.denyPrivateEgress }}
-    # SSRF protection: deny egress to private IP ranges
-    # This is enforced by only allowing specific ports above
-    # and relying on cluster-level network policies for IP-based restrictions.
-    # For full SSRF protection, deploy a CiliumNetworkPolicy or Calico policy
+    # SSRF protection: when no CIDRs are configured, egress is deny-by-default.
+    # If CIDRs are configured, only those destinations are reachable.
+    # For full IP-range blocking, deploy a CiliumNetworkPolicy or Calico policy
     # that blocks egress to 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     # except for Kubernetes service CIDRs.
     {{- end }}

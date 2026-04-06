@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Search and analyze source code across configured MCP backends",
   "author": "Argus MCP",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "tools": [
     {
       "name": "search_code",

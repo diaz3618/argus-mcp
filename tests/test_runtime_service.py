@@ -12,8 +12,6 @@ import pytest
 from argus_mcp.runtime.models import ServiceState, is_valid_transition
 from argus_mcp.runtime.service import ArgusService, _InvalidStateTransition
 
-# Helpers
-
 
 def _dummy_config() -> Dict[str, Any]:
     """Return a minimal backends dict for testing."""
@@ -56,6 +54,7 @@ class TestInit:
         assert svc.resources == []
         assert svc.prompts == []
         assert svc.config_data is None
+        assert svc.full_config is None
         assert svc.is_running is False
         assert svc.health_checker is None
         assert svc.group_manager is None

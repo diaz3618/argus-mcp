@@ -9,7 +9,6 @@ from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# All 20 built-in Textual themes
 ALL_THEMES: List[str] = [
     "textual-dark",
     "textual-light",

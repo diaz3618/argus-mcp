@@ -20,7 +20,7 @@ from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Button, DataTable, Label, RichLog, Static, TextArea
 
-from argus_mcp._error_utils import safe_query
+from argus_mcp.tui._error_utils import safe_query
 
 logger = logging.getLogger(__name__)
 
@@ -437,7 +437,6 @@ class WorkflowsPanel(Widget):
 
             import asyncio  # noqa: F811
 
-            # Mark as running in the table
             wf_data["status"] = "running"
             panel.update_workflows(panel._workflows)
 
@@ -501,7 +500,6 @@ class WorkflowsPanel(Widget):
                 severity=severity,
             )
 
-            # Mark in the table
             wf_data["status"] = "completed" if failed == 0 else "failed"
             wf_data["last_run"] = datetime.now(timezone.utc).isoformat()
             self.update_workflows(self._workflows)

@@ -106,17 +106,14 @@ class ServerDetailModal(ModalScreen[Optional[Dict[str, Any]]]):
                 meta_lines.append(f"Command: [dim]{cmd}[/]")
             yield Static("\n".join(meta_lines), id="server-detail-meta")
 
-            # Description
             if entry.description:
                 yield Static(entry.description, id="server-detail-description")
 
-            # Tools table
             if entry.tools:
                 yield Label("[b]Tools[/b]")
                 with VerticalScroll():
                     yield DataTable(id="server-detail-tools-table")
 
-            # Categories
             if entry.categories:
                 cats = ", ".join(entry.categories)
                 yield Static(f"Categories: {cats}", id="server-detail-categories")
@@ -133,7 +130,6 @@ class ServerDetailModal(ModalScreen[Optional[Dict[str, Any]]]):
                         id="server-detail-extra",
                     )
 
-            # Action buttons
             with Horizontal(id="server-detail-actions"):
                 yield Button("Install", variant="success", id="btn-detail-install")
                 yield Button("Close", variant="default", id="btn-detail-close")

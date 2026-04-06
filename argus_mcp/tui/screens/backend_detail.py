@@ -124,7 +124,6 @@ class BackendDetailModal(ModalScreen[Optional[str]]):
                     f"{resources_count} resources, {prompts_count} prompts"
                 )
 
-            # Labels
             labels = b.get("labels", {})
             if labels:
                 lbl_parts = [f"{k}={v}" for k, v in labels.items()]
@@ -152,14 +151,12 @@ class BackendDetailModal(ModalScreen[Optional[str]]):
                 ]
                 yield Static("\n".join(h_lines), id="backend-detail-health")
 
-            # Conditions log
             conditions = b.get("conditions", [])
             if conditions:
                 yield Label("[b]Conditions[/b]")
                 with VerticalScroll():
                     yield DataTable(id="backend-detail-conditions")
 
-            # Action buttons
             with Horizontal(id="backend-detail-actions"):
                 yield Button("Restart", variant="warning", id="btn-backend-restart")
                 yield Button("Disconnect", variant="error", id="btn-backend-disconnect")

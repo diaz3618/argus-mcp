@@ -36,38 +36,53 @@ impl RustTokenCache {
         }
     }
 
-    #[getter]
-    fn valid(&self) -> bool {
-        let g = self.inner.lock().unwrap();
-        g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e)
+    #[getter(_expiry_buffer)]
+    fn get_expiry_buffer(&self) -> f64 {
+        self.expiry_buffer
     }
 
-    fn get(&self) -> Option<String> {
-        let g = self.inner.lock().unwrap();
+    #[getter]
+    fn valid(&self) -> PyResult<bool> {
+        let g = self.inner.lock().map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+        })?;
+        Ok(g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e))
+    }
+
+    fn get(&self) -> PyResult<Option<String>> {
+        let g = self.inner.lock().map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+        })?;
         if g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e) {
-            g.token.clone()
+            Ok(g.token.clone())
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn set(&self, token: String, expires_in: f64) {
+    fn set(&self, token: String, expires_in: f64) -> PyResult<()> {
         let effective_ttl = (expires_in - self.expiry_buffer).max(0.0);
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock().map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+        })?;
         if let Some(ref mut old) = g.token {
             old.zeroize();
         }
         g.token = Some(token);
         g.expires_at = Some(Instant::now() + Duration::from_secs_f64(effective_ttl));
+        Ok(())
     }
 
-    fn invalidate(&self) {
-        let mut g = self.inner.lock().unwrap();
+    fn invalidate(&self) -> PyResult<()> {
+        let mut g = self.inner.lock().map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+        })?;
         if let Some(ref mut t) = g.token {
             t.zeroize();
         }
         g.token = None;
         g.expires_at = None;
+        Ok(())
     }
 }
 

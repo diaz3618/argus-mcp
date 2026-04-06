@@ -837,7 +837,6 @@ class TestIsHeadless:
         # Remove SSH vars if present
         with patch.dict("os.environ", env, clear=False):
             with patch.dict("os.environ", {}, clear=False):
-                # Clear SSH vars
                 import os
 
                 old_ssh = os.environ.pop("SSH_CONNECTION", None)

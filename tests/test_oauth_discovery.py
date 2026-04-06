@@ -16,8 +16,6 @@ from argus_mcp.bridge.auth.discovery import (
     discover_oauth_metadata,
 )
 
-# Helpers
-
 
 def _mock_response(
     status_code: int = 200,

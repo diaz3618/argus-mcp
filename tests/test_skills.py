@@ -34,7 +34,7 @@ class TestSkillManifest:
             "config": {"key": "val"},
             "dependencies": ["dep-a"],
             "author": "tester",
-            "license": "MIT",
+            "license": "GPL-3.0-only",
         }
         manifest = SkillManifest.from_dict(data)
         assert manifest.version == "2.1.0"
