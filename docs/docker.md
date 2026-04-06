@@ -129,7 +129,7 @@ docker run -p 9000:9000 -v ./config.yaml:/app/config.yaml argus-mcp
 
 - **Base:** `python:3.13-slim`
 - **Node.js:** LTS (22.x) included for `npx`-based stdio backends
-- **User:** Runs as non-root user
+- **User:** Runs as non-root `argus` user (UID/GID 1000)
 - **Entrypoint:** `argus-mcp` — pass any subcommand (`server`, `tui`, `secret`) as arguments
 - **Default command:** `server --host 0.0.0.0 --port 9000`
 

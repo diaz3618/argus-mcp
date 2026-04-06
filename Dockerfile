@@ -134,7 +134,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 # Create non-root user for runtime security
-RUN groupadd -r argus && useradd -r -g argus -d /app argus
+RUN groupadd -g 1000 argus && useradd -u 1000 -g argus -d /app -s /sbin/nologin argus
 
 WORKDIR /app
 
