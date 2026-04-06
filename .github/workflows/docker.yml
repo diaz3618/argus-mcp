@@ -94,7 +94,7 @@ jobs:
       # ── Single build, push to both registries ────
       - name: Build and push
         id: build-push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -203,7 +203,7 @@ jobs:
 
       - name: Build and push DHI
         id: build-push-dhi
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile.dhi
