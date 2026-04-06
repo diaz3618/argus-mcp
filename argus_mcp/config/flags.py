@@ -81,6 +81,14 @@ FLAG_REGISTRY: Dict[str, FlagSpec] = {
         risk="low",
         description="Pre-build container images for stdio backends at server startup.",
     ),
+    "use_dhi_images": FlagSpec(
+        default=False,
+        risk="high",
+        description=(
+            "Use Docker Hardened Images (Chainguard) as base images for "
+            "container-isolated backends. Requires registry access to cgr.dev."
+        ),
+    ),
 }
 
 _DEFAULTS: Dict[str, bool] = {k: v.default for k, v in FLAG_REGISTRY.items()}

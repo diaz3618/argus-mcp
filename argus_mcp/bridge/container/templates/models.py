@@ -52,6 +52,21 @@ RUNTIME_DEFAULTS: Dict[str, Dict[str, object]] = {
     },
 }
 
+DHI_RUNTIME_DEFAULTS: Dict[str, Dict[str, object]] = {
+    "uvx": {
+        "builder_image": "cgr.dev/chainguard/python:latest-dev",
+        "additional_packages": [],  # Chainguard images include ca-certificates
+    },
+    "npx": {
+        "builder_image": "cgr.dev/chainguard/node:latest-dev",
+        "additional_packages": [],
+    },
+    "go": {
+        "builder_image": "cgr.dev/chainguard/go:latest-dev",
+        "additional_packages": [],
+    },
+}
+
 
 @dataclass
 class RuntimeConfig:
@@ -71,18 +86,23 @@ class RuntimeConfig:
         transport: str,
         *,
         overrides: Optional[Dict[str, object]] = None,
+        use_dhi: bool = False,
     ) -> RuntimeConfig:
         """Create a ``RuntimeConfig`` with defaults for the transport.
 
         Parameters
         ----------
         transport:
-            Transport type key (``"uvx"`` or ``"npx"``).
+            Transport type key (``"uvx"``, ``"npx"``, or ``"go"``).
         overrides:
             Optional dict with ``"builder_image"`` and/or
             ``"additional_packages"`` to override defaults.
+        use_dhi:
+            If ``True``, use Docker Hardened Image (Chainguard) defaults
+            instead of standard upstream images.
         """
-        defaults = RUNTIME_DEFAULTS.get(transport, {})
+        source = DHI_RUNTIME_DEFAULTS if use_dhi else RUNTIME_DEFAULTS
+        defaults = source.get(transport, {})
         raw_pkgs = defaults.get("additional_packages", [])
         config = cls(
             builder_image=str(defaults.get("builder_image", "")),
