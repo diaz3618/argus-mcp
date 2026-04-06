@@ -25,6 +25,10 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["argus_mcp*"]
 
+[tool.setuptools.package-data]
+"argus_mcp.bridge.container.templates" = ["*.j2"]
+"argus_mcp.tui" = ["*.tcss"]
+
 [project.scripts]
 argus-mcp = "argus_mcp.cli:main"
 

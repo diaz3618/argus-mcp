@@ -1,0 +1,2 @@
+recursive-include argus_mcp *.j2
+recursive-include argus_mcp *.tcss
