@@ -98,13 +98,13 @@ docker run --rm diaz3618/argus-mcp:latest --help
 
     ```bash
     uv sync              # runtime only
-    uv sync --group dev  # runtime + dev tools
+    uv sync --group dev --group test  # runtime + dev + test tools
     ```
 
 4. **Makefile Shortcuts**
 
     ```bash
-    make help          # Show all targets
+    make help          # Show available targets
     make test          # Run pytest suite
     make lint          # Run ruff linter
     make typecheck     # Run mypy

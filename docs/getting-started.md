@@ -81,8 +81,8 @@ development:
 git clone https://github.com/diaz3618/argus-mcp.git
 cd argus-mcp
 
-# Install argus-mcp with all dev dependencies
-uv sync --group dev
+# Install argus-mcp with all dev + test dependencies
+uv sync --group dev --group test
 
 # Install argus-cli from its sub-package
 uv pip install -e packages/argus_cli
