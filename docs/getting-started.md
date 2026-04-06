@@ -376,7 +376,7 @@ make clean         # Remove build artifacts and caches
 ### Missing templates after `pip install`
 
 If you see `TemplateNotFound` errors when using container isolation,
-ensure you're running **v0.7.3 or later**. Earlier wheels were missing
+ensure you're running **v0.8.2 or later**. Earlier wheels were missing
 the Jinja2 Dockerfile templates (`.j2` files) and the TUI stylesheet.
 Upgrade with:
 
