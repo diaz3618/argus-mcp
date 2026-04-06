@@ -57,31 +57,9 @@ WORKDIR /src/mcp-stdio-wrapper
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper .
 
 # Build a static healthcheck binary for the runtime stage
+COPY tools/healthcheck/ /src/healthcheck/
 WORKDIR /src/healthcheck
-COPY <<'GOEOF' main.go
-package main
-
-import (
-	"net/http"
-	"os"
-	"time"
-)
-
-func main() {
-	client := &http.Client{Timeout: 4 * time.Second}
-	resp, err := client.Get("http://localhost:9000/manage/v1/health")
-	if err != nil {
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-		os.Exit(0)
-	}
-	os.Exit(1)
-}
-GOEOF
-RUN go mod init healthcheck && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/healthcheck .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/healthcheck .
 
 # ── Stage 3: Python Builder ───────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded; runtime uses nonroot UID 65532)
