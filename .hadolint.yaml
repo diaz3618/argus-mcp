@@ -1,0 +1,17 @@
+# Hadolint configuration for argus-mcp
+# Docs: https://github.com/hadolint/hadolint#configure
+---
+failure-threshold: warning
+
+ignored:
+  # DL3008: Pin versions in apt-get install — we use --no-install-recommends
+  # and runtime packages float to get security patches from base image updates
+  - DL3008
+
+  # DL3013: Pin pip package versions — pip itself is pinned (line 126),
+  # maturin is build-stage only (discarded), uv is COPY'd from pinned image
+  - DL3013
+
+  # DL3059: Multiple consecutive RUN — we deliberately separate RUN layers
+  # for cache efficiency in multi-stage build
+  - DL3059
