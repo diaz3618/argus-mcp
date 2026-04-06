@@ -14,6 +14,7 @@ from argus_cli.client import ArgusClientError  # noqa: E402
 from argus_cli.commands.server import app  # noqa: E402
 from typer.testing import CliRunner  # noqa: E402
 
+
 def make_cli_config():
     """Create a mock CLI config for ArgusClient-based commands."""
     cfg = MagicMock()

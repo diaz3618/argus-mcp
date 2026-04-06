@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("argus_cli", reason="argus_cli package not installed")
 
-from argus_cli.repl.state import ConnectionState, ReplState, SessionState  # noqa: E402
+from argus_cli.repl.state import ReplState  # noqa: E402
 from argus_cli.repl.toolbar import _ansi, make_prompt, make_toolbar  # noqa: E402
 
 _MOCK_COLORS = {

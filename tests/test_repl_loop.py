@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 pytest.importorskip("argus_cli", reason="argus_cli package not installed")
 
-from argus_cli.repl.loop import _build_key_bindings, _REPL_HANDLERS, start_repl  # noqa: E402
+from argus_cli.repl.loop import _REPL_HANDLERS, _build_key_bindings, start_repl  # noqa: E402
 from argus_cli.repl.state import ReplState  # noqa: E402
 
 

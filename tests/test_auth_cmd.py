@@ -89,7 +89,7 @@ class TestAuthConfigure:
         with (
             patch("argus_cli.config._load_yaml_config", return_value={}),
             patch("argus_cli.config._save_yaml_config") as mock_save,
-            patch("argus_cli.config.CONFIG_FILE") as mock_cf,
+            patch("argus_cli.config.CONFIG_FILE"),
         ):
             result = runner.invoke(
                 cli_app,
