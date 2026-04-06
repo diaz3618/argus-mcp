@@ -23,11 +23,17 @@ on:
       - main
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.dhi'
+      - '.dockerignore'
+      - '.hadolint.yaml'
       - 'pyproject.toml'
       - '.github/workflows/docker-security.yml'
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.dhi'
+      - '.dockerignore'
+      - '.hadolint.yaml'
       - 'pyproject.toml'
       - '.github/workflows/docker-security.yml'
   workflow_dispatch:
@@ -56,10 +62,6 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
-          failure-threshold: warning
-          ignore: DL3008,DL3013
-          # DL3008: Pin versions in apt-get (we use --no-install-recommends)
-          # DL3013: Pin pip package versions (we pin pip explicitly)
 
   # ──────────────────────────────────────────────
   # Build — required for Dockle, Syft, Trivy
@@ -186,13 +188,23 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/image.tar
 
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability + secret scanner (SARIF)
         uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: ${{ env.IMAGE_TAG }}
+          scanners: vuln,secret
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
+
+      - name: Run Trivy CI gate (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          scanners: vuln,secret
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
 
       - name: Upload Trivy SARIF results
         if: always() && hashFiles('trivy-results.sarif') != ''
