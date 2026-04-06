@@ -210,6 +210,61 @@ argus-mcp clean
 argus-mcp clean --all
 ```
 
+## Development Workflow
+
+If you're working from source, the Makefile provides common shortcuts:
+
+```bash
+make help          # Show all targets
+make test          # Run pytest suite
+make lint          # Run ruff linter
+make typecheck     # Run mypy
+make security      # Run semgrep + Snyk scans
+make quality       # Full gate: lint + types + tests + security
+make docker-build  # Build Docker image (local arch)
+make dev-install   # Install project + dev dependencies
+make clean         # Remove build artifacts and caches
+```
+
+## Troubleshooting
+
+### Missing templates after `pip install`
+
+If you see `TemplateNotFound` errors when using container isolation,
+ensure you're running **v0.7.3 or later**. Earlier wheels were missing
+the Jinja2 Dockerfile templates (`.j2` files) and the TUI stylesheet.
+Upgrade with:
+
+```bash
+uv tool upgrade argus-mcp
+# or
+pip install --upgrade argus-mcp
+```
+
+### Container runtime not found
+
+Container isolation requires Docker or Podman on the host. If neither
+is available, Argus falls back to bare subprocesses. To explicitly
+disable container isolation:
+
+```bash
+ARGUS_CONTAINER_ISOLATION=false argus-mcp server
+```
+
+### TUI won't connect
+
+The TUI is a client that connects to a **running** Argus server over
+HTTP. Start the server first, then launch the TUI in a separate
+terminal:
+
+```bash
+# Terminal 1
+argus-mcp server
+
+# Terminal 2
+argus-mcp tui --server http://127.0.0.1:9000
+```
+
 ## What's Next?
 
 - [Configuration](configuration.md) — Full config reference

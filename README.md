@@ -87,7 +87,20 @@ docker run --rm diaz3618/argus-mcp:latest --help
 3. **Install Dependencies**
 
     ```bash
-    uv sync
+    uv sync              # runtime only
+    uv sync --group dev  # runtime + dev tools
+    ```
+
+4. **Makefile Shortcuts**
+
+    ```bash
+    make help          # Show all targets
+    make test          # Run pytest suite
+    make lint          # Run ruff linter
+    make typecheck     # Run mypy
+    make quality       # Full gate: lint + types + tests + security
+    make docker-build  # Build Docker image (local arch)
+    make clean         # Remove build artifacts and caches
     ```
 
 ## Quick Start
