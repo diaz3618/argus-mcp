@@ -130,14 +130,17 @@ argus_mcp/
 │   │   ├── image_builder.py # Docker image build orchestration
 │   │   ├── runtime.py       # Container runtime detection (Docker/Podman)
 │   │   ├── network.py       # Network mode resolution
+│   │   ├── labels.py        # OCI/Docker container labels
+│   │   ├── go_docker_adapter.py  # Go binary Docker adapter
 │   │   └── templates/       # Jinja2 Dockerfile templates
 │   │       ├── models.py        # TemplateData, RuntimeConfig, UID constants
 │   │       ├── engine.py        # Template rendering engine
 │   │       ├── _generators.py   # Per-transport build logic
 │   │       ├── validation.py    # Template output validation
-│   │       ├── uvx.dockerfile.j2  # Python/uvx backend Dockerfile
-│   │       ├── npx.dockerfile.j2  # Node.js/npx backend Dockerfile
-│   │       └── go.dockerfile.j2   # Go binary backend Dockerfile
+│   │       ├── uvx.dockerfile.j2     # Python/uvx backend Dockerfile
+│   │       ├── npx.dockerfile.j2     # Node.js/npx backend Dockerfile
+│   │       ├── go.dockerfile.j2      # Go binary backend Dockerfile
+│   │       └── source.dockerfile.j2  # Source-build backend Dockerfile
 │   ├── health/          # Health checking (checker + circuit breaker)
 │   ├── middleware/       # Request middleware chain
 │   └── optimizer/       # Tool optimizer (meta-tools + search index)
