@@ -27,10 +27,12 @@ USER root
 WORKDIR /build
 
 # Chainguard rust image has no Python — install it for PyO3 compilation
-RUN apk add --no-cache python3 python3-dev
+RUN apk add --no-cache python3 python3-dev curl
 
-# Install maturin via cargo (avoids pip/apk transient CDN failures)
-RUN cargo install maturin --locked
+# Install pre-built maturin binary (faster and more reliable than cargo install or pip)
+ARG MATURIN_VERSION=1.8.6
+RUN curl -sSfL "https://github.com/PyO3/maturin/releases/download/v${MATURIN_VERSION}/maturin-x86_64-unknown-linux-musl.tar.gz" \
+    | tar xz -C /usr/local/bin/ maturin
 
 COPY argus_mcp/ ./argus_mcp/
 COPY pyproject.toml Cargo.lock* ./
