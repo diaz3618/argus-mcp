@@ -25,11 +25,15 @@ FROM cgr.dev/chainguard/rust:latest-dev AS rust-builder
 
 USER root
 WORKDIR /build
+
+# Chainguard rust image has no Python — install it for PyO3 compilation
+RUN apk add --no-cache python3 python3-dev py3-pip
+
 COPY argus_mcp/ ./argus_mcp/
 COPY pyproject.toml Cargo.lock* ./
 
 # Build each Rust extension with maturin (abi3 → single .so per crate)
-RUN pip install --no-cache-dir maturin && \
+RUN pip install --no-cache-dir --break-system-packages maturin && \
     for crate in \
       argus_mcp/config/_yaml_rs \
       argus_mcp/audit/_audit_rs \

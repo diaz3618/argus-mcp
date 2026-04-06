@@ -25,3 +25,8 @@ ignored:
   # and :latest-dev tags as their stable release channel (no semver tags).
   # Pinning is done via image digest in production deployments.
   - DL3007
+
+  # DL3018: Pin versions in apk add — same rationale as DL3008 for apt-get.
+  # Chainguard builder stage packages float to get security patches;
+  # the builder stage is discarded and does not affect the runtime image.
+  - DL3018
