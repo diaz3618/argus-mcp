@@ -44,6 +44,12 @@ spec:
               containerPort: {{ .Values.gateway.port }}
               protocol: TCP
           env:
+            # HOME must be set explicitly: the k8s securityContext
+            # overrides runAsUser (1000) which does not exist in
+            # /etc/passwd, causing os.path.expanduser("~") to
+            # resolve to "/" instead of "/app".
+            - name: HOME
+              value: /app
             {{- if .Values.gateway.existingSecret }}
             - name: ARGUS_MGMT_TOKEN
               valueFrom:
