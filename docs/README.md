@@ -19,6 +19,7 @@
 | [Security](security/) | Authentication, authorization, secrets |
 | [TUI Guide](tui/) | Interactive terminal UI (containers, Kubernetes, catalog) |
 | [Middleware](middleware.md) | Request pipeline and middleware chain |
+| [Plugins](plugins/) | Builtin and custom plugins |
 | [Audit & Observability](audit/) | Audit logging, telemetry, health checks |
 | [Skills](skills/) | Portable bundles of tools, workflows, and config |
 | [Workflows](workflows/) | Composite tool pipelines (DAG-based) |
@@ -118,6 +119,6 @@ docs/
 
 ## Version
 
-Current version: **0.8.1**
+Current version: **0.8.2**
 
 License: GPL-3.0-only
