@@ -15,3 +15,13 @@ ignored:
   # DL3059: Multiple consecutive RUN — we deliberately separate RUN layers
   # for cache efficiency in multi-stage build
   - DL3059
+
+  # DL3002: Last USER should not be root — false positive for multi-stage builds.
+  # Builder stages (rust-builder, go-builder, builder) need root for package
+  # installs; the runtime stage correctly ends with USER 65532 (nonroot).
+  - DL3002
+
+  # DL3007: Using latest is prone to errors — Chainguard images use :latest
+  # and :latest-dev tags as their stable release channel (no semver tags).
+  # Pinning is done via image digest in production deployments.
+  - DL3007
