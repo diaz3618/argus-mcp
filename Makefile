@@ -112,6 +112,11 @@ docker-build:
 	docker build -t $(IMAGE_DOCKERHUB):$(VERSION) -t $(IMAGE_DOCKERHUB):latest .
 	@echo "Built $(IMAGE_DOCKERHUB):$(VERSION)"
 
+.PHONY: docker-build-dhi
+docker-build-dhi: ## Build DHI (Chainguard) Docker image
+	docker build -f Dockerfile.dhi -t $(IMAGE_DOCKERHUB)-dhi:$(VERSION) -t $(IMAGE_DOCKERHUB)-dhi:latest .
+	@echo "Built $(IMAGE_DOCKERHUB)-dhi:$(VERSION)"
+
 # ══════════════════════════════════════════════════════════════
 # Utilities
 # ══════════════════════════════════════════════════════════════
