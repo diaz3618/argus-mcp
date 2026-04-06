@@ -251,7 +251,7 @@ provides-extras = ["tui", "dev"]
 
 [[package]]
 name = "argus-mcp"
-version = "0.8.2"
+version = "0.8.3"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
