@@ -53,6 +53,12 @@ func NewClient() (*Client, error) {
 	return &Client{cs: cs, metrics: mc}, nil
 }
 
+// NewTestClient creates a Client using the given kubernetes.Interface.
+// Intended for use in tests with fake.NewSimpleClientset().
+func NewTestClient(cs kubernetes.Interface) *Client {
+	return &Client{cs: cs}
+}
+
 // Available reports whether the k8s client was successfully initialized.
 func (c *Client) Available() bool {
 	return c != nil && c.cs != nil

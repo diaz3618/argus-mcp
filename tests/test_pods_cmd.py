@@ -5,9 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import typer
-from argus_cli.commands.pods import app
-from typer.testing import CliRunner
+
+pytest.importorskip("argus_cli", reason="argus_cli package not installed")
+
+import typer  # noqa: E402
+from argus_cli.commands.pods import app  # noqa: E402
+from typer.testing import CliRunner  # noqa: E402
 
 runner = CliRunner()
 

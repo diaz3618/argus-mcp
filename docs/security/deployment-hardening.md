@@ -164,8 +164,7 @@ docker run --network=argus-net -p 9000:9000 argus-mcp
 
 ## 4. Non-Root Container Checklist
 
-The official Docker image runs as a non-root `argus` user (UID/GID
-assigned by `groupadd -r` / `useradd -r`).
+The official Docker image runs as a non-root `argus` user (UID/GID 1000).
 
 ### Verify at Runtime
 
@@ -174,7 +173,7 @@ docker run --rm argus-mcp whoami
 # Output: argus
 
 docker run --rm argus-mcp id
-# Output: uid=999(argus) gid=999(argus) groups=999(argus)
+# Output: uid=1000(argus) gid=1000(argus) groups=1000(argus)
 ```
 
 ### Hardening Flags

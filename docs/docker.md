@@ -43,7 +43,7 @@ docker run -d \
   --name argus \
   -p 9000:9000 \
   -v ./config.yaml:/app/config.yaml \
-  -e ARGUS_MGMT_TOKEN=my-secret-token \
+  -e ARGUS_MGMT_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" \
   -e MY_API_KEY=sk-xxx \
   diaz3618/argus-mcp:latest
 ```
@@ -129,7 +129,7 @@ docker run -p 9000:9000 -v ./config.yaml:/app/config.yaml argus-mcp
 
 - **Base:** `python:3.13-slim`
 - **Node.js:** LTS (22.x) included for `npx`-based stdio backends
-- **User:** Runs as non-root user
+- **User:** Runs as non-root `argus` user (UID/GID 1000)
 - **Entrypoint:** `argus-mcp` — pass any subcommand (`server`, `tui`, `secret`) as arguments
 - **Default command:** `server --host 0.0.0.0 --port 9000`
 
@@ -207,7 +207,7 @@ backends:
 Use a specific tag instead of `latest`:
 
 ```bash
-docker pull diaz3618/argus-mcp:0.8.1
+docker pull diaz3618/argus-mcp:0.8.2
 ```
 
 Tags follow the project version (semver) and are published on each release.

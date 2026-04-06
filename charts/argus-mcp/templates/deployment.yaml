@@ -44,6 +44,11 @@ spec:
               containerPort: {{ .Values.gateway.port }}
               protocol: TCP
           env:
+            # HOME is set explicitly as a safety net: ensures
+            # os.path.expanduser("~") always resolves to "/app"
+            # regardless of /etc/passwd state inside the container.
+            - name: HOME
+              value: /app
             {{- if .Values.gateway.existingSecret }}
             - name: ARGUS_MGMT_TOKEN
               valueFrom:

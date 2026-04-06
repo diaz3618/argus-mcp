@@ -78,6 +78,61 @@ def _get_service(request: Request) -> ArgusService:
     return service
 
 
+def _redact_status_response(status: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip sensitive internal details from a status response dict.
+
+    Removes config file paths, transport bind addresses/URLs, and other
+    implementation details that could aid reconnaissance (SEC-17).
+
+    Safe to expose: service name, version, state, uptime, backend count,
+    feature flags.
+    """
+    result = {**status}
+
+    # Redact config file path
+    if "config" in result:
+        cfg = {**result["config"]}
+        cfg["file_path"] = "[redacted]"
+        result["config"] = cfg
+
+    # Redact transport details (bind host/port, internal URLs)
+    if "transport" in result:
+        transport = {**result["transport"]}
+        transport["host"] = "[redacted]"
+        transport["port"] = 0
+        transport["sse_url"] = "[redacted]"
+        if "streamable_http_url" in transport:
+            transport["streamable_http_url"] = "[redacted]"
+        result["transport"] = transport
+
+    return result
+
+
+def _redact_backends_response(backends: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip sensitive internal details from a backends response dict.
+
+    Removes error messages (may contain stack traces, IPs, credentials)
+    and status conditions (may contain internal diagnostics) (SEC-17).
+
+    Safe to expose: backend name, type, group, connection state,
+    health status, capability counts.
+    """
+    result = {**backends}
+
+    if "backends" in result:
+        redacted_backends = []
+        for backend in result["backends"]:
+            b = {**backend}
+            # Error messages may leak internal IPs, stack traces, credentials
+            b["error"] = None
+            # Conditions may contain detailed internal diagnostics
+            b["conditions"] = []
+            redacted_backends.append(b)
+        result["backends"] = redacted_backends
+
+    return result
+
+
 def _error_json(error: str, message: str, status_code: int = 500) -> JSONResponse:
     body = ErrorResponse(error=error, message=message)
     return JSONResponse(body.model_dump(), status_code=status_code)
@@ -144,7 +199,13 @@ async def handle_ready(request: Request) -> JSONResponse:
 async def handle_status(request: Request) -> JSONResponse:
     """Full service status including runtime state, config, and transport."""
     resp = _build_status(request)
-    return JSONResponse(resp.model_dump())
+    data = resp.model_dump()
+
+    # Apply redaction when SecurityConfig.redact_status is enabled (SEC-17)
+    if getattr(getattr(request.app.state, "security_config", None), "redact_status", False):
+        data = _redact_status_response(data)
+
+    return JSONResponse(data)
 
 
 def _build_status(request: Request) -> StatusResponse:
@@ -184,7 +245,13 @@ def _build_status(request: Request) -> StatusResponse:
 async def handle_backends(request: Request) -> JSONResponse:
     """List all backend server connections with their status."""
     resp = _build_backends(request)
-    return JSONResponse(resp.model_dump())
+    data = resp.model_dump()
+
+    # Apply redaction when SecurityConfig.redact_status is enabled (SEC-17)
+    if getattr(getattr(request.app.state, "security_config", None), "redact_status", False):
+        data = _redact_backends_response(data)
+
+    return JSONResponse(data)
 
 
 def _build_backends(request: Request) -> BackendsResponse:
@@ -493,7 +560,16 @@ async def handle_batch(request: Request) -> JSONResponse:
         capabilities=caps_resp,
         events=events_resp,
     )
-    return JSONResponse(resp.model_dump())
+    data = resp.model_dump()
+
+    # Apply redaction to the batch sub-responses when enabled (SEC-17)
+    if getattr(getattr(request.app.state, "security_config", None), "redact_status", False):
+        if "status" in data:
+            data["status"] = _redact_status_response(data["status"])
+        if "backends" in data:
+            data["backends"] = _redact_backends_response(data["backends"])
+
+    return JSONResponse(data)
 
 
 async def handle_events_stream(request: Request) -> StreamingResponse:

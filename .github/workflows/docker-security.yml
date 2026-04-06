@@ -13,6 +13,10 @@
 # NOTE: The ci.yml container-scan job covers PR/push Trivy image scans.
 #       This workflow adds deeper supply-chain analysis: Hadolint, Dockle,
 #       Syft SBOM, and optionally Grype.
+#
+# Both standard (Dockerfile) and DHI (Dockerfile.dhi) variants are scanned
+# via matrix strategy. Each variant gets distinct artifact names to avoid
+# collision in parallel execution.
 # =============================================================================
 
 name: Docker Security
@@ -23,11 +27,19 @@ on:
       - main
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.dhi'
+      - '.dockerignore'
+      - '.hadolint.yaml'
+      - '.trivyignore'
       - 'pyproject.toml'
       - '.github/workflows/docker-security.yml'
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'Dockerfile.dhi'
+      - '.dockerignore'
+      - '.hadolint.yaml'
+      - '.trivyignore'
       - 'pyproject.toml'
       - '.github/workflows/docker-security.yml'
   workflow_dispatch:
@@ -39,58 +51,68 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  IMAGE_TAG: argus-mcp:security-check
-
 jobs:
   # ──────────────────────────────────────────────
   # Hadolint — Dockerfile best-practices linter
   # ──────────────────────────────────────────────
   hadolint:
-    name: Hadolint (Dockerfile lint)
+    name: Hadolint (${{ matrix.dockerfile }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile: [Dockerfile, Dockerfile.dhi]
     steps:
       - uses: actions/checkout@v6
 
       - name: Run Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
-          dockerfile: Dockerfile
-          failure-threshold: warning
-          ignore: DL3008,DL3013
-          # DL3008: Pin versions in apt-get (we use --no-install-recommends)
-          # DL3013: Pin pip package versions (we pin pip explicitly)
+          dockerfile: ${{ matrix.dockerfile }}
+          config: .hadolint.yaml
 
   # ──────────────────────────────────────────────
   # Build — required for Dockle, Syft, Trivy
   # ──────────────────────────────────────────────
   build:
-    name: Build image
+    name: Build (${{ matrix.dockerfile }})
     needs: [hadolint]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dockerfile: [Dockerfile, Dockerfile.dhi]
+        include:
+          - dockerfile: Dockerfile
+            image-tag: argus-mcp:security-check
+            artifact-name: docker-image
+          - dockerfile: Dockerfile.dhi
+            image-tag: argus-mcp:security-check-dhi
+            artifact-name: docker-image-dhi
     steps:
       - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build image (local)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: false
           load: true
-          tags: ${{ env.IMAGE_TAG }}
+          tags: ${{ matrix.image-tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Save image tarball
-        run: docker save ${{ env.IMAGE_TAG }} -o /tmp/image.tar
+        run: docker save ${{ matrix.image-tag }} -o /tmp/image.tar
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v7
         with:
-          name: docker-image
+          name: ${{ matrix.artifact-name }}
           path: /tmp/image.tar
           retention-days: 1
 
@@ -98,14 +120,24 @@ jobs:
   # Dockle — CIS Docker Benchmark checks
   # ──────────────────────────────────────────────
   dockle:
-    name: Dockle (CIS benchmark)
+    name: Dockle (${{ matrix.variant }})
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: standard
+            image-tag: argus-mcp:security-check
+            artifact-name: docker-image
+          - variant: dhi
+            image-tag: argus-mcp:security-check-dhi
+            artifact-name: docker-image-dhi
     steps:
       - name: Download image artifact
         uses: actions/download-artifact@v8
         with:
-          name: docker-image
+          name: ${{ matrix.artifact-name }}
           path: /tmp
 
       - name: Load image
@@ -118,7 +150,7 @@ jobs:
           # instead of rm -rf /var/lib/apt/lists — unfixable upstream
           DOCKLE_IGNORES: DKL-DI-0005
         with:
-          image: ${{ env.IMAGE_TAG }}
+          image: ${{ matrix.image-tag }}
           failure-threshold: WARN
           accept-keywords: GPG_KEY
           accept-filenames: settings.py
@@ -128,14 +160,24 @@ jobs:
   # Syft — SBOM generation (SPDX + CycloneDX)
   # ──────────────────────────────────────────────
   sbom:
-    name: Syft (SBOM)
+    name: Syft SBOM (${{ matrix.variant }})
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: standard
+            image-tag: argus-mcp:security-check
+            artifact-name: docker-image
+          - variant: dhi
+            image-tag: argus-mcp:security-check-dhi
+            artifact-name: docker-image-dhi
     steps:
       - name: Download image artifact
         uses: actions/download-artifact@v8
         with:
-          name: docker-image
+          name: ${{ matrix.artifact-name }}
           path: /tmp
 
       - name: Load image
@@ -144,21 +186,21 @@ jobs:
       - name: Generate SBOM (SPDX JSON)
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.IMAGE_TAG }}
+          image: ${{ matrix.image-tag }}
           format: spdx-json
           output-file: sbom-spdx.json
 
       - name: Generate SBOM (CycloneDX JSON)
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.IMAGE_TAG }}
+          image: ${{ matrix.image-tag }}
           format: cyclonedx-json
           output-file: sbom-cyclonedx.json
 
       - name: Upload SBOMs
         uses: actions/upload-artifact@v7
         with:
-          name: sbom-reports
+          name: sbom-reports-${{ matrix.variant }}
           path: |
             sbom-spdx.json
             sbom-cyclonedx.json
@@ -168,38 +210,62 @@ jobs:
   # Trivy — deep image vulnerability scan
   # ──────────────────────────────────────────────
   trivy:
-    name: Trivy (vulnerability scan)
+    name: Trivy (${{ matrix.variant }})
     needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: standard
+            image-tag: argus-mcp:security-check
+            artifact-name: docker-image
+          - variant: dhi
+            image-tag: argus-mcp:security-check-dhi
+            artifact-name: docker-image-dhi
     steps:
       - uses: actions/checkout@v6
 
       - name: Download image artifact
         uses: actions/download-artifact@v8
         with:
-          name: docker-image
+          name: ${{ matrix.artifact-name }}
           path: /tmp
 
       - name: Load image
         run: docker load -i /tmp/image.tar
 
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability + secret scanner (SARIF)
         uses: aquasecurity/trivy-action@v0.35.0
         with:
-          image-ref: ${{ env.IMAGE_TAG }}
+          image-ref: ${{ matrix.image-tag }}
+          scanners: vuln,secret
           format: sarif
-          output: trivy-results.sarif
+          output: trivy-results-${{ matrix.variant }}.sarif
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+
+      - name: Run Trivy CI gate (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ matrix.image-tag }}
+          scanners: vuln,secret
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
 
       - name: Upload Trivy SARIF results
-        if: always() && hashFiles('trivy-results.sarif') != ''
+        if: always() && hashFiles(format('trivy-results-{0}.sarif', matrix.variant)) != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: trivy-results.sarif
-          category: docker-security-trivy
+          sarif_file: trivy-results-${{ matrix.variant }}.sarif
+          category: docker-security-trivy-${{ matrix.variant }}
 
   # ──────────────────────────────────────────────
   # Gate — all security checks must pass

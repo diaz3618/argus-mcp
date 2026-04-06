@@ -38,27 +38,27 @@ help:
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: rust-build
-rust-build:
+rust-build: ## Build Rust PyO3 extensions
 	python scripts/build_rust.py
 
 .PHONY: rust-check
-rust-check:
+rust-check: ## Check if Rust extensions are available
 	@python scripts/build_rust.py --check
 
 .PHONY: go-build
-go-build:
+go-build: ## Build Go binaries (argusd + docker-adapter)
 	python scripts/build_go.py
 
 .PHONY: go-check
-go-check:
+go-check: ## Check if Go binaries are available
 	@python scripts/build_go.py --check
 
 .PHONY: go-build-all
-go-build-all:
+go-build-all: ## Build all Go binaries (all platforms)
 	python scripts/build_go.py --all
 
 .PHONY: build-extensions
-build-extensions:
+build-extensions: ## Build all native extensions (Rust + Go)
 	@echo "══ Building Rust extensions ══"
 	@python scripts/build_rust.py
 	@echo ""
@@ -70,27 +70,27 @@ build-extensions:
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: test
-test:
+test: ## Run pytest suite
 	uv run pytest tests/ -q
 
 .PHONY: lint
-lint:
+lint: ## Run ruff linter
 	uv run ruff check argus_mcp/ tests/
 
 .PHONY: typecheck
-typecheck:
+typecheck: ## Run mypy type checker
 	uv run mypy argus_mcp/
 
 .PHONY: semgrep
-semgrep:
+semgrep: ## Run Semgrep SAST scanner
 	semgrep scan --config .semgrep.yml $(addprefix --config ,$(SEMGREP_PACKS)) argus_mcp/
 
 .PHONY: snyk
-snyk:
+snyk: ## Run Snyk SAST scan
 	snyk code test --severity-threshold=medium
 
 .PHONY: snyk-sca
-snyk-sca:
+snyk-sca: ## Run Snyk SCA (dependency) scan
 	uv export --format requirements-txt --no-hashes --no-emit-project 2>/dev/null | \
 		grep -v '^\s*#' | grep -v '^\s*$$' | sed 's/ ;.*//' > .snyk-requirements.txt
 	snyk test --file=.snyk-requirements.txt --package-manager=pip --severity-threshold=medium; \
@@ -98,27 +98,32 @@ snyk-sca:
 		if [ $$SCA_EXIT -ne 0 ]; then exit $$SCA_EXIT; fi
 
 .PHONY: security
-security: semgrep snyk
+security: semgrep snyk ## Run all security scans (semgrep + snyk)
 
 .PHONY: quality
-quality: lint typecheck test security
+quality: lint typecheck test security ## Full quality gate (lint + types + tests + security)
 
 # ══════════════════════════════════════════════════════════════
 # Docker — Build
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: docker-build
-docker-build:
+docker-build: ## Build Docker image (local arch)
 	docker build -t $(IMAGE_DOCKERHUB):$(VERSION) -t $(IMAGE_DOCKERHUB):latest .
 	@echo "Built $(IMAGE_DOCKERHUB):$(VERSION)"
+
+.PHONY: docker-build-dhi
+docker-build-dhi: ## Build DHI (Chainguard) Docker image
+	docker build -f Dockerfile.dhi -t $(IMAGE_DOCKERHUB)-dhi:$(VERSION) -t $(IMAGE_DOCKERHUB)-dhi:latest .
+	@echo "Built $(IMAGE_DOCKERHUB)-dhi:$(VERSION)"
 
 # ══════════════════════════════════════════════════════════════
 # Utilities
 # ══════════════════════════════════════════════════════════════
 
 .PHONY: dev-install
-dev-install:
-	uv sync --group dev
+dev-install: ## Install dev + test deps and build native extensions
+	uv sync --group dev --group test
 	@echo ""
 	@echo "══ Building native extensions (optional) ══"
 	@python scripts/build_rust.py || echo "  Skipping Rust extensions (toolchain not available)"
@@ -127,7 +132,7 @@ dev-install:
 .PHONY: install-all
 install-all: ## Install argus-mcp + argus-cli + all Rust/Go extensions
 	@echo "══ Step 1/5: Installing dependencies ══"
-	uv sync --group dev --no-install-project
+	uv sync --group dev --group test --no-install-project
 	@echo ""
 	@echo "══ Step 2/5: Building Rust PyO3 extensions ══"
 	@python scripts/build_rust.py || echo "  ⚠ Skipping Rust extensions (toolchain not available)"
@@ -149,17 +154,17 @@ install-all: ## Install argus-mcp + argus-cli + all Rust/Go extensions
 	@echo "  argusd:     $$(ls packages/argusd/argusd 2>/dev/null || echo 'not built')"
 
 .PHONY: uninstall
-uninstall:
+uninstall: ## Uninstall argus-mcp
 	uv pip uninstall argus-mcp 2>/dev/null || pip uninstall -y argus-mcp 2>/dev/null || true
 	@echo "argus-mcp uninstalled"
 
 .PHONY: uninstall-cli
-uninstall-cli:
+uninstall-cli: ## Uninstall argus-cli
 	uv pip uninstall argus-cli 2>/dev/null || pip uninstall -y argus-cli 2>/dev/null || true
 	@echo "argus-cli uninstalled"
 
 .PHONY: uninstall-all
-uninstall-all:
+uninstall-all: ## Uninstall everything and remove built binaries
 	uv pip uninstall argus-mcp argus-cli 2>/dev/null || pip uninstall -y argus-mcp argus-cli 2>/dev/null || true
 	rm -f packages/argusd/argusd
 	rm -rf packages/argusd/dist/
@@ -167,7 +172,7 @@ uninstall-all:
 	@echo "argus-mcp, argus-cli, and built binaries removed"
 
 .PHONY: clean
-clean:
+clean: ## Remove build artifacts and caches
 	rm -rf build/ dist/ *.egg-info argus_mcp.egg-info/
 	find . -type d -name __pycache__ -not -path './.venv/*' -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .mypy_cache -not -path './.venv/*' -exec rm -rf {} + 2>/dev/null || true

@@ -4,6 +4,9 @@ recursive-include argus_mcp *.rs Cargo.toml Cargo.lock
 # Include Jinja2 templates for container isolation
 recursive-include argus_mcp *.j2
 
+# Include Textual TUI stylesheets
+recursive-include argus_mcp *.tcss
+
 # Include project metadata
 include pyproject.toml
 include README.md

@@ -1,0 +1,143 @@
+# ──────────────────────────────────────────────────────────────
+# Argus MCP — Docker Hardened Image (DHI) variant
+# ──────────────────────────────────────────────────────────────
+# Chainguard base images for all stages. Reduced attack surface:
+# - Minimal runtime (no shell, no package manager)
+# - UID 65532 (nonroot) by default
+# - Compiled Go healthcheck binary (no Python in HEALTHCHECK)
+#
+# Differences from standard Dockerfile:
+#   - Chainguard base images instead of Debian/Alpine upstream
+#   - No Node.js in runtime (npx backends use container isolation)
+#   - Compiled healthcheck binary instead of Python urllib
+#   - nonroot user (UID 65532) instead of custom argus user
+#
+# Usage:
+#   docker build -f Dockerfile.dhi -t argus-mcp:dhi .
+#   docker run -p 9000:9000 -v ./config.yaml:/app/config.yaml argus-mcp:dhi
+#
+# Requires: Registry access to cgr.dev/chainguard (free tier available)
+# ──────────────────────────────────────────────────────────────
+
+# ── Stage 1: Rust Builder ──────────────────────────────────
+# nosemgrep: docker-user-root (builder stage is discarded)
+FROM cgr.dev/chainguard/rust:latest-dev AS rust-builder
+
+USER root
+WORKDIR /build
+
+# Chainguard rust image has no Python — install it for PyO3 compilation
+RUN apk add --no-cache python3 python3-dev curl
+
+# Install pre-built maturin binary (faster and more reliable than cargo install or pip)
+ARG MATURIN_VERSION=1.8.6
+RUN curl -sSfL -o /tmp/maturin.tar.gz \
+      "https://github.com/PyO3/maturin/releases/download/v${MATURIN_VERSION}/maturin-x86_64-unknown-linux-musl.tar.gz" && \
+    tar xzf /tmp/maturin.tar.gz -C /usr/local/bin/ maturin && \
+    rm /tmp/maturin.tar.gz
+
+COPY argus_mcp/ ./argus_mcp/
+COPY pyproject.toml Cargo.lock* ./
+
+# Build each Rust extension with maturin (abi3 → single .so per crate)
+RUN for crate in \
+      argus_mcp/config/_yaml_rs \
+      argus_mcp/audit/_audit_rs \
+      argus_mcp/bridge/_filter_rs \
+      argus_mcp/bridge/auth/_token_cache_rs \
+      argus_mcp/bridge/health/_circuit_breaker_rs \
+      argus_mcp/plugins/_hash_rs \
+      argus_mcp/plugins/builtins_rust; \
+    do \
+      echo "=== Building $crate ===" && \
+      maturin build --release --manifest-path "$crate/Cargo.toml" --out /build/wheels || exit 1; \
+    done
+
+# ── Stage 2: Go Builder ───────────────────────────────────
+# nosemgrep: docker-user-root (builder stage is discarded)
+FROM cgr.dev/chainguard/go:latest-dev AS go-builder
+
+COPY tools/docker-adapter/ /src/docker-adapter/
+COPY tools/mcp-stdio-wrapper/ /src/mcp-stdio-wrapper/
+
+WORKDIR /src/docker-adapter
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/docker-adapter .
+
+WORKDIR /src/mcp-stdio-wrapper
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/mcp-stdio-wrapper .
+
+# Build a static healthcheck binary for the runtime stage
+COPY tools/healthcheck/ /src/healthcheck/
+WORKDIR /src/healthcheck
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /go-bin/healthcheck .
+
+# ── Stage 3: Python Builder ───────────────────────────────
+# nosemgrep: docker-user-root (builder stage is discarded; runtime uses nonroot UID 65532)
+FROM cgr.dev/chainguard/python:latest-dev AS builder
+
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /usr/local/bin/uv
+
+USER root
+WORKDIR /build
+
+# Copy dependency metadata first (cache-friendly layer)
+COPY pyproject.toml ./
+COPY argus_mcp/ ./argus_mcp/
+
+# Install the package and all runtime dependencies into a virtual env.
+# nosemgrep: docker-pip-no-cache, dependency-docker-no-unpinned-pip-install
+RUN uv venv /opt/venv && \
+    UV_LINK_MODE=copy uv pip install --no-cache --python /opt/venv/bin/python .
+
+# Install pre-built Rust extension wheels from Stage 1
+COPY --from=rust-builder /build/wheels/ /tmp/wheels/
+RUN uv pip install --no-cache --python /opt/venv/bin/python /tmp/wheels/*.whl && \
+    rm -rf /tmp/wheels
+
+# Place Go binaries in the package's _bin/ directory
+COPY --from=go-builder /go-bin/docker-adapter /go-bin/mcp-stdio-wrapper \
+    /opt/venv/lib/python*/site-packages/argus_mcp/_bin/
+
+RUN find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
+
+
+# ── Stage 4: Runtime (Chainguard minimal) ──────────────────
+FROM cgr.dev/chainguard/python:latest AS runtime
+
+LABEL org.opencontainers.image.title="Argus MCP (DHI)" \
+      org.opencontainers.image.description="Central aggregation server for MCP — Docker Hardened Image (Chainguard)" \
+      org.opencontainers.image.source="https://github.com/diaz3618/argus-mcp" \
+      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.variant="dhi"
+
+# Copy the pre-built virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy compiled healthcheck binary from Go builder
+COPY --from=go-builder /go-bin/healthcheck /usr/local/bin/healthcheck
+
+# Put the venv on PATH
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Copy example config as fallback (user should mount their own config.yaml)
+COPY example_config.yaml ./example_config.yaml
+COPY example_config.yaml ./config.yaml
+
+# Chainguard images run as nonroot (UID 65532) by default — no useradd needed
+USER 65532
+
+# Default port
+EXPOSE 9000
+
+# Health check via compiled Go binary (no Python/shell dependency)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/usr/local/bin/healthcheck"]
+
+# Run the server bound to all interfaces
+ENTRYPOINT ["argus-mcp"]
+CMD ["server", "--host", "0.0.0.0", "--port", "9000"]

@@ -134,7 +134,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 # Create non-root user for runtime security
-RUN groupadd -r argus && useradd -r -g argus -d /app argus
+RUN groupadd -g 1000 argus && useradd -u 1000 -g argus -d /app -s /sbin/nologin argus
 
 WORKDIR /app
 
@@ -153,7 +153,7 @@ EXPOSE 9000
 
 # Health check via the management API
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9000/manage/v1/health')" || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/manage/v1/health')"]
 
 # Run the server bound to all interfaces
 ENTRYPOINT ["argus-mcp"]

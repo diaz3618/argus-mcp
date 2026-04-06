@@ -33,6 +33,7 @@ include = ["argus_mcp*"]
 [tool.setuptools.package-data]
 "argus_mcp._bin" = ["*"]
 "argus_mcp.bridge.container.templates" = ["*.j2"]
+"argus_mcp.tui" = ["*.tcss"]
 
 # ── setuptools-rust: 7 PyO3 extension modules ───────────────────────────
 # optional=true: build succeeds without Rust (Python fallbacks exist);

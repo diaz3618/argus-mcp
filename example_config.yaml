@@ -207,3 +207,9 @@ feature_flags:
   # outgoing_auth: true             # default: true
   # session_management: true        # default: true
   # yaml_config: true               # default: true
+  # use_dhi_images: false
+  #   Use Docker Hardened Images (Chainguard) as base images for
+  #   container-isolated backends. High-risk flag — requires registry
+  #   access to cgr.dev. When enabled, all container-isolated backends
+  #   use Chainguard base images instead of standard upstream images.
+  #   Per-backend container.builder_image overrides take precedence.

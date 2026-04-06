@@ -21,6 +21,9 @@ from argus_mcp.server.handlers import register_handlers
 from argus_mcp.server.lifespan import app_lifespan
 from argus_mcp.server.management import create_management_app
 from argus_mcp.server.origin import OriginValidationMiddleware
+from argus_mcp.server.payload_limits import PayloadLimitsMiddleware
+from argus_mcp.server.rate_limit import RateLimitMiddleware
+from argus_mcp.server.security_headers import SecurityHeadersMiddleware
 from argus_mcp.server.transport import handle_sse, handle_streamable_http, sse_transport
 from argus_mcp.server.well_known import handle_well_known_oauth_resource
 
@@ -110,6 +113,18 @@ def create_app() -> Starlette:
     # Must be added AFTER _MCPSlashMiddleware (Starlette middleware
     # wraps in reverse order, so last-added executes first).
     application.add_middleware(OriginValidationMiddleware)
+
+    # Security middleware stack (added after OriginValidation).
+    # Starlette wraps in reverse order, so execution order is:
+    #   SecurityHeaders → PayloadLimits → RateLimit → Origin → App
+    #
+    # Config is loaded later during lifespan (see _attach_to_mcp_server
+    # in lifespan.py).  At app-factory time we wire defaults; each
+    # middleware's __init__ uses sensible built-in defaults when no
+    # config object is supplied.
+    application.add_middleware(RateLimitMiddleware)
+    application.add_middleware(PayloadLimitsMiddleware)
+    application.add_middleware(SecurityHeadersMiddleware)
     # Store mgmt_app reference so lifespan can propagate service state to it.
     setattr(application.state, "mgmt_app", mgmt_app)
     logger.info(

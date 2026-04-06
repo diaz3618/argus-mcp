@@ -150,6 +150,14 @@ networkPolicy:
   allowFrom: []
   # -- Deny egress to private networks (SSRF protection)
   denyPrivateEgress: true
+  egress:
+    # -- Allowed egress CIDR blocks for backend connections (e.g., ["10.0.0.0/8"])
+    cidrs: []
+    # -- Allow DNS egress to kube-dns (port 53 UDP/TCP)
+    allowDNS: true
+  ingress:
+    # -- Enable ingress restriction to service port only
+    enabled: true
 
 # -- Node selector constraints
 nodeSelector: {}

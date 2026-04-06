@@ -1,0 +1,18 @@
+# Trivy vulnerability ignore list for argus-mcp
+# Format: one CVE ID per line
+
+# CVE-2026-34040 — github.com/docker/docker v28.5.2+incompatible
+# Fixed in Docker Engine v29.3.1, but v29.x is NOT published as a Go module.
+# The Go module proxy only has up to v28.5.2+incompatible. We cannot upgrade
+# until Docker publishes v29.x to the Go module registry.
+# Component: tools/docker-adapter (gobinary)
+# Reviewed: 2026-04-06
+CVE-2026-34040
+
+# CVE-2026-33671 — picomatch 4.0.3 (fixed in 4.0.4, 3.0.2, 2.3.2)
+# This is an npm dependency bundled in the base Debian image's Node.js/npm
+# installation (/usr/lib/node_modules/npm/node_modules/picomatch). We do not
+# use npm or picomatch — it ships with the base image and is outside our
+# control. Only affects the standard image (not DHI/Chainguard).
+# Reviewed: 2026-04-06
+CVE-2026-33671

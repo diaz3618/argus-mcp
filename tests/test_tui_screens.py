@@ -13,10 +13,18 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
-from textual.css.query import NoMatches
+import pytest
+
+# Skip if textual version lacks SystemCommand (required by argus_mcp.tui)
+try:
+    from textual.app import SystemCommand  # noqa: F401
+except ImportError:
+    pytest.skip("textual version lacks SystemCommand", allow_module_level=True)
+
+from textual.css.query import NoMatches  # noqa: E402
 
 # ServerLogsScreen
-from argus_mcp.tui.screens.server_logs import ServerLogsScreen
+from argus_mcp.tui.screens.server_logs import ServerLogsScreen  # noqa: E402
 
 
 class TestServerLogsScreenInit:

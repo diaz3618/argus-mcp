@@ -97,7 +97,20 @@ docker run --rm diaz3618/argus-mcp:latest --help
 3. **Install Dependencies**
 
     ```bash
-    uv sync
+    uv sync              # runtime only
+    uv sync --group dev --group test  # runtime + dev + test tools
+    ```
+
+4. **Makefile Shortcuts**
+
+    ```bash
+    make help          # Show available targets
+    make test          # Run pytest suite
+    make lint          # Run ruff linter
+    make typecheck     # Run mypy
+    make quality       # Full gate: lint + types + tests + security
+    make docker-build  # Build Docker image (local arch)
+    make clean         # Remove build artifacts and caches
     ```
 
 ## Quick Start
@@ -111,7 +124,7 @@ argus-mcp --help
 ```text
 usage: argus-mcp [-h] {server,build,stop,status,tui,secret,clean} ...
 
-Argus MCP v0.8.1
+Argus MCP v0.8.2
 
 positional arguments:
   {server,build,stop,status,tui,secret,clean}

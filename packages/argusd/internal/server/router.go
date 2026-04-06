@@ -9,7 +9,7 @@ import (
 
 // Handler holds dependencies for route handlers.
 type Handler struct {
-	Docker *docker.Client
+	Docker docker.DockerClient
 	K8s    *k8s.Client
 }
 

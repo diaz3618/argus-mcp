@@ -88,7 +88,7 @@ server:
 ```
 
 ```bash
-export ARGUS_MGMT_TOKEN=my-secret-token
+export ARGUS_MGMT_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 argus-mcp server
 ```
 
