@@ -148,10 +148,6 @@ jobs:
             cibw_archs: aarch64
             go_os: linux
             go_arch: arm64
-          - os: macos-13
-            cibw_archs: x86_64
-            go_os: darwin
-            go_arch: amd64
           - os: macos-latest
             cibw_archs: arm64
             go_os: darwin
@@ -220,6 +216,9 @@ jobs:
   verify-packages:
     name: Verify packages
     needs: [build-wheels, build-sdist]
+    if: |
+      !cancelled() &&
+      needs.build-sdist.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
