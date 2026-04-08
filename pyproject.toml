@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-mcp"
-version = "0.8.3"
+version = "0.8.4"
 description = "A central server for MCP servers"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,13 @@ exclude = ["argus_mcp.*.target", "argus_mcp.*.target.*", "argus_mcp.*.*.target",
 "argus_mcp._bin" = ["*"]
 "argus_mcp.bridge.container.templates" = ["*.j2"]
 "argus_mcp.tui" = ["*.tcss"]
+
+# ── Exclude Rust build artifacts from wheels ─────────────────────────────
+# MANIFEST.in prune only works for sdist; exclude-package-data is needed
+# for wheels. These patterns prevent target/ build artifacts from leaking
+# into the installed package.
+[tool.setuptools.exclude-package-data]
+"*" = ["target/**"]
 
 # ── setuptools-rust: 7 PyO3 extension modules ───────────────────────────
 # optional=true: build succeeds without Rust (Python fallbacks exist);
