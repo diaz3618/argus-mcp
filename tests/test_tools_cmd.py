@@ -60,9 +60,7 @@ def _mc(**overrides) -> MagicMock:
     return mc
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListTools:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mc = _mc()
@@ -81,7 +79,7 @@ class TestListTools:
             assert result.exit_code == 1
 
 
-# ── inspect ────────────────────────────────────────────────────────────
+# inspect
 # inspect calls client.capabilities(type_filter="tools", search=name)
 # and finds matching tool by name in the returned list
 
@@ -121,9 +119,7 @@ class TestInspectTool:
             assert result.exit_code == 1
 
 
-# ── call ───────────────────────────────────────────────────────────────
-
-
+# call
 class TestCallTool:
     def test_call_with_args(self, cli_app: typer.Typer) -> None:
         mc = _mc()
@@ -147,7 +143,7 @@ class TestCallTool:
             assert result.exit_code == 1
 
 
-# ── rename ─────────────────────────────────────────────────────────────
+# rename
 # rename is LOCAL-ONLY (no client call). It takes --to for the new name
 # and just prints instructions to modify config.
 
@@ -165,7 +161,7 @@ class TestRenameTool:
         assert result.exit_code == 0
 
 
-# ── filter ─────────────────────────────────────────────────────────────
+# filter
 # filter is LOCAL-ONLY (no client call). Takes --allow/--deny patterns.
 # With no args, exits 1.
 

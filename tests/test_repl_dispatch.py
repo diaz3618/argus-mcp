@@ -32,9 +32,7 @@ def _make_repl_state(**overrides) -> ReplState:
     )
 
 
-# ── dispatch_command ──────────────────────────────────────────────────
-
-
+# dispatch_command
 def test_dispatch_empty_input():
     """Empty input should be a no-op."""
     from argus_cli.repl.dispatch import dispatch_command
@@ -180,9 +178,7 @@ def test_dispatch_restores_output_format(mock_set_repl, mock_app):
     assert state.config.output_format == "rich"
 
 
-# ── collect_multiline ─────────────────────────────────────────────────
-
-
+# collect_multiline
 def test_collect_multiline_single_continuation():
     """Backslash continuation should merge lines."""
     from argus_cli.repl.dispatch import collect_multiline

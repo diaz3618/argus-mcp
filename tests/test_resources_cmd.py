@@ -51,9 +51,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListResources:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -78,9 +76,7 @@ class TestListResources:
             assert result.exit_code == 1
 
 
-# ── read ───────────────────────────────────────────────────────────────
-
-
+# read
 class TestReadResource:
     def test_read_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()

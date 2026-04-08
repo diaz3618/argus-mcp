@@ -52,9 +52,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── start ──────────────────────────────────────────────────────────────
-
-
+# start
 class TestStart:
     @patch("argus_cli.commands.server.subprocess.run")
     def test_start_detach_success(self, mock_run: MagicMock, cli_app: typer.Typer) -> None:
@@ -76,9 +74,7 @@ class TestStart:
         assert result.exit_code == 1
 
 
-# ── stop ───────────────────────────────────────────────────────────────
-
-
+# stop
 class TestStop:
     def test_stop_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -111,9 +107,7 @@ class TestStop:
             assert result.exit_code == 1
 
 
-# ── status ─────────────────────────────────────────────────────────────
-
-
+# status
 class TestStatus:
     def test_status_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -147,9 +141,7 @@ class TestStatus:
             assert result.exit_code == 1
 
 
-# ── build ──────────────────────────────────────────────────────────────
-
-
+# build
 class TestBuild:
     @patch("argus_cli.commands.server.subprocess.run")
     def test_build_success(self, mock_run: MagicMock, cli_app: typer.Typer) -> None:
@@ -170,9 +162,7 @@ class TestBuild:
         assert result.exit_code == 1
 
 
-# ── clean ──────────────────────────────────────────────────────────────
-
-
+# clean
 class TestClean:
     def test_clean_no_flags(self, cli_app: typer.Typer) -> None:
         """Clean without any flags exits with error."""

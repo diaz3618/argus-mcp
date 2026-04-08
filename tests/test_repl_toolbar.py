@@ -34,9 +34,7 @@ def _make_state(**overrides) -> ReplState:
     return state
 
 
-# ── _ansi helper ──────────────────────────────────────────────────────
-
-
+# _ansi helper
 class TestAnsi:
     @patch("argus_cli.repl.toolbar._ensure_loaded")
     @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS, clear=True)
@@ -73,9 +71,7 @@ class TestAnsi:
         assert result == "#ff0000"
 
 
-# ── make_prompt ───────────────────────────────────────────────────────
-
-
+# make_prompt
 class TestMakePrompt:
     @patch("argus_cli.repl.toolbar._ensure_loaded")
     @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS, clear=True)
@@ -121,9 +117,7 @@ class TestMakePrompt:
         assert "my-backend" in str(prompt)
 
 
-# ── make_toolbar ──────────────────────────────────────────────────────
-
-
+# make_toolbar
 class TestMakeToolbar:
     @patch("argus_cli.repl.toolbar._ensure_loaded")
     @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS, clear=True)

@@ -62,9 +62,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListPrompts:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -97,9 +95,7 @@ class TestListPrompts:
             assert result.exit_code == 1
 
 
-# ── get ────────────────────────────────────────────────────────────────
-
-
+# get
 class TestGetPrompt:
     def test_get_success(self, cli_app: typer.Typer) -> None:
         """get command calls capabilities(type_filter='prompts', search=name) and

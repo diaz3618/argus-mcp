@@ -70,7 +70,7 @@ def _mc(**overrides) -> MagicMock:
     return mc
 
 
-# ── list ───────────────────────────────────────────────────────────────
+# list
 # list uses _fetch_skills(cfg) which calls client.skills_list()
 
 
@@ -90,7 +90,7 @@ class TestListSkills:
             assert result.exit_code == 1
 
 
-# ── inspect ────────────────────────────────────────────────────────────
+# inspect
 # inspect uses _fetch_skills(cfg) to find skill by name in list
 
 
@@ -119,7 +119,7 @@ class TestInspectSkill:
             assert result.exit_code == 1
 
 
-# ── enable ─────────────────────────────────────────────────────────────
+# enable
 # enable calls client.skills_enable(name), checks data.get("ok")
 
 
@@ -139,7 +139,7 @@ class TestEnableSkill:
             assert result.exit_code == 1
 
 
-# ── disable ────────────────────────────────────────────────────────────
+# disable
 # disable calls client.skills_disable(name), checks data.get("ok")
 
 
@@ -159,7 +159,7 @@ class TestDisableSkill:
             assert result.exit_code == 1
 
 
-# ── apply ──────────────────────────────────────────────────────────────
+# apply
 # apply takes TWO positional arguments: name and target
 # apply with --dry-run calls _fetch_skills() to find the skill
 # apply without --dry-run calls client.skills_enable(name)

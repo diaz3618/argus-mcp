@@ -14,9 +14,8 @@ from argus_cli.daemon_client import (
     default_socket_path,
 )
 
-# ── default_socket_path ───────────────────────────────────────────────
 
-
+# default_socket_path
 class TestDefaultSocketPath:
     def test_uses_xdg_runtime_dir(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/1000")
@@ -29,9 +28,7 @@ class TestDefaultSocketPath:
         assert "tmp" in path.lower() or "temp" in path.lower()
 
 
-# ── DaemonClient lifecycle ────────────────────────────────────────────
-
-
+# DaemonClient lifecycle
 class TestDaemonClientLifecycle:
     def test_default_socket_path(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/42")
@@ -70,9 +67,7 @@ class TestDaemonClientLifecycle:
         await client.close()
 
 
-# ── DaemonClient._request ────────────────────────────────────────────
-
-
+# DaemonClient._request
 def _make_client_with_mock(
     status_code: int = 200,
     json_data: dict[str, Any] | list[Any] | None = None,
@@ -138,9 +133,7 @@ class TestDaemonClientRequest:
             await dc.health()
 
 
-# ── Docker Container methods ──────────────────────────────────────────
-
-
+# Docker Container methods
 class TestContainerMethods:
     @pytest.mark.asyncio
     async def test_list_containers(self):
@@ -188,9 +181,7 @@ class TestContainerMethods:
         mock.request.assert_called_once_with("POST", "/v1/containers/abc/remove")
 
 
-# ── Kubernetes methods ────────────────────────────────────────────────
-
-
+# Kubernetes methods
 class TestKubernetesMethods:
     @pytest.mark.asyncio
     async def test_list_pods(self):
@@ -232,9 +223,7 @@ class TestKubernetesMethods:
         mock.request.assert_called_once_with("POST", "/v1/deployments/default/mydeployment/restart")
 
 
-# ── SSE streaming ─────────────────────────────────────────────────────
-
-
+# SSE streaming
 class _FakeSSE:
     """Mimics an httpx_sse ServerSentEvent."""
 

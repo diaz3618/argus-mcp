@@ -62,9 +62,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListEvents:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -100,9 +98,7 @@ class TestListEvents:
             assert result.exit_code == 1
 
 
-# ── stream ─────────────────────────────────────────────────────────────
-
-
+# stream
 class TestStreamEvents:
     def test_stream_keyboard_interrupt(self, cli_app: typer.Typer) -> None:
         """Stream command uses asyncio.run internally; patch it to simulate interrupt."""

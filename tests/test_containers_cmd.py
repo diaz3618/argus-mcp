@@ -16,9 +16,8 @@ runner = CliRunner()
 
 _PATCH_TARGET = "argus_cli.daemon_client.DaemonClient"
 
-# ── Fixtures ───────────────────────────────────────────────────────────
 
-
+# Fixtures
 def _make_config() -> MagicMock:
     cfg = MagicMock()
     cfg.output_format = "rich"
@@ -42,8 +41,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── Helpers ────────────────────────────────────────────────────────────
-
+# Helpers
 _SAMPLE_CONTAINERS = [
     {
         "name": "argus-web",
@@ -72,9 +70,7 @@ _SAMPLE_INSPECT = {
 }
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListContainers:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()
@@ -105,9 +101,7 @@ class TestListContainers:
             assert result.exit_code == 1
 
 
-# ── inspect ────────────────────────────────────────────────────────────
-
-
+# inspect
 class TestInspect:
     def test_inspect_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()
@@ -140,9 +134,7 @@ class TestInspect:
             assert result.exit_code == 1
 
 
-# ── logs ───────────────────────────────────────────────────────────────
-
-
+# logs
 class TestLogs:
     def test_logs_no_follow(self, cli_app: typer.Typer) -> None:
         async def _fake_stream(*_a, **_kw):
@@ -197,9 +189,7 @@ class TestLogs:
             assert result.exit_code == 1
 
 
-# ── stats ──────────────────────────────────────────────────────────────
-
-
+# stats
 class TestStats:
     def test_stats_snapshot(self, cli_app: typer.Typer) -> None:
         async def _fake_stream(*_a, **_kw):
@@ -250,9 +240,7 @@ class TestStats:
             assert result.exit_code == 1
 
 
-# ── lifecycle (start, stop, restart, remove) ───────────────────────────
-
-
+# lifecycle (start, stop, restart, remove)
 class TestLifecycle:
     def test_start_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()

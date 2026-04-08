@@ -68,9 +68,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestAuditList:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -103,9 +101,7 @@ class TestAuditList:
             assert result.exit_code == 1
 
 
-# ── export ─────────────────────────────────────────────────────────────
-
-
+# export
 class TestAuditExport:
     def test_export_json(self, cli_app: typer.Typer, tmp_path) -> None:
         mock_client = MagicMock()

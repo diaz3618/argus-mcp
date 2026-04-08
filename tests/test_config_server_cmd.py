@@ -60,9 +60,7 @@ def _mc(**overrides) -> MagicMock:
     return mc
 
 
-# ── show ───────────────────────────────────────────────────────────────
-
-
+# show
 class TestConfigShow:
     def test_show_success(self, cli_app: typer.Typer) -> None:
         mc = _mc()
@@ -79,9 +77,7 @@ class TestConfigShow:
             assert result.exit_code == 1
 
 
-# ── validate ───────────────────────────────────────────────────────────
-
-
+# validate
 class TestConfigValidate:
     def test_validate_valid(self, cli_app: typer.Typer, tmp_path) -> None:
         cfg_file = tmp_path / "config.yaml"
@@ -94,9 +90,7 @@ class TestConfigValidate:
             assert result.exit_code == 0
 
 
-# ── reload ─────────────────────────────────────────────────────────────
-
-
+# reload
 class TestConfigReload:
     def test_reload_success(self, cli_app: typer.Typer) -> None:
         mc = _mc()
@@ -125,9 +119,7 @@ class TestConfigReload:
             assert result.exit_code == 1
 
 
-# ── export ─────────────────────────────────────────────────────────────
-
-
+# export
 class TestConfigExport:
     def test_export_json_success(self, cli_app: typer.Typer) -> None:
         mc = _mc()
@@ -144,9 +136,7 @@ class TestConfigExport:
             assert result.exit_code == 1
 
 
-# ── diff ───────────────────────────────────────────────────────────────
-
-
+# diff
 class TestConfigDiff:
     def test_diff_success(self, cli_app: typer.Typer, tmp_path) -> None:
         mc = _mc()

@@ -34,9 +34,7 @@ def _make_repl_state(**overrides) -> ReplState:
     )
 
 
-# ── show_banner ───────────────────────────────────────────────────────
-
-
+# show_banner
 @patch("argus_cli.widgets.banner.render_banner")
 def test_show_banner_connected(mock_banner):
     from argus_cli.repl.handlers import show_banner
@@ -69,9 +67,7 @@ def test_show_banner_disconnected(mock_banner):
     assert "Not connected" in output or console.print.called
 
 
-# ── show_help ─────────────────────────────────────────────────────────
-
-
+# show_help
 def test_show_help():
     from argus_cli.repl.handlers import show_help
 
@@ -83,9 +79,7 @@ def test_show_help():
     assert "tools" in text
 
 
-# ── handle_use ────────────────────────────────────────────────────────
-
-
+# handle_use
 def test_handle_use_valid_backend():
     from argus_cli.repl.handlers import handle_use
 
@@ -124,9 +118,7 @@ def test_handle_use_no_args():
     assert "Usage" in output
 
 
-# ── handle_alias / handle_unalias ────────────────────────────────────
-
-
+# handle_alias / handle_unalias
 @patch("argus_cli.repl.handlers.save_aliases")
 def test_handle_alias_create(mock_save):
     from argus_cli.repl.handlers import handle_alias
@@ -189,9 +181,7 @@ def test_handle_unalias_no_args():
     assert "Usage" in output
 
 
-# ── handle_watch ──────────────────────────────────────────────────────
-
-
+# handle_watch
 def test_handle_watch_no_args():
     from argus_cli.repl.handlers import handle_watch
 
@@ -226,9 +216,7 @@ def test_handle_watch_runs_until_interrupt(mock_sleep):
     assert "Watch stopped" in output
 
 
-# ── handle_connect ────────────────────────────────────────────────────
-
-
+# handle_connect
 def test_handle_connect_no_args():
     from argus_cli.repl.handlers import handle_connect
 
@@ -260,9 +248,7 @@ def test_handle_connect_valid_url(mock_refresh):
     mock_refresh.assert_called_once_with(state)
 
 
-# ── handle_set ────────────────────────────────────────────────────────
-
-
+# handle_set
 @patch("argus_cli.repl.handlers._persist_setting")
 def test_handle_set_output_format(mock_persist):
     from argus_cli.repl.handlers import handle_set
@@ -325,9 +311,7 @@ def test_handle_set_unknown_key():
     assert "Unknown setting" in output
 
 
-# ── handle_history ────────────────────────────────────────────────────
-
-
+# handle_history
 @patch("argus_cli.repl.handlers.ensure_history_dir")
 def test_handle_history_with_entries(mock_dir, tmp_path: Path):
     from argus_cli.repl.handlers import handle_history

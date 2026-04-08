@@ -83,9 +83,7 @@ def _mock_client(**overrides) -> MagicMock:
     return mc
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListBackends:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mc = _mock_client()
@@ -102,7 +100,7 @@ class TestListBackends:
             assert result.exit_code == 1
 
 
-# ── inspect ────────────────────────────────────────────────────────────
+# inspect
 # inspect calls client.backends() and finds by name in the list
 
 
@@ -129,7 +127,7 @@ class TestInspectBackend:
             assert result.exit_code == 1
 
 
-# ── reconnect ──────────────────────────────────────────────────────────
+# reconnect
 # reconnect uses client.reconnect(name) and checks result.get("reconnected")
 # Also uses console.status() context manager
 
@@ -162,7 +160,7 @@ class TestReconnect:
             assert result.exit_code == 1
 
 
-# ── reconnect-all ──────────────────────────────────────────────────────
+# reconnect-all
 # reconnect_all calls client.backends() first, then iterates and calls
 # client.reconnect(name) for each backend
 
@@ -184,7 +182,7 @@ class TestReconnectAll:
             assert result.exit_code == 1
 
 
-# ── health ─────────────────────────────────────────────────────────────
+# health
 # health calls client.backends() and extracts health info per backend
 
 
@@ -204,7 +202,7 @@ class TestBackendHealth:
             assert result.exit_code == 1
 
 
-# ── groups ─────────────────────────────────────────────────────────────
+# groups
 # groups calls client.groups()
 
 
@@ -224,7 +222,7 @@ class TestBackendGroups:
             assert result.exit_code == 1
 
 
-# ── sessions ───────────────────────────────────────────────────────────
+# sessions
 # sessions calls client.sessions()
 
 
@@ -256,7 +254,7 @@ class TestBackendSessions:
             assert result.exit_code == 1
 
 
-# ── versions ───────────────────────────────────────────────────────────
+# versions
 # versions calls client.status() (not client.versions())
 
 

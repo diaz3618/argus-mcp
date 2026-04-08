@@ -51,9 +51,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── status ─────────────────────────────────────────────────────────────
-
-
+# status
 class TestAuthStatus:
     def test_status_connected(self, cli_app: typer.Typer) -> None:
         """status always exits 0 — catches ArgusClientError internally and sets
@@ -80,9 +78,7 @@ class TestAuthStatus:
             assert result.exit_code == 0
 
 
-# ── configure ──────────────────────────────────────────────────────────
-
-
+# configure
 class TestAuthConfigure:
     def test_configure_with_token(self, cli_app: typer.Typer) -> None:
         """configure patches _load_yaml_config/_save_yaml_config from argus_cli.config."""
@@ -109,9 +105,7 @@ class TestAuthConfigure:
         assert result.exit_code == 1
 
 
-# ── test ───────────────────────────────────────────────────────────────
-
-
+# test
 class TestAuthTest:
     def test_test_connection_ok(self, cli_app: typer.Typer) -> None:
         """test command calls client.status() (not client.health())."""

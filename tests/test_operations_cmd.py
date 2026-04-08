@@ -51,9 +51,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── optimizer status ───────────────────────────────────────────────────
-
-
+# optimizer status
 class TestOptimizerStatus:
     def test_optimizer_status_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -86,9 +84,7 @@ class TestOptimizerStatus:
             assert result.exit_code == 1
 
 
-# ── optimizer enable/disable ──────────────────────────────────────────
-
-
+# optimizer enable/disable
 class TestOptimizerToggle:
     def test_optimizer_enable_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -142,9 +138,7 @@ class TestOptimizerToggle:
             assert result.exit_code == 1
 
 
-# ── telemetry status ──────────────────────────────────────────────────
-
-
+# telemetry status
 class TestTelemetryStatus:
     def test_telemetry_status_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -178,9 +172,7 @@ class TestTelemetryStatus:
             assert result.exit_code == 1
 
 
-# ── telemetry configure ───────────────────────────────────────────────
-
-
+# telemetry configure
 class TestTelemetryConfigure:
     def test_configure_with_endpoint(self, cli_app: typer.Typer) -> None:
         with patch("argus_cli.output.print_warning"):

@@ -48,9 +48,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListSecrets:
     def test_list_empty(self, cli_app: typer.Typer, tmp_path) -> None:
         secrets_dir = tmp_path / "secrets"
@@ -69,9 +67,7 @@ class TestListSecrets:
             assert result.exit_code == 0
 
 
-# ── set ────────────────────────────────────────────────────────────────
-
-
+# set
 class TestSetSecret:
     def test_set_success(self, cli_app: typer.Typer, tmp_path) -> None:
         secrets_dir = tmp_path / "secrets"
@@ -94,9 +90,7 @@ class TestSetSecret:
             assert (secrets_dir / "PROMPT_KEY").read_text() == "prompted-value"
 
 
-# ── get ────────────────────────────────────────────────────────────────
-
-
+# get
 class TestGetSecret:
     def test_get_success(self, cli_app: typer.Typer, tmp_path) -> None:
         secrets_dir = tmp_path / "secrets"
@@ -114,9 +108,7 @@ class TestGetSecret:
             assert result.exit_code == 1
 
 
-# ── delete ─────────────────────────────────────────────────────────────
-
-
+# delete
 class TestDeleteSecret:
     def test_delete_success(self, cli_app: typer.Typer, tmp_path) -> None:
         secrets_dir = tmp_path / "secrets"

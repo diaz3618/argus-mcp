@@ -48,9 +48,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── init ───────────────────────────────────────────────────────────────
-
-
+# init
 class TestConfigInit:
     def test_init_creates_file(self, cli_app: typer.Typer, tmp_path) -> None:
         config_file = tmp_path / "config.yaml"
@@ -76,18 +74,14 @@ class TestConfigInit:
             assert result.exit_code == 1
 
 
-# ── local ──────────────────────────────────────────────────────────────
-
-
+# local
 class TestConfigLocal:
     def test_local_shows_config(self, cli_app: typer.Typer) -> None:
         result = runner.invoke(cli_app, ["config", "local", "--output", "json"])
         assert result.exit_code == 0
 
 
-# ── themes ─────────────────────────────────────────────────────────────
-
-
+# themes
 class TestConfigThemes:
     def test_themes_lists_palettes(self, cli_app: typer.Typer) -> None:
         result = runner.invoke(cli_app, ["config", "themes", "--output", "json"])

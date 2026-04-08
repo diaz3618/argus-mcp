@@ -27,9 +27,7 @@ def _make_state():
     return ReplState(config=_make_config())
 
 
-# ── _build_key_bindings ──────────────────────────────────────────────
-
-
+# _build_key_bindings
 class TestBuildKeyBindings:
     def test_returns_key_bindings(self):
         """_build_key_bindings returns a KeyBindings object."""
@@ -67,9 +65,7 @@ class TestBuildKeyBindings:
         pytest.fail("Ctrl-L binding not found")
 
 
-# ── _REPL_HANDLERS dispatch table ────────────────────────────────────
-
-
+# _REPL_HANDLERS dispatch table
 class TestReplHandlers:
     def test_clear_handler(self):
         console = MagicMock()
@@ -138,9 +134,7 @@ class TestReplHandlers:
         mock_set.assert_called_once_with(console, state, args)
 
 
-# ── start_repl ────────────────────────────────────────────────────────
-
-
+# start_repl
 class TestStartRepl:
     @patch("argus_cli.repl.loop.PromptSession")
     @patch("argus_cli.repl.loop.refresh_completions")

@@ -19,9 +19,8 @@ from argus_cli.repl.state import (  # noqa: E402
     save_aliases,
 )
 
-# ── ConnectionState defaults ──────────────────────────────────────────
 
-
+# ConnectionState defaults
 def test_connection_state_defaults():
     conn = ConnectionState()
     assert conn.is_connected is False
@@ -40,9 +39,7 @@ def test_connection_state_custom():
     assert conn.healthy_count == 3
 
 
-# ── CompletionData defaults ───────────────────────────────────────────
-
-
+# CompletionData defaults
 def test_completion_data_defaults():
     comp = CompletionData()
     assert comp.backend_names == []
@@ -63,9 +60,7 @@ def test_completion_data_populated():
     assert comp.tool_names == ["t1"]
 
 
-# ── SessionState ──────────────────────────────────────────────────────
-
-
+# SessionState
 def test_session_state_defaults():
     sess = SessionState()
     assert sess.aliases == {}
@@ -79,9 +74,7 @@ def test_session_state_aliases():
     assert sess.scoped_backend == "my-backend"
 
 
-# ── ReplState composite ──────────────────────────────────────────────
-
-
+# ReplState composite
 def test_repl_state_composite():
     cfg = MagicMock()
     state = ReplState(config=cfg)
@@ -91,9 +84,7 @@ def test_repl_state_composite():
     assert isinstance(state.session, SessionState)
 
 
-# ── ensure_history_dir ────────────────────────────────────────────────
-
-
+# ensure_history_dir
 def test_ensure_history_dir(tmp_path: Path):
     fake_dir = tmp_path / ".config" / "argus-mcp"
     with patch("argus_cli.repl.state._HISTORY_DIR", str(fake_dir)):
@@ -102,9 +93,7 @@ def test_ensure_history_dir(tmp_path: Path):
     assert fake_dir.is_dir()
 
 
-# ── load_aliases / save_aliases ───────────────────────────────────────
-
-
+# load_aliases / save_aliases
 def test_load_aliases_missing_file(tmp_path: Path):
     fake_file = tmp_path / "aliases.yaml"
     with patch("argus_cli.repl.state._ALIASES_FILE", fake_file):

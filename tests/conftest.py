@@ -226,9 +226,7 @@ def multi_backend_config() -> Dict[str, Any]:
     }
 
 
-# ── CLI Command Test Fixtures (ArgusClient-based) ─────────────────────
-
-
+# CLI Command Test Fixtures (ArgusClient-based)
 def make_cli_config() -> MagicMock:
     """Create a MagicMock config object suitable for ArgusClient CLI commands.
 

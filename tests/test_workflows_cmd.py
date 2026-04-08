@@ -60,9 +60,7 @@ def _mc(**overrides) -> MagicMock:
     return mc
 
 
-# ── list ───────────────────────────────────────────────────────────────
-
-
+# list
 class TestListWorkflows:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         result = runner.invoke(cli_app, ["workflows", "list", "--output", "json"])
@@ -76,9 +74,7 @@ class TestListWorkflows:
             assert name in result.output
 
 
-# ── run ────────────────────────────────────────────────────────────────
-
-
+# run
 class TestRunWorkflow:
     def test_run_dry_run(self, cli_app: typer.Typer) -> None:
         result = runner.invoke(cli_app, ["workflows", "run", "health-check", "--dry-run"])
@@ -111,9 +107,7 @@ class TestRunWorkflow:
             assert result.exit_code == 1
 
 
-# ── history ────────────────────────────────────────────────────────────
-
-
+# history
 class TestWorkflowHistory:
     def test_history_success(self, cli_app: typer.Typer) -> None:
         mc = _mc()

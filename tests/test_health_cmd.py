@@ -51,9 +51,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── status ─────────────────────────────────────────────────────────────
-
-
+# status
 class TestStatus:
     def test_status_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -81,9 +79,7 @@ class TestStatus:
             assert result.exit_code == 1
 
 
-# ── sessions ───────────────────────────────────────────────────────────
-
-
+# sessions
 class TestSessions:
     def test_sessions_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -117,9 +113,7 @@ class TestSessions:
             assert result.exit_code == 1
 
 
-# ── versions ───────────────────────────────────────────────────────────
-
-
+# versions
 class TestVersions:
     def test_versions_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -153,9 +147,7 @@ class TestVersions:
             assert result.exit_code == 1
 
 
-# ── groups ─────────────────────────────────────────────────────────────
-
-
+# groups
 class TestGroups:
     def test_groups_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()

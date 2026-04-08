@@ -51,9 +51,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── search ─────────────────────────────────────────────────────────────
-
-
+# search
 class TestSearch:
     def test_search_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -91,9 +89,7 @@ class TestSearch:
             assert result.exit_code == 1
 
 
-# ── inspect ────────────────────────────────────────────────────────────
-
-
+# inspect
 class TestInspect:
     def test_inspect_success(self, cli_app: typer.Typer) -> None:
         mock_client = MagicMock()
@@ -142,9 +138,7 @@ class TestInspect:
             assert result.exit_code == 1
 
 
-# ── install ────────────────────────────────────────────────────────────
-
-
+# install
 class TestInstall:
     def test_install_no_config(self, cli_app: typer.Typer) -> None:
         """Install without --config just prints the entry."""

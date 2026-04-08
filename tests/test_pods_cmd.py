@@ -16,9 +16,8 @@ runner = CliRunner()
 
 _PATCH_TARGET = "argus_cli.daemon_client.DaemonClient"
 
-# ── Fixtures ───────────────────────────────────────────────────────────
 
-
+# Fixtures
 def _make_config() -> MagicMock:
     cfg = MagicMock()
     cfg.output_format = "rich"
@@ -42,8 +41,7 @@ def cli_app() -> typer.Typer:
     return _wrap_app()
 
 
-# ── Sample data ────────────────────────────────────────────────────────
-
+# Sample data
 _SAMPLE_PODS = [
     {
         "name": "argus-server-abc12",
@@ -92,9 +90,7 @@ _SAMPLE_EVENTS = [
 ]
 
 
-# ── List ───────────────────────────────────────────────────────────────
-
-
+# List
 class TestListPods:
     def test_list_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()
@@ -123,9 +119,7 @@ class TestListPods:
         assert result.exit_code == 1
 
 
-# ── Describe ───────────────────────────────────────────────────────────
-
-
+# Describe
 class TestDescribe:
     def test_describe_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()
@@ -165,9 +159,7 @@ class TestDescribe:
         mock_client.describe_pod.assert_awaited_once_with("default", "my-pod")
 
 
-# ── Logs ───────────────────────────────────────────────────────────────
-
-
+# Logs
 class TestLogs:
     def test_logs_no_follow(self, cli_app: typer.Typer) -> None:
         async def _fake_stream(*_args, **_kwargs):
@@ -201,9 +193,7 @@ class TestLogs:
         assert result.exit_code == 1
 
 
-# ── Events ─────────────────────────────────────────────────────────────
-
-
+# Events
 class TestEvents:
     def test_events_success(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()
@@ -231,9 +221,7 @@ class TestEvents:
         assert result.exit_code == 1
 
 
-# ── Lifecycle ──────────────────────────────────────────────────────────
-
-
+# Lifecycle
 class TestLifecycle:
     def test_delete_confirmed(self, cli_app: typer.Typer) -> None:
         mock_client = AsyncMock()

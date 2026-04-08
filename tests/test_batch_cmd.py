@@ -67,7 +67,7 @@ def _mc(**overrides) -> MagicMock:
     return mc
 
 
-# ── reconnect-all ──────────────────────────────────────────────────────
+# reconnect-all
 # reconnect_all uses --yes/-y flag, calls client.backends() then
 # client.reconnect(name) per backend with Progress context manager
 
@@ -93,7 +93,7 @@ class TestBatchReconnectAll:
             assert result.exit_code == 1
 
 
-# ── restart-all ────────────────────────────────────────────────────────
+# restart-all
 # restart_all uses --yes/-y flag, calls client.reload() (not client.restart_all)
 
 

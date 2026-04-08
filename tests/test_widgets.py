@@ -35,9 +35,7 @@ _MOCK_STATUS_STYLES = {
 }
 
 
-# ── Banner ────────────────────────────────────────────────────────────
-
-
+# Banner
 @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS)
 @patch("argus_cli.widgets.banner.get_console")
 def test_render_banner_with_version_and_url(mock_console_fn):
@@ -71,9 +69,7 @@ def test_render_banner_version_only(mock_console_fn):
     assert console.print.called
 
 
-# ── Panels ────────────────────────────────────────────────────────────
-
-
+# Panels
 @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS)
 def test_info_panel_returns_panel():
     from argus_cli.widgets.panels import info_panel
@@ -134,9 +130,7 @@ def test_detail_panel_no_sections():
     assert isinstance(result, Panel)
 
 
-# ── Spinners ──────────────────────────────────────────────────────────
-
-
+# Spinners
 @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS)
 @patch("argus_cli.widgets.spinners.get_console")
 def test_live_status_context_manager(mock_console_fn):
@@ -196,9 +190,7 @@ def test_step_progress_non_callable(mock_console_fn):
     assert results == ["just a string"]
 
 
-# ── Tables ────────────────────────────────────────────────────────────
-
-
+# Tables
 @patch.dict("argus_cli.theme.STATUS_STYLES", _MOCK_STATUS_STYLES)
 @patch.dict("argus_cli.theme.COLORS", _MOCK_COLORS)
 def test_simple_table_returns_table():

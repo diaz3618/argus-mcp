@@ -30,9 +30,7 @@ def _make_repl_state(**overrides) -> ReplState:
     )
 
 
-# ── build_command_tree ────────────────────────────────────────────────
-
-
+# build_command_tree
 def test_build_command_tree_static_keys():
     from argus_cli.repl.completions import build_command_tree
 
@@ -85,9 +83,7 @@ def test_build_command_tree_set_subcommands():
     assert "rich" in tree["set"]["output"]
 
 
-# ── refresh_completions ───────────────────────────────────────────────
-
-
+# refresh_completions
 @patch("argus_cli.client.ArgusClient")
 def test_refresh_completions_success(MockClient):
     from argus_cli.repl.completions import refresh_completions
