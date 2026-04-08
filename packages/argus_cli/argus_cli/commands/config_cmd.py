@@ -64,7 +64,7 @@ poll_interval: 30
 # Max history entries shown by the `history` command
 history_limit: 50
 
-# ── argusd (Docker/Kubernetes sidecar daemon) ──────────────────────
+# argusd (Docker/Kubernetes sidecar daemon)
 # argusd is required for `argus containers` and `argus pods` commands.
 # See: https://github.com/diaz3618/argus-mcp/blob/main/docs/architecture/07-argusd.md
 argusd:

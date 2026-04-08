@@ -15,7 +15,7 @@ __all__ = [
     "transport_badge",
 ]
 
-# ── Status dots ─────────────────────────────────────────────────────────
+# Status dots
 # Canonical mapping: status keyword → (icon, Rich color name).
 STATUS_DOT: dict[str, tuple[str, str]] = {
     "healthy": ("●", "green"),
@@ -29,7 +29,7 @@ STATUS_DOT: dict[str, tuple[str, str]] = {
     "live": ("●", "green"),
 }
 
-# ── Phase displays ──────────────────────────────────────────────────────
+# Phase displays
 # Lifecycle phase → (icon, Rich style name).
 PHASE_DISPLAY: dict[str, tuple[str, str]] = {
     "pending": ("◌", "dim"),
@@ -40,7 +40,7 @@ PHASE_DISPLAY: dict[str, tuple[str, str]] = {
     "shutting_down": ("◑", "cyan"),
 }
 
-# ── Transport badges ───────────────────────────────────────────────────
+# Transport badges
 TRANSPORT_BADGE: dict[str, str] = {
     "stdio": "[cyan]stdio[/cyan]",
     "sse": "[yellow]SSE[/yellow]",
@@ -49,7 +49,7 @@ TRANSPORT_BADGE: dict[str, str] = {
 }
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def status_dot(status: str, *, plain: bool = False) -> str:

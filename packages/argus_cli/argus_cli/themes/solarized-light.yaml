@@ -2,7 +2,7 @@
 # https://ethanschoonover.com/solarized/
 name: Solarized Light
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#859900"

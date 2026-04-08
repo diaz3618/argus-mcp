@@ -2,7 +2,7 @@
 # https://monokai.pro
 name: Monokai
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#a6e22e"

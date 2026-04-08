@@ -2,7 +2,7 @@
 # https://www.nordtheme.com
 name: Nord
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#a3be8c"

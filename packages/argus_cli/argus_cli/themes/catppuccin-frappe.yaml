@@ -2,7 +2,7 @@
 # https://github.com/catppuccin/catppuccin
 name: Catppuccin Frappé
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#a6d189"

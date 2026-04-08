@@ -2,7 +2,7 @@
 # https://rosepinetheme.com
 name: Rosé Pine Moon
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#3e8fb0"

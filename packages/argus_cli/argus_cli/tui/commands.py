@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from textual.app import App
     from textual.screen import Screen
 
-# ── REPL verb → TUI mode mapping ───────────────────────────────────────
+# REPL verb → TUI mode mapping
 # Lets TUI users type the same command group names they would use in the
 # REPL (e.g. "backends list", "health", "audit") and jump to the
 # matching TUI mode.  Keeps muscle memory consistent across interfaces.

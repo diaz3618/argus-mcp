@@ -23,7 +23,7 @@ from pathlib import Path
 from rich.style import Style
 from rich.theme import Theme
 
-# ── Required color keys every theme file must provide ───────────────────
+# Required color keys every theme file must provide
 
 _REQUIRED_KEYS = frozenset(
     {
@@ -41,7 +41,7 @@ _REQUIRED_KEYS = frozenset(
     }
 )
 
-# ── Theme loading ───────────────────────────────────────────────────────
+# Theme loading
 
 _BUILTIN_DIR = Path(__file__).parent / "themes"
 _USER_DIR = Path.home() / ".config" / "argus-mcp" / "themes"
@@ -104,7 +104,7 @@ def refresh_themes() -> None:
     THEME_NAMES[:] = sorted(PALETTES.keys())
 
 
-# ── Active theme state ──────────────────────────────────────────────────
+# Active theme state
 
 _DEFAULT_THEME = "catppuccin-mocha"
 _active_theme: str = _DEFAULT_THEME
@@ -140,7 +140,7 @@ def get_active_theme() -> str:
     return _active_theme
 
 
-# ── Status colors (semantic) ───────────────────────────────────────────
+# Status colors (semantic)
 
 # Canonical mapping: status keyword → Rich theme tag (e.g. "success", "warning")
 # Used by both _build_status_styles() and status_markup() to avoid duplication.
@@ -185,7 +185,7 @@ def _build_status_styles(colors: dict[str, str]) -> dict[str, Style]:
 STATUS_STYLES: dict[str, Style] = {}
 
 
-# ── Rich Theme ─────────────────────────────────────────────────────────
+# Rich Theme
 
 
 def _build_rich_theme(colors: dict[str, str]) -> Theme:
@@ -222,7 +222,7 @@ def status_markup(status: str) -> str:
     return f"[{tag}]{status}[/{tag}]"
 
 
-# ── Textual ↔ YAML theme bridging ──────────────────────────────────────
+# Textual ↔ YAML theme bridging
 
 # Maps Textual built-in theme names to the closest YAML palette.
 # Themes not listed here fall back to catppuccin-mocha.

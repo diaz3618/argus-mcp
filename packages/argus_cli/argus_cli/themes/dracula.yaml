@@ -2,7 +2,7 @@
 # https://draculatheme.com
 name: Dracula
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#50fa7b"

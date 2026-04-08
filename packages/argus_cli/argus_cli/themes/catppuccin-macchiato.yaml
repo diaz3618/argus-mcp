@@ -2,7 +2,7 @@
 # https://github.com/catppuccin/catppuccin
 name: Catppuccin Macchiato
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#a6da95"

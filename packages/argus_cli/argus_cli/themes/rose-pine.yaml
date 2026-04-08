@@ -2,7 +2,7 @@
 # https://rosepinetheme.com
 name: Rosé Pine
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#31748f"

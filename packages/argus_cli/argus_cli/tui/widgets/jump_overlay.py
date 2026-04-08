@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from textual.screen import Screen
 
 
-# ── Protocol ────────────────────────────────────────────────────────────
+# Protocol
 
 
 @runtime_checkable
@@ -33,7 +33,7 @@ class Jumpable(Protocol):
     jump_key: str
 
 
-# ── Data types ──────────────────────────────────────────────────────────
+# Data types
 
 
 class JumpInfo(NamedTuple):
@@ -46,7 +46,7 @@ class JumpInfo(NamedTuple):
     """Either the widget ID or a direct widget reference."""
 
 
-# ── Jumper engine ───────────────────────────────────────────────────────
+# Jumper engine
 
 
 class Jumper:
@@ -89,7 +89,7 @@ class Jumper:
         return overlays
 
 
-# ── Overlay modal ───────────────────────────────────────────────────────
+# Overlay modal
 
 
 class JumpOverlay(ModalScreen[str | Widget | None]):

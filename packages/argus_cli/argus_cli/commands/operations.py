@@ -19,7 +19,7 @@ from argus_cli.output import OutputOption
 app = typer.Typer(no_args_is_help=True)
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _get_feature_flags(cfg: CliConfig) -> dict[str, Any]:
@@ -32,7 +32,7 @@ def _get_feature_flags(cfg: CliConfig) -> dict[str, Any]:
     return flags
 
 
-# ── Optimizer subgroup ──────────────────────────────────────────────
+# Optimizer subgroup
 optimizer_app = typer.Typer(no_args_is_help=True, help="Optimizer controls.")
 
 
@@ -119,7 +119,7 @@ def optimizer_disable(ctx: typer.Context) -> None:
 app.add_typer(optimizer_app, name="optimizer")
 
 
-# ── Telemetry subgroup ──────────────────────────────────────────────
+# Telemetry subgroup
 telemetry_app = typer.Typer(no_args_is_help=True, help="Telemetry controls.")
 
 

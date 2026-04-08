@@ -151,7 +151,7 @@ def start_repl(config: CliConfig) -> None:
         cmd = parts[0]
         args = parts[1:]
 
-        # ── REPL-exclusive commands ────────────────────────────────
+        # REPL-exclusive commands
         handler = _REPL_HANDLERS.get(cmd)
         if handler is not None:
             handler(console, state, args)
@@ -160,7 +160,7 @@ def start_repl(config: CliConfig) -> None:
                 session.completer = completer
             continue
 
-        # ── Dispatch to Typer ──────────────────────────────────────
+        # Dispatch to Typer
         dispatch_command(console, state, text)
 
         # Refresh completions after state-mutating commands

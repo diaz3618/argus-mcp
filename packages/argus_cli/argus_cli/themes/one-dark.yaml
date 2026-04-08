@@ -2,7 +2,7 @@
 # https://github.com/atom/one-dark-syntax
 name: One Dark
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#98c379"

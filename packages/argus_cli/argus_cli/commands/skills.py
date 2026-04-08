@@ -16,7 +16,7 @@ from argus_cli.output import OutputOption
 app = typer.Typer(no_args_is_help=True)
 
 
-# ── Commands ───────────────────────────────────────────────────────────
+# Commands
 
 
 def _fetch_skills(cfg: object) -> list[dict]:

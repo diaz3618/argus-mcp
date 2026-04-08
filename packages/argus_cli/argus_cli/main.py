@@ -9,7 +9,7 @@ import typer
 from argus_cli import __version__
 from argus_cli.config import CliConfig, get_config, is_repl_mode, set_config
 
-# ── Typer app ──────────────────────────────────────────────────────────
+# Typer app
 
 app = typer.Typer(
     name="argus",
@@ -23,7 +23,7 @@ app = typer.Typer(
 )
 
 
-# ── Global options callback ────────────────────────────────────────────
+# Global options callback
 
 
 def _version_callback(value: bool) -> None:
@@ -119,7 +119,7 @@ def main(
         start_repl(_config)
 
 
-# ── Command group registration ─────────────────────────────────────────
+# Command group registration
 # Import and register sub-apps. Each module creates its own typer.Typer()
 # instance that gets added as a command group.
 
@@ -213,7 +213,7 @@ def _register_commands() -> None:
 _register_commands()
 
 
-# ── Shell / REPL entry ─────────────────────────────────────────────────
+# Shell / REPL entry
 
 
 @app.command()

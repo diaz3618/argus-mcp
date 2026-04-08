@@ -45,14 +45,14 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration ──────────────────────────────────────────────────────
+# Configuration
 
 _BASE_URL = "http://argusd"
 _JSON_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 _STREAM_TIMEOUT = httpx.Timeout(connect=5.0, read=None, write=10.0, pool=5.0)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────
+# Helpers
 
 
 def default_socket_path() -> str:
@@ -63,7 +63,7 @@ def default_socket_path() -> str:
     return os.path.join(tempfile.gettempdir(), "argusd.sock")
 
 
-# ── Error ──────────────────────────────────────────────────────────────
+# Error
 
 
 class DaemonError(Exception):
@@ -75,7 +75,7 @@ class DaemonError(Exception):
         super().__init__(message)
 
 
-# ── Client ─────────────────────────────────────────────────────────────
+# Client
 
 
 class DaemonClient:
@@ -92,7 +92,7 @@ class DaemonClient:
         self._socket_path = socket_path or default_socket_path()
         self._client: httpx.AsyncClient | None = None
 
-    # ── Lifecycle ──────────────────────────────────────────────────
+    # Lifecycle
 
     async def connect(self) -> None:
         """Create the underlying httpx async client with UDS transport."""
@@ -130,7 +130,7 @@ class DaemonClient:
     def socket_exists(self) -> bool:
         return Path(self._socket_path).exists()
 
-    # ── Auto-start ─────────────────────────────────────────────────
+    # Auto-start
 
     @staticmethod
     def find_binary(hint: str | None = None) -> str | None:
@@ -195,7 +195,7 @@ class DaemonClient:
         logger.warning("argusd started but socket did not appear within 3 s")
         return False
 
-    # ── Internal helpers ───────────────────────────────────────────
+    # Internal helpers
 
     def _ensure_connected(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -264,13 +264,13 @@ class DaemonClient:
                 f"Cannot connect to argusd at {self._socket_path}: {exc}",
             ) from exc
 
-    # ── Health ─────────────────────────────────────────────────────
+    # Health
 
     async def health(self) -> dict[str, Any]:
         """Check daemon health and capability summary."""
         return await self._request("GET", "/health")
 
-    # ── Docker Containers ──────────────────────────────────────────
+    # Docker Containers
 
     async def list_containers(self) -> list[dict[str, Any]]:
         """List all Argus-managed containers."""
@@ -331,7 +331,7 @@ class DaemonClient:
         async for event in self._stream_sse(f"/containers/{container_id}/stats"):
             yield event
 
-    # ── Docker Events ──────────────────────────────────────────────
+    # Docker Events
 
     async def stream_events(self) -> AsyncGenerator[dict[str, Any], None]:
         """Stream Docker events for Argus containers via SSE.
@@ -342,7 +342,7 @@ class DaemonClient:
         async for event in self._stream_sse("/events"):
             yield event
 
-    # ── Kubernetes Pods ────────────────────────────────────────────
+    # Kubernetes Pods
 
     async def list_pods(self) -> list[dict[str, Any]]:
         """List all Argus-managed Kubernetes pods."""
@@ -387,7 +387,7 @@ class DaemonClient:
         """Return Kubernetes events for a specific pod."""
         return await self._request("GET", f"/pods/{namespace}/{name}/events")  # type: ignore[return-value]
 
-    # ── Kubernetes Deployments ─────────────────────────────────────
+    # Kubernetes Deployments
 
     async def rollout_restart(self, namespace: str, name: str) -> dict[str, Any]:
         """Trigger a rolling restart of a deployment."""

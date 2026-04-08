@@ -16,7 +16,7 @@ from argus_cli.output import OutputOption, OutputSpec
 
 app = typer.Typer(no_args_is_help=True)
 
-# ── Built-in workflows ─────────────────────────────────────────────────
+# Built-in workflows
 
 BUILTIN_WORKFLOWS = {
     "health-check": {

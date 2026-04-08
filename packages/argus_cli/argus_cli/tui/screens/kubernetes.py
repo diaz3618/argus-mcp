@@ -138,7 +138,7 @@ class KubernetesScreen(ArgusScreen):
             bar = self.query_one("#pod-status-bar", PodStatusBar)
             bar.update(f"[red]{message}[/red]")
 
-    # ── Pod selection ──────────────────────────────────────────────
+    # Pod selection
 
     def _get_selected_key(self) -> str | None:
         """Return the row key ('namespace/name') of the currently selected pod."""
@@ -169,7 +169,7 @@ class KubernetesScreen(ArgusScreen):
         ns, _, name = key.partition("/")
         return ns, name
 
-    # ── Streaming / detail loading ─────────────────────────────────
+    # Streaming / detail loading
 
     async def _stream_pod_logs(self, key: str) -> None:
         """Background task: stream logs for a pod."""
@@ -234,7 +234,7 @@ class KubernetesScreen(ArgusScreen):
             task.cancel()
         self._stream_tasks.clear()
 
-    # ── Actions ────────────────────────────────────────────────────
+    # Actions
 
     async def action_refresh_pods(self) -> None:
         await self._load_pods()

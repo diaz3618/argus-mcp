@@ -13,7 +13,7 @@ from argus_cli.output import OutputOption
 app = typer.Typer(no_args_is_help=True)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _run_async(coro):
@@ -33,7 +33,7 @@ def _parse_pod_ref(name: str) -> tuple[str, str]:
     return "default", name
 
 
-# ── Commands ───────────────────────────────────────────────────────────
+# Commands
 
 
 @app.command("list")

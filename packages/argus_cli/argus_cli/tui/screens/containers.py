@@ -139,7 +139,7 @@ class ContainersScreen(ArgusScreen):
             bar = self.query_one("#container-status-bar", ContainerStatusBar)
             bar.update(f"[red]{message}[/red]")
 
-    # ── Container actions ──────────────────────────────────────────
+    # Container actions
 
     def _get_selected_id(self) -> str | None:
         """Return the row key of the currently selected container."""
@@ -192,7 +192,7 @@ class ContainersScreen(ArgusScreen):
         if action:
             self.run_worker(getattr(self, action)())
 
-    # ── SSE streaming ──────────────────────────────────────────────
+    # SSE streaming
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Start streaming logs + stats for the selected container."""

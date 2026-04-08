@@ -2,7 +2,7 @@
 # https://github.com/rebelot/kanagawa.nvim
 name: Kanagawa
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#76946a"

@@ -36,7 +36,7 @@ from rich.table import Table
 from argus_cli._console import get_console, reset_console
 from argus_cli.theme import status_markup
 
-# ── Shared --output option for commands ────────────────────────────────
+# Shared --output option for commands
 
 OutputOption = Annotated[
     str | None,
@@ -52,7 +52,7 @@ def apply_output_option(fmt: str | None) -> None:
         get_config().output_format = fmt
 
 
-# ── Format dispatch ────────────────────────────────────────────────────
+# Format dispatch
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +103,7 @@ def output(
         )
 
 
-# ── JSON output ────────────────────────────────────────────────────────
+# JSON output
 
 
 def _output_json(data: Any) -> None:
@@ -111,7 +111,7 @@ def _output_json(data: Any) -> None:
     typer.echo(json.dumps(data, indent=2, default=str))
 
 
-# ── Table output ───────────────────────────────────────────────────────
+# Table output
 
 
 def _output_table(data: Any, *, columns: list[str] | None = None) -> None:
@@ -129,7 +129,7 @@ def _output_table(data: Any, *, columns: list[str] | None = None) -> None:
         typer.echo(str(data))
 
 
-# ── Text output (plain) ───────────────────────────────────────────────
+# Text output (plain)
 
 
 def _output_text(data: Any, *, title: str | None = None) -> None:
@@ -153,7 +153,7 @@ def _output_text(data: Any, *, title: str | None = None) -> None:
         typer.echo(str(data))
 
 
-# ── Rich output ────────────────────────────────────────────────────────
+# Rich output
 
 
 def _output_rich(
@@ -245,7 +245,7 @@ def _rich_panel(
     console.print(panel)
 
 
-# ── Helpers for commands ───────────────────────────────────────────────
+# Helpers for commands
 
 
 def print_success(message: str) -> None:

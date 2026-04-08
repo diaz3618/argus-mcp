@@ -13,7 +13,7 @@ from argus_cli.output import OutputOption
 app = typer.Typer(no_args_is_help=True)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _run_async(coro):
@@ -25,7 +25,7 @@ def _run_async(coro):
         asyncio.run(coro)
 
 
-# ── Commands ───────────────────────────────────────────────────────────
+# Commands
 
 
 @app.command("list")

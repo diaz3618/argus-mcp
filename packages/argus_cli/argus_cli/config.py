@@ -27,7 +27,7 @@ MANAGE_API_PREFIX = "/manage/v1"
 CONFIG_DIR = Path.home() / ".config" / "argus-mcp"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
 
-# ── YAML config loader ─────────────────────────────────────────────────
+# YAML config loader
 
 
 _config_source: Path | None = None
@@ -207,7 +207,7 @@ def _is_terminal() -> bool:
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
-# ── Global config state ───────────────────────────────────────────────
+# Global config state
 
 _active_config: CliConfig | None = None
 _in_repl: bool = False

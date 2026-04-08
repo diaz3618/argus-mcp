@@ -32,12 +32,12 @@ from argus_mcp.api.client import ApiClientError
 
 from argus_cli.config import CliConfig
 
-# ── Timeout configuration ──────────────────────────────────────────────
+# Timeout configuration
 
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 SSE_TIMEOUT = httpx.Timeout(connect=5.0, read=None, write=10.0, pool=5.0)
 
-# ── Retry configuration ────────────────────────────────────────────────
+# Retry configuration
 
 MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 0.5  # seconds; doubles each attempt
@@ -125,7 +125,7 @@ def _handle_response(response: httpx.Response) -> dict[str, Any]:
         ) from exc
 
 
-# ── Sync client (one-shot commands) ────────────────────────────────────
+# Sync client (one-shot commands)
 
 
 class ArgusClient:
@@ -186,7 +186,7 @@ class ArgusClient:
                 time.sleep(RETRY_BACKOFF_BASE * (2**attempt))
         raise last_exc  # type: ignore[misc]
 
-    # ── GET endpoints ──────────────────────────────────────────────────
+    # GET endpoints
 
     def health(self) -> dict[str, Any]:
         return self._request("get", "/health")
@@ -227,7 +227,7 @@ class ArgusClient:
         params = _build_events_params(limit=limit, since=since, severity=severity)
         return self._request("get", "/events", params=params)
 
-    # ── POST endpoints ─────────────────────────────────────────────────
+    # POST endpoints
 
     def reload(self) -> dict[str, Any]:
         return self._request("post", "/reload")
@@ -238,7 +238,7 @@ class ArgusClient:
     def shutdown(self, timeout_seconds: int = 30) -> dict[str, Any]:
         return self._request("post", "/shutdown", json={"timeout_seconds": timeout_seconds})
 
-    # ── Registry endpoints ─────────────────────────────────────────────
+    # Registry endpoints
 
     def registry_search(
         self,
@@ -252,7 +252,7 @@ class ArgusClient:
             params["registry"] = registry
         return self._request("get", "/registry/search", params=params)
 
-    # ── Skills endpoints ───────────────────────────────────────────────
+    # Skills endpoints
 
     def skills_list(self) -> dict[str, Any]:
         return self._request("get", "/skills")
@@ -271,7 +271,7 @@ class ArgusClient:
         return self._request("post", "/resources/read", json={"uri": uri})
 
 
-# ── Async client (REPL mode) ──────────────────────────────────────────
+# Async client (REPL mode)
 
 
 class AsyncArgusClient:
@@ -334,7 +334,7 @@ class AsyncArgusClient:
                 await asyncio.sleep(RETRY_BACKOFF_BASE * (2**attempt))
         raise last_exc  # type: ignore[misc]
 
-    # ── GET endpoints ──────────────────────────────────────────────────
+    # GET endpoints
 
     async def health(self) -> dict[str, Any]:
         return await self._request("get", "/health")
@@ -375,7 +375,7 @@ class AsyncArgusClient:
         params = _build_events_params(limit=limit, since=since, severity=severity)
         return await self._request("get", "/events", params=params)
 
-    # ── POST endpoints ─────────────────────────────────────────────────
+    # POST endpoints
 
     async def reload(self) -> dict[str, Any]:
         return await self._request("post", "/reload")
@@ -386,7 +386,7 @@ class AsyncArgusClient:
     async def shutdown(self, timeout_seconds: int = 30) -> dict[str, Any]:
         return await self._request("post", "/shutdown", json={"timeout_seconds": timeout_seconds})
 
-    # ── Registry endpoints ─────────────────────────────────────────────
+    # Registry endpoints
 
     async def registry_search(
         self,
@@ -400,7 +400,7 @@ class AsyncArgusClient:
             params["registry"] = registry
         return await self._request("get", "/registry/search", params=params)
 
-    # ── Skills endpoints ───────────────────────────────────────────────
+    # Skills endpoints
 
     async def skills_list(self) -> dict[str, Any]:
         return await self._request("get", "/skills")
@@ -418,7 +418,7 @@ class AsyncArgusClient:
     async def read_resource(self, uri: str) -> dict[str, Any]:
         return await self._request("post", "/resources/read", json={"uri": uri})
 
-    # ── SSE streaming ──────────────────────────────────────────────────
+    # SSE streaming
 
     async def events_stream(self) -> AsyncGenerator[dict[str, Any], None]:
         """Yield SSE events from /events/stream as dicts.

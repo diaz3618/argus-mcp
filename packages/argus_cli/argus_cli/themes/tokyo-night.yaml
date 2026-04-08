@@ -2,7 +2,7 @@
 # https://github.com/enkia/tokyo-night-vscode-theme
 name: Tokyo Night
 
-# ── Semantic color roles ──────────────────────────────────────────────
+# Semantic color roles
 
 colors:
   success: "#9ece6a"

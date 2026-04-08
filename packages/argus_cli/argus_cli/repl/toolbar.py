@@ -11,7 +11,7 @@ from prompt_toolkit.formatted_text import HTML
 from argus_cli.repl.state import ReplState
 from argus_cli.theme import COLORS, _ensure_loaded
 
-# ── ANSI color helpers ──────────────────────────────────────────────────
+# ANSI color helpers
 # prompt_toolkit HTML uses ANSI color names or hex.  We map from the
 # active YAML palette's semantic colors to the closest ANSI keyword so
 # that the prompt and toolbar respect the current theme.
