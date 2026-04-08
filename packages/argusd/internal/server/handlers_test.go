@@ -117,8 +117,7 @@ func (m *mockDockerClient) Close() error {
 // Compile-time interface check.
 var _ docker.DockerClient = (*mockDockerClient)(nil)
 
-// --- Health handler ---
-
+// Health handler
 func TestHealth_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -169,8 +168,7 @@ func TestHealth_WithK8s(t *testing.T) {
 	}
 }
 
-// --- ListContainers handler ---
-
+// ListContainers handler
 func TestListContainers_OK(t *testing.T) {
 	mock := &mockDockerClient{
 		ListContainersFn: func(ctx context.Context) ([]docker.ContainerInfo, error) {
@@ -213,8 +211,7 @@ func TestListContainers_Error(t *testing.T) {
 	}
 }
 
-// --- InspectContainer handler ---
-
+// InspectContainer handler
 func TestInspectContainer_OK(t *testing.T) {
 	mock := &mockDockerClient{
 		InspectContainerFn: func(ctx context.Context, id string) (*types.ContainerJSON, error) {
@@ -257,8 +254,7 @@ func TestInspectContainer_NotFound(t *testing.T) {
 	}
 }
 
-// --- StartContainer handler ---
-
+// StartContainer handler
 func TestStartContainer_OK(t *testing.T) {
 	mock := &mockDockerClient{}
 	h := &Handler{Docker: mock}
@@ -303,8 +299,7 @@ func TestStartContainer_Error(t *testing.T) {
 	}
 }
 
-// --- StopContainer handler ---
-
+// StopContainer handler
 func TestStopContainer_OK(t *testing.T) {
 	stopped := false
 	mock := &mockDockerClient{
@@ -353,8 +348,7 @@ func TestStopContainer_Error(t *testing.T) {
 	}
 }
 
-// --- RestartContainer handler ---
-
+// RestartContainer handler
 func TestRestartContainer_OK(t *testing.T) {
 	mock := &mockDockerClient{}
 	h := &Handler{Docker: mock}
@@ -399,8 +393,7 @@ func TestRestartContainer_Error(t *testing.T) {
 	}
 }
 
-// --- RemoveContainer handler ---
-
+// RemoveContainer handler
 func TestRemoveContainer_OK(t *testing.T) {
 	mock := &mockDockerClient{}
 	h := &Handler{Docker: mock}
@@ -445,8 +438,7 @@ func TestRemoveContainer_Error(t *testing.T) {
 	}
 }
 
-// --- ContainerLogs handler (SSE streaming) ---
-
+// ContainerLogs handler (SSE streaming)
 func TestContainerLogs_OK(t *testing.T) {
 	mock := &mockDockerClient{
 		StreamLogsFn: func(ctx context.Context, id string, follow bool, since, tail string, w io.Writer) error {
@@ -493,8 +485,7 @@ func TestContainerLogs_StreamError(t *testing.T) {
 	}
 }
 
-// --- ContainerStats handler (SSE streaming) ---
-
+// ContainerStats handler (SSE streaming)
 func TestContainerStats_OK(t *testing.T) {
 	mock := &mockDockerClient{
 		StreamStatsFn: func(ctx context.Context, id string, w io.Writer) error {
@@ -537,8 +528,7 @@ func TestContainerStats_Error(t *testing.T) {
 	}
 }
 
-// --- DockerEvents handler (SSE streaming) ---
-
+// DockerEvents handler (SSE streaming)
 func TestDockerEvents_OK(t *testing.T) {
 	mock := &mockDockerClient{
 		StreamEventsFn: func(ctx context.Context, w io.Writer) error {
@@ -575,8 +565,7 @@ func TestDockerEvents_Error(t *testing.T) {
 	}
 }
 
-// --- requireK8s ---
-
+// requireK8s
 func TestRequireK8s_NilClient(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -601,8 +590,7 @@ func TestRequireK8s_Available(t *testing.T) {
 	}
 }
 
-// --- ListPods handler ---
-
+// ListPods handler
 func TestListPods_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -657,8 +645,7 @@ func TestListPods_Error(t *testing.T) {
 	}
 }
 
-// --- DescribePod handler ---
-
+// DescribePod handler
 func TestDescribePod_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -713,8 +700,7 @@ func TestDescribePod_NotFound(t *testing.T) {
 	}
 }
 
-// --- DeletePod handler ---
-
+// DeletePod handler
 func TestDeletePod_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -759,8 +745,7 @@ func TestDeletePod_OK(t *testing.T) {
 	}
 }
 
-// --- PodLogs handler ---
-
+// PodLogs handler
 func TestPodLogs_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -772,8 +757,7 @@ func TestPodLogs_NoK8s(t *testing.T) {
 	}
 }
 
-// --- PodEvents handler ---
-
+// PodEvents handler
 func TestPodEvents_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -816,8 +800,7 @@ func TestPodEvents_OK(t *testing.T) {
 	}
 }
 
-// --- RolloutRestart handler ---
-
+// RolloutRestart handler
 func TestRolloutRestart_NoK8s(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 	rec := httptest.NewRecorder()
@@ -829,8 +812,7 @@ func TestRolloutRestart_NoK8s(t *testing.T) {
 	}
 }
 
-// --- SSE nil fallback for non-flusher writers ---
-
+// SSE nil fallback for non-flusher writers
 func TestContainerLogs_NoFlusher(t *testing.T) {
 	h := &Handler{Docker: &mockDockerClient{}}
 
@@ -868,8 +850,7 @@ func TestDockerEvents_NoFlusher(t *testing.T) {
 	h.DockerEvents(w, req)
 }
 
-// --- DeletePod error path ---
-
+// DeletePod error path
 func TestDeletePod_Error(t *testing.T) {
 	// Pod exists but is not managed → K8s returns error
 	pod := &corev1.Pod{
@@ -895,8 +876,7 @@ func TestDeletePod_Error(t *testing.T) {
 	}
 }
 
-// --- PodLogs with tail parameter ---
-
+// PodLogs with tail parameter
 func TestPodLogs_WithTailParam(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -926,8 +906,7 @@ func TestPodLogs_WithTailParam(t *testing.T) {
 	}
 }
 
-// --- PodEvents error path ---
-
+// PodEvents error path
 func TestPodEvents_Error(t *testing.T) {
 	// Use empty clientset; fake clientset will return events fine but
 	// we can trigger error via namespace query
@@ -949,8 +928,7 @@ func TestPodEvents_Error(t *testing.T) {
 	}
 }
 
-// --- RolloutRestart error handler path ---
-
+// RolloutRestart error handler path
 func TestRolloutRestart_Error(t *testing.T) {
 	cs := fake.NewSimpleClientset() // no deployment
 	k8sClient := k8s.NewTestClient(cs)
@@ -1015,8 +993,7 @@ func TestRolloutRestart_OK(t *testing.T) {
 	}
 }
 
-// --- SSE adapter tests: exercise Write and Flush directly ---
-
+// SSE adapter tests: exercise Write and Flush directly
 func TestSSEAdapters_Write_And_Flush(t *testing.T) {
 	rec := httptest.NewRecorder()
 	sse := NewSSEWriter(rec)

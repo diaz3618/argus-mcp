@@ -193,10 +193,7 @@ func TestPodEvents(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // podToInfo coverage: container statuses and age formatting
-// ---------------------------------------------------------------------------
-
 func TestPodToInfo_ContainerStatuses(t *testing.T) {
 	now := metav1.Now()
 	pod := &corev1.Pod{
@@ -319,10 +316,7 @@ func TestPodToInfo_AgeFormatting(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // RolloutRestart coverage
-// ---------------------------------------------------------------------------
-
 func managedDeployment(ns, name string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -428,10 +422,7 @@ func TestRolloutRestart_ExistingAnnotations(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // Additional edge cases for existing methods
-// ---------------------------------------------------------------------------
-
 func TestDeletePod_NotFound(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	c := NewTestClient(cs)
@@ -471,10 +462,7 @@ func TestListPods_MultipleNamespaces(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // StreamPodLogs tests
-// ---------------------------------------------------------------------------
-
 func TestStreamPodLogs_AllOptions(t *testing.T) {
 	// The fake clientset returns an error from Stream() because it has no
 	// real REST backend, but this exercises the function setup (options
