@@ -29,6 +29,7 @@ tui = [
 
 [tool.setuptools.packages.find]
 include = ["argus_mcp*"]
+exclude = ["argus_mcp.*.target", "argus_mcp.*.target.*", "argus_mcp.*.*.target", "argus_mcp.*.*.target.*", "argus_mcp.*.*.*.target", "argus_mcp.*.*.*.target.*"]
 
 [tool.setuptools.package-data]
 "argus_mcp._bin" = ["*"]

@@ -21,6 +21,25 @@ from argus_mcp.bridge.container.templates.models import (
 
 _TEMPLATE_DIR = os.path.dirname(__file__)
 
+# Belt-and-suspenders: verify templates were included in the wheel.
+# If this fires, the wheel was built without package-data — see
+# pyproject.toml [tool.setuptools.package-data] and MANIFEST.in.
+_REQUIRED_TEMPLATES = (
+    "uvx.dockerfile.j2",
+    "npx.dockerfile.j2",
+    "go.dockerfile.j2",
+    "source.dockerfile.j2",
+)
+
+_missing = [t for t in _REQUIRED_TEMPLATES if not os.path.isfile(os.path.join(_TEMPLATE_DIR, t))]
+if _missing:
+    raise FileNotFoundError(
+        f"Required Dockerfile templates missing from installed package: {_missing}. "
+        f"Template directory: {_TEMPLATE_DIR}. "
+        "This indicates the wheel was built without package-data. "
+        "Reinstall from a correctly built wheel or from source."
+    )
+
 # Autoescape is intentionally disabled: these templates generate
 # Dockerfiles (plain text), not HTML.  Enabling autoescape would
 # corrupt shell commands and file paths with HTML entities.
@@ -68,3 +87,27 @@ def render_template(template_name: str, context: Dict[str, Any]) -> str:
     tmpl = _env.get_template(template_name)
     merged = {**_IDENTITY_DEFAULTS, **context}
     return tmpl.render(merged)
+
+
+def check_templates() -> Dict[str, Any]:
+    """Verify all required Dockerfile templates are present.
+
+    Returns a dict with keys:
+
+    - ``ok`` (bool) — True if all templates found
+    - ``template_dir`` (str) — absolute path to the template directory
+    - ``found`` (list[str]) — template filenames that exist
+    - ``missing`` (list[str]) — template filenames that are missing
+    - ``expected_count`` (int) — total templates expected
+
+    Intended for CI verification scripts and diagnostics.
+    """
+    found = [t for t in _REQUIRED_TEMPLATES if os.path.isfile(os.path.join(_TEMPLATE_DIR, t))]
+    missing = [t for t in _REQUIRED_TEMPLATES if t not in found]
+    return {
+        "ok": len(missing) == 0,
+        "template_dir": _TEMPLATE_DIR,
+        "found": found,
+        "missing": missing,
+        "expected_count": len(_REQUIRED_TEMPLATES),
+    }

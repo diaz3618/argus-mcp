@@ -40,6 +40,30 @@ permissions:
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
 
+  # ── Job 0: Version consistency gate ────────────────────────────────────
+  version-check:
+    name: Version consistency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Verify version consistency
+        run: |
+          PYP=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          CON=$(grep -oP 'SERVER_VERSION\s*=\s*"\K[^"]+' argus_mcp/constants.py)
+          echo "pyproject.toml:  $PYP"
+          echo "constants.py:   $CON"
+          if [ "$PYP" != "$CON" ]; then
+            echo "::error::Version mismatch: pyproject.toml=$PYP constants.py=$CON"
+            exit 1
+          fi
+          echo "Version consistent: $PYP"
+
   # ── Job 1: Cross-compile Go binaries ─────────────────────────────────────
   build-go-binaries:
     name: Build Go binaries
@@ -110,7 +134,7 @@ jobs:
   # ── Job 2: Build platform wheels via cibuildwheel ────────────────────────
   build-wheels:
     name: Wheel (${{ matrix.os }})
-    needs: [build-go-binaries]
+    needs: [version-check, build-go-binaries]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -165,6 +189,7 @@ jobs:
   # ── Job 3: Source distribution ───────────────────────────────────────────
   build-sdist:
     name: Build sdist
+    needs: [version-check]
     runs-on: ubuntu-latest
 
     steps:
@@ -191,14 +216,44 @@ jobs:
             dist/*.tar.gz
             packages/argus_cli/dist/*
 
+  # ── Job 3.5: Verify all built packages ─────────────────────────────────
+  verify-packages:
+    name: Verify packages
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          path: dist/
+          merge-multiple: true
+
+      - name: Download sdist artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: dist/
+
+      - name: Verify all packages
+        run: python scripts/verify_package.py dist/
+
   # ── Job 4a: Publish argus-mcp to PyPI ─────────────────────────────────────
   publish:
     name: Publish argus-mcp to PyPI
     if: |
       !cancelled() &&
       startsWith(github.ref, 'refs/tags/v') &&
-      needs.build-sdist.result == 'success'
-    needs: [build-wheels, build-sdist]
+      needs.build-sdist.result == 'success' &&
+      needs.verify-packages.result == 'success'
+    needs: [build-wheels, build-sdist, verify-packages]
     runs-on: ubuntu-latest
 
     permissions:
@@ -233,8 +288,9 @@ jobs:
     if: |
       !cancelled() &&
       startsWith(github.ref, 'refs/tags/v') &&
-      needs.build-sdist.result == 'success'
-    needs: [build-wheels, build-sdist]
+      needs.build-sdist.result == 'success' &&
+      needs.verify-packages.result == 'success'
+    needs: [build-wheels, build-sdist, verify-packages]
     runs-on: ubuntu-latest
 
     permissions:
@@ -269,8 +325,9 @@ jobs:
     if: |
       !cancelled() &&
       startsWith(github.ref, 'refs/tags/v') &&
-      needs.build-sdist.result == 'success'
-    needs: [build-wheels, build-sdist]
+      needs.build-sdist.result == 'success' &&
+      needs.verify-packages.result == 'success'
+    needs: [build-wheels, build-sdist, verify-packages]
     runs-on: ubuntu-latest
     continue-on-error: true
 
@@ -305,8 +362,9 @@ jobs:
     if: |
       !cancelled() &&
       startsWith(github.ref, 'refs/tags/v') &&
-      needs.build-sdist.result == 'success'
-    needs: [build-wheels, build-sdist]
+      needs.build-sdist.result == 'success' &&
+      needs.verify-packages.result == 'success'
+    needs: [build-wheels, build-sdist, verify-packages]
     runs-on: ubuntu-latest
     continue-on-error: true
 

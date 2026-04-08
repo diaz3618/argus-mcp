@@ -45,7 +45,7 @@ from argus_mcp.bridge.container.templates._generators import (
     parse_npx_args,
     parse_uvx_args,
 )
-from argus_mcp.bridge.container.templates.engine import render_template
+from argus_mcp.bridge.container.templates.engine import check_templates, render_template
 from argus_mcp.bridge.container.templates.models import (
     CONTAINER_HOME,
     CONTAINER_UID,
@@ -79,6 +79,7 @@ __all__ = [
     "validate_build_env_value",
     # Engine
     "render_template",
+    "check_templates",
     # Generators (public API — backwards compatible)
     "parse_uvx_args",
     "parse_npx_args",

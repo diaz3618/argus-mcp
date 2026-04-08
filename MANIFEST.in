@@ -1,3 +1,4 @@
+# ── Includes (additive — build the file set) ──────────────────────────
 # Include Rust source for sdist (build-from-source support)
 recursive-include argus_mcp *.rs Cargo.toml Cargo.lock
 
@@ -11,3 +12,18 @@ recursive-include argus_mcp *.tcss
 include pyproject.toml
 include README.md
 include LICENSE
+
+# ── Excludes (subtractive — MUST come AFTER includes) ────────────────
+# Prune Rust build artifacts (7 crate target/ directories).
+# These MUST come AFTER recursive-include so they remove what was added.
+prune argus_mcp/config/_yaml_rs/target
+prune argus_mcp/audit/_audit_rs/target
+prune argus_mcp/bridge/_filter_rs/target
+prune argus_mcp/bridge/auth/_token_cache_rs/target
+prune argus_mcp/bridge/health/_circuit_breaker_rs/target
+prune argus_mcp/plugins/_hash_rs/target
+prune argus_mcp/plugins/builtins_rust/target
+
+# Belt-and-suspenders: exclude compiled artifacts that escape prune
+global-exclude *.rlib *.rmeta *.fingerprint
+global-exclude *.o *.a *.lib *.pdb
