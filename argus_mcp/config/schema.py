@@ -359,6 +359,60 @@ class WorkflowsConfig(BaseModel):
     )
 
 
+# -- Backend type pre-validation helpers ------------------------------------
+# These sit at module level so Pydantic doesn't capture them as model fields.
+
+# Valid backend type tags accepted by the BackendConfig discriminated union.
+_VALID_BACKEND_TYPES = frozenset({"stdio", "sse", "streamable-http"})
+
+# Aliases from other MCP ecosystem conventions (VS Code, Claude Desktop,
+# OpenCode) mapped to the nearest argus-mcp equivalent.  Used for hints.
+_BACKEND_TYPE_HINTS: Dict[str, str] = {
+    "remote": "streamable-http",
+    "http": "streamable-http",
+    "https": "streamable-http",
+    "streamable_http": "streamable-http",
+    "streamablehttp": "streamable-http",
+    "server-sent-events": "sse",
+}
+
+
+def _check_backend_types(backends: Any) -> None:
+    """Raise a clear :class:`ConfigurationError` for unknown backend types.
+
+    Called from ``ArgusConfig._coerce_none_to_default`` (before Pydantic's
+    discriminated-union validator) so users get an actionable message
+    instead of the cryptic ``Input tag '...' found using 'type'`` error.
+    """
+    if not isinstance(backends, dict):
+        return
+    bad: List[str] = []
+    for name, cfg in backends.items():
+        if not isinstance(cfg, dict):
+            continue
+        btype = cfg.get("type")
+        if btype is None:
+            bad.append(
+                f"  \u2022 backends \u2192 {name}: missing required field 'type'. "
+                f"Valid types: {', '.join(sorted(_VALID_BACKEND_TYPES))}"
+            )
+        elif btype not in _VALID_BACKEND_TYPES:
+            hint = _BACKEND_TYPE_HINTS.get(btype.lower().strip(), "")
+            msg = (
+                f"  \u2022 backends \u2192 {name}: unknown backend type '{btype}'. "
+                f"Valid types: {', '.join(sorted(_VALID_BACKEND_TYPES))}"
+            )
+            if hint:
+                msg += f". Hint: '{btype}' is not an argus-mcp type \u2014 did you mean '{hint}'?"
+            bad.append(msg)
+    if bad:
+        from argus_mcp.errors import ConfigurationError
+
+        raise ConfigurationError(
+            f"Configuration validation failed ({len(bad)} error(s)):\n" + "\n".join(bad)
+        )
+
+
 class ArgusConfig(BaseModel):
     """Top-level validated configuration for Argus MCP.
 
@@ -380,6 +434,10 @@ class ArgusConfig(BaseModel):
             for key in ("registries", "backends"):
                 if key in data and data[key] is None:
                     del data[key]
+            # Pre-validate backend types to give actionable error messages
+            # before Pydantic's discriminated union emits a cryptic
+            # "Input tag '...' found using 'type'" error.
+            _check_backend_types(data.get("backends"))
         return data
 
     version: str = "1"
