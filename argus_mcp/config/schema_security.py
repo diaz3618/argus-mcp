@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+HMAC_ALGORITHMS: frozenset[str] = frozenset({"HS256", "HS384", "HS512"})
 
 
 class IncomingAuthConfig(BaseModel):
@@ -48,6 +51,25 @@ class IncomingAuthConfig(BaseModel):
         description="Allowed JWT signing algorithms.",
     )
 
+    @field_validator("algorithms")
+    @classmethod
+    def validate_algorithms(cls, v: List[str]) -> List[str]:
+        from argus_mcp.server.auth.jwt import SUPPORTED_ALGORITHMS
+
+        all_known = SUPPORTED_ALGORITHMS | HMAC_ALGORITHMS
+        for alg in v:
+            if alg.lower() == "none":
+                raise ValueError("Algorithm 'none' is forbidden")
+            if alg not in all_known:
+                raise ValueError(f"Algorithm '{alg}' not in supported set: {sorted(all_known)}")
+            if alg in HMAC_ALGORITHMS:
+                warnings.warn(
+                    f"HMAC algorithm '{alg}' is not recommended for production JWT validation",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        return v
+
 
 class AuthorizationConfig(BaseModel):
     """Role-based authorization policy config."""
@@ -73,6 +95,16 @@ class SecurityHeadersConfig(BaseModel):
         le=63072000,
         description="Strict-Transport-Security max-age in seconds (default 2 years). Only sent over TLS.",
     )
+
+    @field_validator("hsts_max_age")
+    @classmethod
+    def validate_hsts_max_age(cls, v: int) -> int:
+        if 1 <= v <= 299:
+            raise ValueError(
+                f"hsts_max_age {v} is below minimum meaningful value (300). "
+                "Use 0 to disable HSTS or ≥300 to enable."
+            )
+        return v
 
 
 class PayloadLimitsConfig(BaseModel):

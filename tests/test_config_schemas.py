@@ -40,7 +40,11 @@ from argus_mcp.config.schema_backends import (
     TimeoutConfig,
     ToolOverrideEntry,
 )
-from argus_mcp.config.schema_security import AuthorizationConfig, IncomingAuthConfig
+from argus_mcp.config.schema_security import (
+    AuthorizationConfig,
+    IncomingAuthConfig,
+    SecurityHeadersConfig,
+)
 from argus_mcp.config.schema_server import ManagementSettings, ServerSettings
 
 # ArgusConfig
@@ -468,3 +472,43 @@ class TestContainerConfigVolumes:
     def test_volume_mount_allowed_path(self):
         c = ContainerConfig(volumes=["/tmp/data:/container:rw"])
         assert c.volumes == ["/tmp/data:/container:rw"]
+
+
+class TestJwtAlgorithmValidator:
+    def test_jwt_none_rejected(self):
+        with pytest.raises(ValidationError, match="forbidden"):
+            IncomingAuthConfig(algorithms=["none"])
+
+    def test_jwt_none_case_insensitive(self):
+        with pytest.raises(ValidationError, match="forbidden"):
+            IncomingAuthConfig(algorithms=["None"])
+
+    def test_jwt_unsupported_rejected(self):
+        with pytest.raises(ValidationError, match="not in supported set"):
+            IncomingAuthConfig(algorithms=["XYZ"])
+
+    def test_jwt_hmac_warns(self):
+        with pytest.warns(UserWarning, match="HMAC algorithm"):
+            IncomingAuthConfig(algorithms=["HS256"])
+
+    def test_jwt_valid_algorithms(self):
+        c = IncomingAuthConfig(algorithms=["RS256", "ES256"])
+        assert c.algorithms == ["RS256", "ES256"]
+
+
+class TestHstsMaxAgeValidator:
+    def test_hsts_below_minimum_rejected(self):
+        with pytest.raises(ValidationError, match="below minimum meaningful"):
+            SecurityHeadersConfig(hsts_max_age=150)
+
+    def test_hsts_zero_allowed(self):
+        c = SecurityHeadersConfig(hsts_max_age=0)
+        assert c.hsts_max_age == 0
+
+    def test_hsts_300_allowed(self):
+        c = SecurityHeadersConfig(hsts_max_age=300)
+        assert c.hsts_max_age == 300
+
+    def test_hsts_default_valid(self):
+        c = SecurityHeadersConfig()
+        assert c.hsts_max_age == 63072000
