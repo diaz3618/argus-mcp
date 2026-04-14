@@ -7,7 +7,9 @@ MCP servers, along with shared sub-models (timeouts, filters, auth).
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
+from pathlib import Path
 from typing import Annotated, Dict, List, Literal, Optional, Union
 from urllib.parse import urlparse
 
@@ -180,6 +182,25 @@ AuthConfig = Annotated[
     Union[StaticAuthConfig, OAuth2AuthConfig, PKCEAuthConfig],
     Field(discriminator="type"),
 ]
+
+DANGEROUS_DOCKER_FLAGS: frozenset[str] = frozenset(
+    {
+        "--privileged",
+        "--cap-add",
+        "--security-opt",
+        "--device",
+        "--pid",
+        "--ipc",
+        "--userns",
+        "--uts",
+        "--network=host",
+        "--net=host",
+        "--add-host",
+        "--volume",
+        "-v",
+        "--mount",
+    }
+)
 
 
 class ContainerConfig(BaseModel):
@@ -357,6 +378,38 @@ class ContainerConfig(BaseModel):
             "Absolute paths and '..' path components are rejected."
         ),
     )
+
+    @field_validator("extra_args")
+    @classmethod
+    def _validate_extra_args(cls, v: List[str]) -> List[str]:
+        for arg in v:
+            flag = arg.split("=")[0].strip()
+            if arg in DANGEROUS_DOCKER_FLAGS or flag in DANGEROUS_DOCKER_FLAGS:
+                matched = arg if arg in DANGEROUS_DOCKER_FLAGS else flag
+                raise ValueError(
+                    f"Dangerous Docker flag '{matched}' not allowed in extra_args. "
+                    "Use explicit ContainerConfig fields instead."
+                )
+        return v
+
+    @field_validator("volumes")
+    @classmethod
+    def _validate_volumes(cls, v: List[str]) -> List[str]:
+        allowed_raw = os.environ.get("ARGUS_VOLUME_ALLOWED_PREFIXES", "/tmp:/data:/workspace")
+        allowed = [Path(p).resolve() for p in allowed_raw.split(":") if p]
+        for vol in v:
+            parts = vol.split(":")
+            host_part = parts[0] if parts else ""
+            if not host_part:
+                continue
+            host_path = Path(host_part).resolve()
+            if not any(
+                host_path == a or str(host_path).startswith(str(a) + os.sep) for a in allowed
+            ):
+                raise ValueError(
+                    f"Volume host path '{host_path}' is not within allowed prefixes: {allowed_raw}"
+                )
+        return v
 
     @field_validator("transport")
     @classmethod

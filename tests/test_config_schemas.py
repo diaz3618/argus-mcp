@@ -30,6 +30,7 @@ from argus_mcp.config.schema import (
 )
 from argus_mcp.config.schema_backends import (
     CapabilityFilterConfig,
+    ContainerConfig,
     FiltersConfig,
     OAuth2AuthConfig,
     SseBackendConfig,
@@ -439,3 +440,31 @@ class TestConflictResolutionConfig:
         c = ConflictResolutionConfig(strategy="prefix", separator=".")
         assert c.strategy == "prefix"
         assert c.separator == "."
+
+
+class TestContainerConfigExtraArgs:
+    def test_extra_args_privileged_rejected(self):
+        with pytest.raises(ValidationError, match="Dangerous Docker flag '--privileged'"):
+            ContainerConfig(extra_args=["--privileged"])
+
+    def test_extra_args_cap_add_rejected(self):
+        with pytest.raises(ValidationError, match="Dangerous Docker flag '--cap-add'"):
+            ContainerConfig(extra_args=["--cap-add=SYS_ADMIN"])
+
+    def test_extra_args_network_host_rejected(self):
+        with pytest.raises(ValidationError, match="Dangerous Docker flag '--network=host'"):
+            ContainerConfig(extra_args=["--network=host"])
+
+    def test_extra_args_safe_flags_allowed(self):
+        c = ContainerConfig(extra_args=["--rm", "--name=test"])
+        assert c.extra_args == ["--rm", "--name=test"]
+
+
+class TestContainerConfigVolumes:
+    def test_volume_mount_traversal_rejected(self):
+        with pytest.raises(ValidationError, match="not within allowed prefixes"):
+            ContainerConfig(volumes=["../../../../etc/passwd:/target:ro"])
+
+    def test_volume_mount_allowed_path(self):
+        c = ContainerConfig(volumes=["/tmp/data:/container:rw"])
+        assert c.volumes == ["/tmp/data:/container:rw"]
