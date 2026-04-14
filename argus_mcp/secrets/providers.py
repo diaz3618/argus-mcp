@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import stat
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -112,6 +113,24 @@ class FileProvider(SecretProvider):
     def _load(self) -> Dict[str, str]:
         if not os.path.exists(self._path):
             return {}
+        try:
+            file_mode = os.stat(self._path).st_mode
+            if file_mode & stat.S_IRGRP:
+                logger.warning(
+                    "Secret file %s is group-readable (mode %o). Recommend: chmod 600 %s",
+                    self._path,
+                    file_mode & 0o777,
+                    self._path,
+                )
+            if file_mode & stat.S_IROTH:
+                logger.warning(
+                    "Secret file %s is world-readable (mode %o). Recommend: chmod 600 %s",
+                    self._path,
+                    file_mode & 0o777,
+                    self._path,
+                )
+        except OSError:
+            pass
         fernet = self._ensure_fernet()
         try:
             with open(self._path, "rb") as f:

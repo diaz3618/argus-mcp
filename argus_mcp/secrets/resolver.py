@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 _SECRET_PATTERN = re.compile(r"^secret:(.+)$")
 
+_MAX_WALK_DEPTH = 20
+
 
 class SecretResolutionError(Exception):
     """Raised when a referenced secret cannot be found."""
@@ -63,12 +65,21 @@ def _walk(
     *,
     strict: bool,
     path: str,
+    _depth: int = 0,
 ) -> Any:
+    if _depth > _MAX_WALK_DEPTH:
+        raise ValueError(
+            f"_walk: recursion depth limit exceeded at path '{path}' (max {_MAX_WALK_DEPTH})"
+        )
     if isinstance(value, dict):
-        return {k: _walk(v, store, strict=strict, path=f"{path}.{k}") for k, v in value.items()}
+        return {
+            k: _walk(v, store, strict=strict, path=f"{path}.{k}", _depth=_depth + 1)
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [
-            _walk(item, store, strict=strict, path=f"{path}[{i}]") for i, item in enumerate(value)
+            _walk(item, store, strict=strict, path=f"{path}[{i}]", _depth=_depth + 1)
+            for i, item in enumerate(value)
         ]
     if isinstance(value, str):
         return _resolve_string(value, store, strict=strict, path=path)
