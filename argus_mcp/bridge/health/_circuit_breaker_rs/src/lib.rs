@@ -112,6 +112,12 @@ impl RustCircuitBreaker {
     fn record_success(&self, _py: Python<'_>) -> PyResult<()> {
         ffi_guard_rs::ffi_guard!("RustCircuitBreaker::record_success", py, {
             let mut g = self.lock_inner()?;
+            if g.state == HALF_OPEN {
+                log::info!(
+                    "Circuit breaker '{}': HALF_OPEN trial succeeded, closing",
+                    self.name
+                );
+            }
             g.state = CLOSED;
             g.consecutive_failures = 0;
             g.last_success = Some(Instant::now());
@@ -124,9 +130,19 @@ impl RustCircuitBreaker {
             let mut g = self.lock_inner()?;
             g.consecutive_failures += 1;
             g.last_failure = Some(Instant::now());
-            if (g.state == CLOSED || g.state == HALF_OPEN)
+            if g.state == HALF_OPEN {
+                log::warn!(
+                    "Circuit breaker '{}': HALF_OPEN trial failed, reopening",
+                    self.name
+                );
+                g.state = OPEN;
+            } else if g.state == CLOSED
                 && g.consecutive_failures >= self.failure_threshold
             {
+                log::warn!(
+                    "Circuit breaker '{}': failure threshold reached, opening",
+                    self.name
+                );
                 g.state = OPEN;
             }
             Ok(())
