@@ -2,13 +2,13 @@ use pyo3::prelude::*;
 use pyo3::types::PyAnyMethods;
 
 const MAX_YAML_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
-const MAX_YAML_NODES: usize = 100;
+const MAX_YAML_NODES: usize = 10_000;
 
 /// Parse a YAML string and return a Python object (dict, list, or scalar).
 ///
 /// Replaces Python's yaml.safe_load() with a Rust-based parser.
 /// Enforces a byte-size limit (default 10 MiB) and a node-count limit
-/// (default 100) to prevent billion-laughs and resource exhaustion.
+/// (default 10,000) to prevent billion-laughs and resource exhaustion.
 ///
 /// The conversion pipeline:
 ///   YAML string → serde_yml::Value → JSON string → Python json.loads()
