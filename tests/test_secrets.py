@@ -222,3 +222,95 @@ class TestFindSecretReferences:
         config = {"a": "secret:x", "b": "secret:x"}
         refs = find_secret_references(config)
         assert refs.count("x") == 2
+
+
+# _walk depth limit
+
+
+class TestWalkDepthLimit:
+    def _make_store(self, data):
+        store = MagicMock(spec=SecretStore)
+        store.get.side_effect = lambda name: data.get(name)
+        return store
+
+    def test_walk_depth_limit_exceeded(self):
+        nested: dict = {"leaf": "val"}
+        for _ in range(25):
+            nested = {"child": nested}
+        store = self._make_store({})
+        with pytest.raises(ValueError, match="recursion depth limit"):
+            resolve_secrets(nested, store)
+
+    def test_walk_normal_depth_succeeds(self):
+        nested: dict = {"leaf": "val"}
+        for _ in range(15):
+            nested = {"child": nested}
+        store = self._make_store({})
+        result = resolve_secrets(nested, store)
+        assert result is not None
+
+
+# FileProvider permission check
+
+
+class TestFileProviderPermissions:
+    def test_file_provider_warns_group_readable(self, tmp_path, monkeypatch, caplog):
+        import logging
+
+        from cryptography.fernet import Fernet
+
+        key = Fernet.generate_key()
+        fernet = Fernet(key)
+        monkeypatch.setenv("ARGUS_SECRET_KEY", key.decode())
+
+        secret_file = tmp_path / "secrets.enc"
+        secret_file.write_bytes(fernet.encrypt(b'{"k": "v"}'))
+        os.chmod(secret_file, 0o640)
+
+        from argus_mcp.secrets.providers import FileProvider
+
+        fp = FileProvider(path=str(secret_file))
+        with caplog.at_level(logging.WARNING):
+            fp.get("k")
+        assert "group-readable" in caplog.text
+
+    def test_file_provider_warns_world_readable(self, tmp_path, monkeypatch, caplog):
+        import logging
+
+        from cryptography.fernet import Fernet
+
+        key = Fernet.generate_key()
+        fernet = Fernet(key)
+        monkeypatch.setenv("ARGUS_SECRET_KEY", key.decode())
+
+        secret_file = tmp_path / "secrets.enc"
+        secret_file.write_bytes(fernet.encrypt(b'{"k": "v"}'))
+        os.chmod(secret_file, 0o644)
+
+        from argus_mcp.secrets.providers import FileProvider
+
+        fp = FileProvider(path=str(secret_file))
+        with caplog.at_level(logging.WARNING):
+            fp.get("k")
+        assert "world-readable" in caplog.text
+
+    def test_file_provider_no_warn_600(self, tmp_path, monkeypatch, caplog):
+        import logging
+
+        from cryptography.fernet import Fernet
+
+        key = Fernet.generate_key()
+        fernet = Fernet(key)
+        monkeypatch.setenv("ARGUS_SECRET_KEY", key.decode())
+
+        secret_file = tmp_path / "secrets.enc"
+        secret_file.write_bytes(fernet.encrypt(b'{"k": "v"}'))
+        os.chmod(secret_file, 0o600)
+
+        from argus_mcp.secrets.providers import FileProvider
+
+        fp = FileProvider(path=str(secret_file))
+        with caplog.at_level(logging.WARNING):
+            fp.get("k")
+        assert "group-readable" not in caplog.text
+        assert "world-readable" not in caplog.text

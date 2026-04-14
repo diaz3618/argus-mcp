@@ -6,9 +6,12 @@ Covers:
 - recursive dict / list / nested walking
 - non-string leaves returned as-is
 - multiple vars in one string
+- recursion depth limit
 """
 
 from __future__ import annotations
+
+import pytest
 
 from argus_mcp.config.migration import expand_env_vars
 
@@ -73,3 +76,19 @@ class TestExpandEnvVars:
         monkeypatch.setenv("Z", "zval")
         result = expand_env_vars(["${Z}", 42, None, True])
         assert result == ["zval", 42, None, True]
+
+
+class TestExpandEnvVarsDepthLimit:
+    def test_depth_limit_exceeded(self):
+        nested: dict = {"leaf": "val"}
+        for _ in range(25):
+            nested = {"child": nested}
+        with pytest.raises(ValueError, match="recursion depth limit"):
+            expand_env_vars(nested)
+
+    def test_normal_depth_succeeds(self):
+        nested: dict = {"leaf": "val"}
+        for _ in range(15):
+            nested = {"child": nested}
+        result = expand_env_vars(nested)
+        assert result is not None
