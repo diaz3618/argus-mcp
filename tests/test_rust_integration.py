@@ -413,6 +413,100 @@ class TestYamlRsBridge:
     def test_loader_module_imports_cleanly(self) -> None:
         import argus_mcp.config.loader  # noqa: F401
 
+    @pytest.mark.skipif(
+        not __import__("argus_mcp.config._yaml_rs", fromlist=["RUST_AVAILABLE"]).RUST_AVAILABLE,
+        reason="Rust yaml_rs not compiled",
+    )
+    def test_yaml_size_limit(self) -> None:
+        from argus_mcp.config._yaml_rs import parse_yaml
+
+        big_yaml = "key: " + "x" * (10 * 1024 * 1024 + 1)
+        with pytest.raises(ValueError, match="exceeds size limit"):
+            parse_yaml(big_yaml)
+
+    @pytest.mark.skipif(
+        not __import__("argus_mcp.config._yaml_rs", fromlist=["RUST_AVAILABLE"]).RUST_AVAILABLE,
+        reason="Rust yaml_rs not compiled",
+    )
+    def test_yaml_valid_parse(self) -> None:
+        from argus_mcp.config._yaml_rs import parse_yaml
+
+        result = parse_yaml("key: value\nlist:\n  - 1\n  - 2")
+        assert result == {"key": "value", "list": [1, 2]}
+
+
+class TestFilterGlobPatterns:
+    """Test globset-based filter patterns (globstar, question mark, brackets)."""
+
+    @_has_rust_filter
+    def test_filter_globstar(self) -> None:
+        from argus_mcp.bridge.filter import build_filter
+
+        f = build_filter(allow=["tools/**"], deny=[])
+        assert f.is_allowed("tools/foo/bar") is True
+        assert f.is_allowed("other") is False
+
+    @_has_rust_filter
+    def test_filter_question_mark(self) -> None:
+        from argus_mcp.bridge.filter import build_filter
+
+        f = build_filter(allow=["tool?"], deny=[])
+        assert f.is_allowed("tools") is True
+        assert f.is_allowed("tooled") is False
+
+    @_has_rust_filter
+    def test_filter_bracket_class(self) -> None:
+        from argus_mcp.bridge.filter import build_filter
+
+        f = build_filter(allow=["tool[abc]"], deny=[])
+        assert f.is_allowed("toola") is True
+        assert f.is_allowed("toolb") is True
+        assert f.is_allowed("toold") is False
+
+
+class TestTokenCacheNanAndClear:
+    """Token cache NaN rejection and clear_cache()."""
+
+    @_has_rust_tc
+    def test_token_cache_nan_reject(self) -> None:
+        from argus_mcp.bridge.auth._token_cache_rs import TokenCache
+
+        tc = TokenCache()
+        with pytest.raises(ValueError, match="finite"):
+            tc.set("token", float("nan"))
+
+    @_has_rust_tc
+    def test_token_cache_clear(self) -> None:
+        from argus_mcp.bridge.auth._token_cache_rs import TokenCache
+
+        tc = TokenCache()
+        tc.set("my_token", 3600.0)
+        assert tc.get() == "my_token"
+        tc.clear_cache()
+        assert tc.get() is None
+
+
+class TestCircuitBreakerHalfOpenFirstFailure:
+    """HALF_OPEN state transitions to OPEN on first failure."""
+
+    @_has_rust_cb
+    def test_halfopen_first_failure_goes_open(self) -> None:
+        from argus_mcp.bridge.health._circuit_breaker_rs import CircuitBreaker
+        from argus_mcp.bridge.health.circuit_breaker import CircuitState
+
+        cb = CircuitBreaker("test-ho", failure_threshold=3, cooldown_seconds=0.01)
+        for _ in range(3):
+            cb.record_failure()
+        assert cb.state == CircuitState.OPEN
+
+        import time
+
+        time.sleep(0.05)
+        assert cb.state == CircuitState.HALF_OPEN
+
+        cb.record_failure()
+        assert cb.state == CircuitState.OPEN
+
 
 #  New crate bridge compatibility
 class TestNewCrateBridgeCompatibility:

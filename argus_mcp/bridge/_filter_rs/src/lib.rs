@@ -1,27 +1,29 @@
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use pyo3::prelude::*;
-use regex::RegexSet;
-fn glob_to_regex(pattern: &str) -> String {
-    let mut re = String::with_capacity(pattern.len() * 2 + 4);
-    re.push('^');
-    for ch in pattern.chars() {
-        match ch {
-            '*' => re.push_str(".*"),
-            '?' => re.push('.'),
-            '.' | '+' | '(' | ')' | '{' | '}' | '[' | ']' | '^' | '$' | '|' | '\\' => {
-                re.push('\\');
-                re.push(ch);
-            }
-            _ => re.push(ch),
-        }
+
+fn build_globset(patterns: &[String]) -> PyResult<GlobSet> {
+    let mut builder = GlobSetBuilder::new();
+    for p in patterns {
+        let glob = Glob::new(p).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "invalid glob pattern '{}': {}",
+                p, e
+            ))
+        })?;
+        builder.add(glob);
     }
-    re.push('$');
-    re
+    builder.build().map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "failed to build glob set: {}",
+            e
+        ))
+    })
 }
 
 #[pyclass(frozen)]
 struct RustCapabilityFilter {
-    allow_set: Option<RegexSet>,
-    deny_set: Option<RegexSet>,
+    allow_set: Option<GlobSet>,
+    deny_set: Option<GlobSet>,
     active: bool,
 }
 
@@ -39,23 +41,13 @@ impl RustCapabilityFilter {
             let allow_set = if allow_patterns.is_empty() {
                 None
             } else {
-                let regexes: Vec<String> = allow_patterns.iter().map(|p| glob_to_regex(p)).collect();
-                Some(RegexSet::new(&regexes).map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "invalid allow pattern: {e}"
-                    ))
-                })?)
+                Some(build_globset(&allow_patterns)?)
             };
 
             let deny_set = if deny_patterns.is_empty() {
                 None
             } else {
-                let regexes: Vec<String> = deny_patterns.iter().map(|p| glob_to_regex(p)).collect();
-                Some(RegexSet::new(&regexes).map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "invalid deny pattern: {e}"
-                    ))
-                })?)
+                Some(build_globset(&deny_patterns)?)
             };
 
             Ok(Self {
