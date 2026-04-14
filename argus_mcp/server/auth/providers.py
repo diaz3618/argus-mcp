@@ -120,7 +120,9 @@ class AuthProviderRegistry:
             }
         """
         if not config:
-            return cls(AnonymousProvider())
+            raise ValueError(
+                "Auth provider config is required — pass explicit type: 'anonymous' to disable auth"
+            )
 
         auth_type = config.get("type", "anonymous")
 

@@ -155,8 +155,10 @@ def _setup_incoming_auth(full_cfg: Any) -> tuple[Any, str]:
     auth_registry: AuthProviderRegistry | None = None
     auth_mode: str = "strict"
     if full_cfg is None:
-        logger.debug("No full config loaded; incoming auth defaults to anonymous.")
-        return auth_registry, auth_mode
+        raise ConfigurationError(
+            "Auth configuration is required — cannot start gateway without auth config. "
+            "Set incoming_auth.type in config.yaml (use 'anonymous' explicitly for dev mode)."
+        )
 
     incoming_auth_type = full_cfg.incoming_auth.type
     auth_mode = full_cfg.incoming_auth.auth_mode
