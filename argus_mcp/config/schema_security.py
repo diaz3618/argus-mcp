@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import warnings
 from typing import Any, Dict, List, Literal, Optional
 
@@ -151,6 +152,14 @@ class SecurityConfig(BaseModel):
             "'permissive': allow missing Origin headers (for CLI/SDK clients)."
         ),
     )
+    trusted_proxies: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "List of trusted proxy IPs or CIDRs (e.g. ['10.0.0.0/8', '172.16.0.1']). "
+            "When set, X-Forwarded-For is read only if the direct client IP matches "
+            "a trusted proxy. When not set, XFF is ignored (AUTH-02)."
+        ),
+    )
     redact_status: bool = Field(
         default=False,
         description=(
@@ -159,3 +168,20 @@ class SecurityConfig(BaseModel):
             "management API responses (SEC-17)."
         ),
     )
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def validate_trusted_proxies(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        for entry in v:
+            try:
+                ipaddress.ip_network(entry, strict=False)
+            except ValueError:
+                try:
+                    ipaddress.ip_address(entry)
+                except ValueError:
+                    raise ValueError(
+                        f"trusted_proxies entry '{entry}' is not a valid IP address or CIDR"
+                    )
+        return v

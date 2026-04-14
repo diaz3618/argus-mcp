@@ -5,6 +5,7 @@ sliding-window counters and temporarily locks out clients that exceed
 a configurable number of authentication failures (401/403).
 """
 
+import ipaddress
 import logging
 import time
 from typing import List, Optional, Tuple
@@ -26,9 +27,22 @@ class RateLimitMiddleware:
         middleware = RateLimitMiddleware(app, config=RateLimitsConfig())
     """
 
-    def __init__(self, app: ASGIApp, config: Optional[RateLimitsConfig] = None) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        config: Optional[RateLimitsConfig] = None,
+        trusted_proxies: Optional[List[str]] = None,
+    ) -> None:
         self.app = app
         self._config = config or RateLimitsConfig()
+        # Parse trusted proxy CIDRs/IPs into network objects
+        self._trusted_proxies = []
+        if trusted_proxies:
+            for entry in trusted_proxies:
+                try:
+                    self._trusted_proxies.append(ipaddress.ip_network(entry, strict=False))
+                except ValueError:
+                    logger.warning("Ignoring invalid trusted_proxies entry: %s", entry)
         # Per-IP request timestamps for sliding window (TTL auto-evicts stale IPs)
         self._request_log: TTLCache = TTLCache(
             maxsize=10000, ttl=self._config.default.window_seconds
@@ -54,9 +68,36 @@ class RateLimitMiddleware:
             logger.info("Rate limiting DISABLED.")
 
     def _get_client_ip(self, scope: Scope) -> str:
-        """Extract client IP from ASGI scope."""
+        """Extract client IP from ASGI scope.
+
+        When trusted_proxies is configured and the direct client IP matches
+        a trusted proxy, the rightmost untrusted IP from X-Forwarded-For
+        is returned. Otherwise, the direct client IP is used (AUTH-02).
+        """
         client: Optional[Tuple[str, int]] = scope.get("client")
-        return client[0] if client else "unknown"
+        if not client:
+            return "unknown"
+        direct_ip = client[0]
+
+        if self._trusted_proxies:
+            try:
+                addr = ipaddress.ip_address(direct_ip)
+                if any(addr in network for network in self._trusted_proxies):
+                    headers_dict = {k: v for k, v in scope.get("headers", [])}
+                    xff = headers_dict.get(b"x-forwarded-for", b"").decode("latin-1")
+                    if xff:
+                        parts = [p.strip() for p in xff.split(",")]
+                        for ip_str in reversed(parts):
+                            try:
+                                candidate = ipaddress.ip_address(ip_str)
+                                if not any(candidate in net for net in self._trusted_proxies):
+                                    return ip_str
+                            except ValueError:
+                                continue
+            except ValueError:
+                pass
+
+        return direct_ip
 
     def _is_locked_out(self, ip: str, now: float) -> bool:
         """Check if an IP is currently locked out.
