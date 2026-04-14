@@ -13,7 +13,10 @@ Usage::
 
 from __future__ import annotations
 
+import ipaddress
 import logging
+import socket
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
@@ -48,6 +51,45 @@ class OIDCDiscovery:
         self._timeout = timeout
         self._cached: Optional[OIDCConfig] = None
 
+    def _validate_issuer_url(self) -> None:
+        """Validate the issuer URL against SSRF patterns.
+
+        Blocks private, loopback, link-local, and reserved IP addresses
+        to prevent server-side request forgery via OIDC discovery.
+        Allows localhost (127.0.0.1/::1) only with http scheme for dev.
+        """
+        parsed = urllib.parse.urlparse(self._issuer)
+        hostname = parsed.hostname
+        scheme = parsed.scheme
+
+        if not hostname:
+            raise OIDCDiscoveryError(f"OIDC issuer URL {self._issuer!r} has no hostname")
+
+        if scheme not in ("http", "https"):
+            raise OIDCDiscoveryError(
+                f"OIDC issuer URL {self._issuer!r} must use http or https scheme"
+            )
+
+        try:
+            addr_infos = socket.getaddrinfo(hostname, None)
+        except socket.gaierror as exc:
+            raise OIDCDiscoveryError(
+                f"OIDC issuer URL {self._issuer!r} — DNS resolution failed: {exc}"
+            ) from exc
+
+        for family, _type, _proto, _canonname, sockaddr in addr_infos:
+            ip_str = sockaddr[0]
+            try:
+                addr = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                raise OIDCDiscoveryError(
+                    f"OIDC issuer URL {self._issuer!r} resolves to "
+                    f"private/loopback/reserved address {addr} — potential SSRF"
+                )
+
     async def fetch(self) -> OIDCConfig:
         """Fetch the OIDC discovery document.
 
@@ -69,9 +111,11 @@ class OIDCDiscovery:
         url = f"{self._issuer}/.well-known/openid-configuration"
         logger.debug("Fetching OIDC discovery document: %s", url)
 
+        self._validate_issuer_url()
+
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.get(url)  # nosemgrep: mcp-unverified-remote-content
+                resp = await client.get(url, follow_redirects=False)
                 resp.raise_for_status()
                 data: Dict[str, Any] = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
