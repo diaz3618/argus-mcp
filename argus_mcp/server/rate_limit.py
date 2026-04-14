@@ -7,9 +7,9 @@ a configurable number of authentication failures (401/403).
 
 import logging
 import time
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
+from cachetools import TTLCache
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -29,12 +29,18 @@ class RateLimitMiddleware:
     def __init__(self, app: ASGIApp, config: Optional[RateLimitsConfig] = None) -> None:
         self.app = app
         self._config = config or RateLimitsConfig()
-        # Per-IP request timestamps for sliding window
-        self._request_log: Dict[str, List[float]] = defaultdict(list)
-        # Per-IP auth-failure timestamps
-        self._auth_failure_log: Dict[str, List[float]] = defaultdict(list)
-        # Per-IP lockout expiry (epoch time)
-        self._lockouts: Dict[str, float] = {}
+        # Per-IP request timestamps for sliding window (TTL auto-evicts stale IPs)
+        self._request_log: TTLCache = TTLCache(
+            maxsize=10000, ttl=self._config.default.window_seconds
+        )
+        # Per-IP auth-failure timestamps (TTL matches auth lockout window)
+        self._auth_failure_log: TTLCache = TTLCache(
+            maxsize=10000, ttl=self._config.auth_lockout_window_seconds
+        )
+        # Per-IP lockout expiry (TTL auto-evicts expired lockouts)
+        self._lockouts: TTLCache = TTLCache(
+            maxsize=10000, ttl=self._config.auth_lockout_duration_seconds
+        )
 
         if self._config.enabled:
             logger.info(
@@ -53,15 +59,11 @@ class RateLimitMiddleware:
         return client[0] if client else "unknown"
 
     def _is_locked_out(self, ip: str, now: float) -> bool:
-        """Check if an IP is currently locked out."""
-        expiry = self._lockouts.get(ip)
-        if expiry is None:
-            return False
-        if now < expiry:
-            return True
-        # Lockout expired — clean up
-        del self._lockouts[ip]
-        return False
+        """Check if an IP is currently locked out.
+
+        TTLCache auto-evicts expired lockouts, so presence implies active lockout.
+        """
+        return ip in self._lockouts
 
     def _prune_window(self, timestamps: List[float], window_start: float) -> List[float]:
         """Remove timestamps outside the sliding window."""
@@ -71,22 +73,26 @@ class RateLimitMiddleware:
         """Return True if the request is within the rate limit."""
         window = self._config.default.window_seconds
         window_start = now - window
-        self._request_log[ip] = self._prune_window(self._request_log[ip], window_start)
-        if len(self._request_log[ip]) >= self._config.default.requests:
+        timestamps = self._request_log.get(ip, [])
+        timestamps = self._prune_window(timestamps, window_start)
+        if len(timestamps) >= self._config.default.requests:
+            self._request_log[ip] = timestamps
             return False
-        self._request_log[ip].append(now)
+        timestamps.append(now)
+        self._request_log[ip] = timestamps
         return True
 
     def _record_auth_failure(self, ip: str, now: float) -> None:
         """Record an auth failure and apply lockout if threshold is exceeded."""
         window_start = now - self._config.auth_lockout_window_seconds
-        self._auth_failure_log[ip] = self._prune_window(self._auth_failure_log[ip], window_start)
-        self._auth_failure_log[ip].append(now)
+        timestamps = self._auth_failure_log.get(ip, [])
+        timestamps = self._prune_window(timestamps, window_start)
+        timestamps.append(now)
+        self._auth_failure_log[ip] = timestamps
 
-        if len(self._auth_failure_log[ip]) >= self._config.auth_lockout_threshold:
-            lockout_until = now + self._config.auth_lockout_duration_seconds
-            self._lockouts[ip] = lockout_until
-            self._auth_failure_log[ip] = []
+        if len(timestamps) >= self._config.auth_lockout_threshold:
+            self._lockouts[ip] = now + self._config.auth_lockout_duration_seconds
+            self._auth_failure_log.pop(ip, None)
             logger.warning(
                 "Auth lockout applied to %s for %ds after %d failures",
                 ip,
