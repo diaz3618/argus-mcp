@@ -254,8 +254,8 @@ class TestWalkDepthLimit:
 
 
 class TestFileProviderPermissions:
-    def test_file_provider_warns_group_readable(self, tmp_path, monkeypatch, caplog):
-        import logging
+    def test_file_provider_warns_group_readable(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
 
         from cryptography.fernet import Fernet
 
@@ -270,12 +270,14 @@ class TestFileProviderPermissions:
         from argus_mcp.secrets.providers import FileProvider
 
         fp = FileProvider(path=str(secret_file))
-        with caplog.at_level(logging.WARNING):
+        with patch("argus_mcp.secrets.providers.logger") as mock_logger:
             fp.get("k")
-        assert "group-readable" in caplog.text
+        mock_logger.warning.assert_called()
+        warn_msg = mock_logger.warning.call_args[0][0]
+        assert "group-readable" in warn_msg
 
-    def test_file_provider_warns_world_readable(self, tmp_path, monkeypatch, caplog):
-        import logging
+    def test_file_provider_warns_world_readable(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
 
         from cryptography.fernet import Fernet
 
@@ -290,12 +292,14 @@ class TestFileProviderPermissions:
         from argus_mcp.secrets.providers import FileProvider
 
         fp = FileProvider(path=str(secret_file))
-        with caplog.at_level(logging.WARNING):
+        with patch("argus_mcp.secrets.providers.logger") as mock_logger:
             fp.get("k")
-        assert "world-readable" in caplog.text
+        mock_logger.warning.assert_called()
+        warn_msg = mock_logger.warning.call_args[0][0]
+        assert "world-readable" in warn_msg
 
-    def test_file_provider_no_warn_600(self, tmp_path, monkeypatch, caplog):
-        import logging
+    def test_file_provider_no_warn_600(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
 
         from cryptography.fernet import Fernet
 
@@ -310,7 +314,10 @@ class TestFileProviderPermissions:
         from argus_mcp.secrets.providers import FileProvider
 
         fp = FileProvider(path=str(secret_file))
-        with caplog.at_level(logging.WARNING):
+        with patch("argus_mcp.secrets.providers.logger") as mock_logger:
             fp.get("k")
-        assert "group-readable" not in caplog.text
-        assert "world-readable" not in caplog.text
+        # Should NOT have warned about permissions
+        for call in mock_logger.warning.call_args_list:
+            msg = call[0][0] if call[0] else ""
+            assert "group-readable" not in msg
+            assert "world-readable" not in msg
