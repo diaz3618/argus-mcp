@@ -89,12 +89,18 @@ class OriginValidationMiddleware:
         self,
         app: ASGIApp,
         *,
-        require_origin: str = "permissive",
+        require_origin: str = "strict",
     ) -> None:
         self.app = app
         self._require_origin = require_origin.lower()
         self._allowed_origins = _parse_allowed_origins()
-        if self._allowed_origins:
+        self._wildcard = "*" in self._allowed_origins
+        if self._wildcard:
+            logger.warning(
+                "Origin wildcard '*' configured — all origins permitted "
+                "(equivalent to permissive mode)"
+            )
+        elif self._allowed_origins:
             logger.info(
                 "Origin validation: additional allowed origins = %s",
                 self._allowed_origins,
@@ -159,6 +165,11 @@ class OriginValidationMiddleware:
 
         # Localhost origins are always acceptable.
         if _is_localhost_origin(origin_lower):
+            await self.app(scope, receive, send)
+            return
+
+        # Wildcard — allow all origins (warning logged at init).
+        if self._wildcard:
             await self.app(scope, receive, send)
             return
 

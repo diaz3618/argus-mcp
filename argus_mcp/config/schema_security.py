@@ -145,10 +145,10 @@ class SecurityConfig(BaseModel):
         ),
     )
     require_origin: Literal["strict", "permissive"] = Field(
-        default="permissive",
+        default="strict",
         description=(
             "Origin validation mode for MCP transport requests. "
-            "'strict': reject requests without an Origin header (SEC-13). "
+            "'strict' (default): reject requests without an Origin header (SEC-13). "
             "'permissive': allow missing Origin headers (for CLI/SDK clients)."
         ),
     )
