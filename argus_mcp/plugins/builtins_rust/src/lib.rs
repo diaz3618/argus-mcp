@@ -35,36 +35,38 @@ struct RustPiiFilter {
 impl RustPiiFilter {
     #[new]
     #[pyo3(signature = (categories=None))]
-    fn new(categories: Option<Vec<String>>) -> PyResult<Self> {
-        let filtered: Vec<&(&str, &str, &str)> = if let Some(ref cats) = categories {
-            PII_DEFS
-                .iter()
-                .filter(|(name, _, _)| cats.iter().any(|c| c == name))
-                .collect()
-        } else {
-            PII_DEFS.iter().collect()
-        };
+    fn new(_py: Python<'_>, categories: Option<Vec<String>>) -> PyResult<Self> {
+        ffi_guard_rs::ffi_guard!("RustPiiFilter::new", py, {
+            let filtered: Vec<&(&str, &str, &str)> = if let Some(ref cats) = categories {
+                PII_DEFS
+                    .iter()
+                    .filter(|(name, _, _)| cats.iter().any(|c| c == name))
+                    .collect()
+            } else {
+                PII_DEFS.iter().collect()
+            };
 
-        let regex_strs: Vec<&str> = filtered.iter().map(|(_, pat, _)| *pat).collect();
-        let regex_set = RegexSet::new(&regex_strs)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+            let regex_strs: Vec<&str> = filtered.iter().map(|(_, pat, _)| *pat).collect();
+            let regex_set = RegexSet::new(&regex_strs)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        let patterns: Vec<PiiPattern> = filtered
-            .into_iter()
-            .map(|(name, pat, repl)| -> Result<PiiPattern, PyErr> {
-                Ok(PiiPattern {
-                    name,
-                    regex: Regex::new(pat).map_err(|e| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-                    })?,
-                    replacement: repl,
+            let patterns: Vec<PiiPattern> = filtered
+                .into_iter()
+                .map(|(name, pat, repl)| -> Result<PiiPattern, PyErr> {
+                    Ok(PiiPattern {
+                        name,
+                        regex: Regex::new(pat).map_err(|e| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
+                        })?,
+                        replacement: repl,
+                    })
                 })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Self {
-            regex_set,
-            patterns,
+            Ok(Self {
+                regex_set,
+                patterns,
+            })
         })
     }
 
@@ -73,25 +75,27 @@ impl RustPiiFilter {
         py: Python<'py>,
         text: &str,
     ) -> PyResult<(String, Bound<'py, PyDict>)> {
-        let counts = PyDict::new(py);
+        ffi_guard_rs::ffi_guard!("RustPiiFilter::mask_string", py, {
+            let counts = PyDict::new(py);
 
-        if !self.regex_set.is_match(text) {
-            return Ok((text.to_string(), counts));
-        }
-
-        let mut result = text.to_string();
-        for entry in &self.patterns {
-            let n = entry.regex.find_iter(&result).count();
-            if n > 0 {
-                result = entry
-                    .regex
-                    .replace_all(&result, entry.replacement)
-                    .into_owned();
-                counts.set_item(entry.name, n)?;
+            if !self.regex_set.is_match(text) {
+                return Ok((text.to_string(), counts));
             }
-        }
 
-        Ok((result, counts))
+            let mut result = text.to_string();
+            for entry in &self.patterns {
+                let n = entry.regex.find_iter(&result).count();
+                if n > 0 {
+                    result = entry
+                        .regex
+                        .replace_all(&result, entry.replacement)
+                        .into_owned();
+                    counts.set_item(entry.name, n)?;
+                }
+            }
+
+            Ok((result, counts))
+        })
     }
 }
 
@@ -135,63 +139,72 @@ struct RustSecretsScanner {
 impl RustSecretsScanner {
     #[new]
     #[pyo3(signature = (redaction=None))]
-    fn new(redaction: Option<&str>) -> PyResult<Self> {
-        let regex_strs: Vec<&str> = SECRET_DEFS.iter().map(|(_, pat)| *pat).collect();
-        let regex_set = RegexSet::new(&regex_strs)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+    fn new(_py: Python<'_>, redaction: Option<&str>) -> PyResult<Self> {
+        ffi_guard_rs::ffi_guard!("RustSecretsScanner::new", py, {
+            let regex_strs: Vec<&str> = SECRET_DEFS.iter().map(|(_, pat)| *pat).collect();
+            let regex_set = RegexSet::new(&regex_strs)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        let patterns: Vec<SecretPattern> = SECRET_DEFS
-            .iter()
-            .map(|(label, pat)| -> Result<SecretPattern, PyErr> {
-                Ok(SecretPattern {
-                    label,
-                    regex: Regex::new(pat).map_err(|e| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
-                    })?,
+            let patterns: Vec<SecretPattern> = SECRET_DEFS
+                .iter()
+                .map(|(label, pat)| -> Result<SecretPattern, PyErr> {
+                    Ok(SecretPattern {
+                        label,
+                        regex: Regex::new(pat).map_err(|e| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
+                        })?,
+                    })
                 })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Self {
-            regex_set,
-            patterns,
-            redaction: redaction.unwrap_or(REDACTION).to_string(),
+            Ok(Self {
+                regex_set,
+                patterns,
+                redaction: redaction.unwrap_or(REDACTION).to_string(),
+            })
         })
     }
 
-    fn scan(&self, text: &str) -> Vec<String> {
-        self.regex_set
-            .matches(text)
-            .into_iter()
-            .map(|idx| self.patterns[idx].label.to_string())
-            .collect()
+    fn scan(&self, _py: Python<'_>, text: &str) -> PyResult<Vec<String>> {
+        ffi_guard_rs::ffi_guard!("RustSecretsScanner::scan", py, {
+            Ok(self
+                .regex_set
+                .matches(text)
+                .into_iter()
+                .map(|idx| self.patterns[idx].label.to_string())
+                .collect())
+        })
     }
 
-    fn has_secrets(&self, text: &str) -> bool {
-        self.regex_set.is_match(text)
+    fn has_secrets(&self, _py: Python<'_>, text: &str) -> PyResult<bool> {
+        ffi_guard_rs::ffi_guard!("RustSecretsScanner::has_secrets", py, {
+            Ok(self.regex_set.is_match(text))
+        })
     }
 
-    fn redact(&self, text: &str) -> String {
-        if !self.regex_set.is_match(text) {
-            return text.to_string();
-        }
+    fn redact(&self, _py: Python<'_>, text: &str) -> PyResult<String> {
+        ffi_guard_rs::ffi_guard!("RustSecretsScanner::redact", py, {
+            if !self.regex_set.is_match(text) {
+                return Ok(text.to_string());
+            }
 
-        let mut result = text.to_string();
-        for entry in &self.patterns {
-            result = entry
-                .regex
-                .replace_all(&result, self.redaction.as_str())
-                .into_owned();
-        }
-        result
+            let mut result = text.to_string();
+            for entry in &self.patterns {
+                result = entry
+                    .regex
+                    .replace_all(&result, self.redaction.as_str())
+                    .into_owned();
+            }
+            Ok(result)
+        })
     }
 }
 
 
 #[pymodule]
-mod security_plugins_rs {
-    #[pymodule_export]
-    use super::RustPiiFilter;
-    #[pymodule_export]
-    use super::RustSecretsScanner;
+fn security_plugins_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_class::<RustPiiFilter>()?;
+    m.add_class::<RustSecretsScanner>()?;
+    Ok(())
 }

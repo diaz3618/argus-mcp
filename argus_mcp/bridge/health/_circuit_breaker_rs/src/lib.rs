@@ -85,65 +85,80 @@ impl RustCircuitBreaker {
     }
 
     #[getter]
-    fn state(&self) -> PyResult<&'static str> {
-        let mut g = self.lock_inner()?;
-        g.check_transition(self.cooldown_secs);
-        Ok(g.state_str())
+    fn state(&self, _py: Python<'_>) -> PyResult<&'static str> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::state", py, {
+            let mut g = self.lock_inner()?;
+            g.check_transition(self.cooldown_secs);
+            Ok(g.state_str())
+        })
     }
 
     #[getter]
-    fn consecutive_failures(&self) -> PyResult<u32> {
-        Ok(self.lock_inner()?.consecutive_failures)
+    fn consecutive_failures(&self, _py: Python<'_>) -> PyResult<u32> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::consecutive_failures", py, {
+            Ok(self.lock_inner()?.consecutive_failures)
+        })
     }
 
     #[getter]
-    fn allows_request(&self) -> PyResult<bool> {
-        let mut g = self.lock_inner()?;
-        g.check_transition(self.cooldown_secs);
-        Ok(g.state != OPEN)
+    fn allows_request(&self, _py: Python<'_>) -> PyResult<bool> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::allows_request", py, {
+            let mut g = self.lock_inner()?;
+            g.check_transition(self.cooldown_secs);
+            Ok(g.state != OPEN)
+        })
     }
 
-    fn record_success(&self) -> PyResult<()> {
-        let mut g = self.lock_inner()?;
-        g.state = CLOSED;
-        g.consecutive_failures = 0;
-        g.last_success = Some(Instant::now());
-        Ok(())
+    fn record_success(&self, _py: Python<'_>) -> PyResult<()> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::record_success", py, {
+            let mut g = self.lock_inner()?;
+            g.state = CLOSED;
+            g.consecutive_failures = 0;
+            g.last_success = Some(Instant::now());
+            Ok(())
+        })
     }
 
-    fn record_failure(&self) -> PyResult<()> {
-        let mut g = self.lock_inner()?;
-        g.consecutive_failures += 1;
-        g.last_failure = Some(Instant::now());
-        if (g.state == CLOSED || g.state == HALF_OPEN)
-            && g.consecutive_failures >= self.failure_threshold
-        {
-            g.state = OPEN;
-        }
-        Ok(())
+    fn record_failure(&self, _py: Python<'_>) -> PyResult<()> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::record_failure", py, {
+            let mut g = self.lock_inner()?;
+            g.consecutive_failures += 1;
+            g.last_failure = Some(Instant::now());
+            if (g.state == CLOSED || g.state == HALF_OPEN)
+                && g.consecutive_failures >= self.failure_threshold
+            {
+                g.state = OPEN;
+            }
+            Ok(())
+        })
     }
 
-    fn reset(&self) -> PyResult<()> {
-        let mut g = self.lock_inner()?;
-        g.state = CLOSED;
-        g.consecutive_failures = 0;
-        Ok(())
+    fn reset(&self, _py: Python<'_>) -> PyResult<()> {
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::reset", py, {
+            let mut g = self.lock_inner()?;
+            g.state = CLOSED;
+            g.consecutive_failures = 0;
+            Ok(())
+        })
     }
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let mut g = self.lock_inner()?;
-        g.check_transition(self.cooldown_secs);
-        let dict = PyDict::new(py);
-        dict.set_item("state", g.state_str())?;
-        dict.set_item("consecutive_failures", g.consecutive_failures)?;
-        dict.set_item("failure_threshold", self.failure_threshold)?;
-        dict.set_item("cooldown_seconds", self.cooldown_secs)?;
-        Ok(dict)
+        ffi_guard_rs::ffi_guard!("RustCircuitBreaker::to_dict", py, {
+            let mut g = self.lock_inner()?;
+            g.check_transition(self.cooldown_secs);
+            let dict = PyDict::new(py);
+            dict.set_item("state", g.state_str())?;
+            dict.set_item("consecutive_failures", g.consecutive_failures)?;
+            dict.set_item("failure_threshold", self.failure_threshold)?;
+            dict.set_item("cooldown_seconds", self.cooldown_secs)?;
+            Ok(dict)
+        })
     }
 }
 
 #[pymodule]
-mod circuit_breaker_rs {
-    #[pymodule_export]
-    use super::RustCircuitBreaker;
+fn circuit_breaker_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_class::<RustCircuitBreaker>()?;
+    Ok(())
 }

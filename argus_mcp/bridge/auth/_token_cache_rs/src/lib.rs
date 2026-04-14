@@ -42,52 +42,61 @@ impl RustTokenCache {
     }
 
     #[getter]
-    fn valid(&self) -> PyResult<bool> {
-        let g = self.inner.lock().map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
-        })?;
-        Ok(g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e))
+    fn valid(&self, _py: Python<'_>) -> PyResult<bool> {
+        ffi_guard_rs::ffi_guard!("RustTokenCache::valid", py, {
+            let g = self.inner.lock().map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+            })?;
+            Ok(g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e))
+        })
     }
 
-    fn get(&self) -> PyResult<Option<String>> {
-        let g = self.inner.lock().map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
-        })?;
-        if g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e) {
-            Ok(g.token.clone())
-        } else {
-            Ok(None)
-        }
+    fn get(&self, _py: Python<'_>) -> PyResult<Option<String>> {
+        ffi_guard_rs::ffi_guard!("RustTokenCache::get", py, {
+            let g = self.inner.lock().map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+            })?;
+            if g.token.is_some() && g.expires_at.is_some_and(|e| Instant::now() < e) {
+                Ok(g.token.clone())
+            } else {
+                Ok(None)
+            }
+        })
     }
 
-    fn set(&self, token: String, expires_in: f64) -> PyResult<()> {
-        let effective_ttl = (expires_in - self.expiry_buffer).max(0.0);
-        let mut g = self.inner.lock().map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
-        })?;
-        if let Some(ref mut old) = g.token {
-            old.zeroize();
-        }
-        g.token = Some(token);
-        g.expires_at = Some(Instant::now() + Duration::from_secs_f64(effective_ttl));
-        Ok(())
+    fn set(&self, _py: Python<'_>, token: String, expires_in: f64) -> PyResult<()> {
+        ffi_guard_rs::ffi_guard!("RustTokenCache::set", py, {
+            let effective_ttl = (expires_in - self.expiry_buffer).max(0.0);
+            let mut g = self.inner.lock().map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+            })?;
+            if let Some(ref mut old) = g.token {
+                old.zeroize();
+            }
+            g.token = Some(token);
+            g.expires_at = Some(Instant::now() + Duration::from_secs_f64(effective_ttl));
+            Ok(())
+        })
     }
 
-    fn invalidate(&self) -> PyResult<()> {
-        let mut g = self.inner.lock().map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
-        })?;
-        if let Some(ref mut t) = g.token {
-            t.zeroize();
-        }
-        g.token = None;
-        g.expires_at = None;
-        Ok(())
+    fn invalidate(&self, _py: Python<'_>) -> PyResult<()> {
+        ffi_guard_rs::ffi_guard!("RustTokenCache::invalidate", py, {
+            let mut g = self.inner.lock().map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("lock poisoned: {e}"))
+            })?;
+            if let Some(ref mut t) = g.token {
+                t.zeroize();
+            }
+            g.token = None;
+            g.expires_at = None;
+            Ok(())
+        })
     }
 }
 
 #[pymodule]
-mod token_cache_rs {
-    #[pymodule_export]
-    use super::RustTokenCache;
+fn token_cache_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_class::<RustTokenCache>()?;
+    Ok(())
 }

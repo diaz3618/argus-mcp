@@ -18,37 +18,35 @@ fn json_sha256(
     capability: &str,
     arguments: &Bound<'_, PyDict>,
 ) -> PyResult<String> {
-    // Use Python json.dumps for reliable dict → sorted JSON conversion.
-    // This handles arbitrary Python types (datetime, UUID, etc.) via default=str.
-    let json_mod = py.import("json")?;
-    let builtins = py.import("builtins")?;
-    let str_fn = builtins.getattr("str")?;
+    ffi_guard_rs::ffi_guard!("json_sha256", py, {
+        let json_mod = py.import("json")?;
+        let builtins = py.import("builtins")?;
+        let str_fn = builtins.getattr("str")?;
 
-    // Build the composite dict in Python for json.dumps
-    let composite = PyDict::new(py);
-    composite.set_item("s", server)?;
-    composite.set_item("c", capability)?;
-    composite.set_item("a", arguments)?;
+        let composite = PyDict::new(py);
+        composite.set_item("s", server)?;
+        composite.set_item("c", capability)?;
+        composite.set_item("a", arguments)?;
 
-    let kwargs = PyDict::new(py);
-    kwargs.set_item("sort_keys", true)?;
-    kwargs.set_item("default", str_fn)?;
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("sort_keys", true)?;
+        kwargs.set_item("default", str_fn)?;
 
-    let json_str: String = json_mod
-        .call_method("dumps", (&composite,), Some(&kwargs))?
-        .extract()?;
+        let json_str: String = json_mod
+            .call_method("dumps", (&composite,), Some(&kwargs))?
+            .extract()?;
 
-    // SHA-256 in Rust — much faster than Python's hashlib
-    let mut hasher = Sha256::new();
-    hasher.update(json_str.as_bytes());
-    let hash = hasher.finalize();
+        let mut hasher = Sha256::new();
+        hasher.update(json_str.as_bytes());
+        let hash = hasher.finalize();
 
-    // Convert to hex string
-    Ok(hex::encode(hash))
+        Ok(hex::encode(hash))
+    })
 }
 
 #[pymodule]
-mod hash_rs {
-    #[pymodule_export]
-    use super::json_sha256;
+fn hash_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_function(wrap_pyfunction!(json_sha256, m)?)?;
+    Ok(())
 }

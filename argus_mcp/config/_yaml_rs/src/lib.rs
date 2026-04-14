@@ -14,22 +14,25 @@ use pyo3::types::PyAnyMethods;
 /// is still faster than Python's pure-Python YAML parser for large files.
 #[pyfunction]
 fn parse_yaml<'py>(py: Python<'py>, yaml_str: &str) -> PyResult<Bound<'py, PyAny>> {
-    let value: serde_yaml::Value = serde_yaml::from_str(yaml_str).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("YAML parse error: {e}"))
-    })?;
+    ffi_guard_rs::ffi_guard!("parse_yaml", py, {
+        let value: serde_yaml::Value = serde_yaml::from_str(yaml_str).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("YAML parse error: {e}"))
+        })?;
 
-    let json_str = serde_json::to_string(&value).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-            "YAML→JSON conversion error: {e}"
-        ))
-    })?;
+        let json_str = serde_json::to_string(&value).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "YAML→JSON conversion error: {e}"
+            ))
+        })?;
 
-    let json_mod = py.import("json")?;
-    json_mod.call_method1("loads", (json_str,))
+        let json_mod = py.import("json")?;
+        json_mod.call_method1("loads", (json_str,))
+    })
 }
 
 #[pymodule]
-mod yaml_rs {
-    #[pymodule_export]
-    use super::parse_yaml;
+fn yaml_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_function(wrap_pyfunction!(parse_yaml, m)?)?;
+    Ok(())
 }

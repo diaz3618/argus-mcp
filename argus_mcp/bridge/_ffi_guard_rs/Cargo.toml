@@ -8,5 +8,3 @@ name = "ffi_guard_rs"
 crate-type = ["rlib"]
 
 [dependencies]
-pyo3 = { version = "0.28", features = ["abi3-py310"] }
-log = "0.4"

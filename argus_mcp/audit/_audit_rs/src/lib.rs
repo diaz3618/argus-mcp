@@ -97,39 +97,41 @@ fn serialize_audit_event(
     error_type: Option<&str>,
     metadata: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<String> {
-    let meta_val = match metadata {
-        Some(d) if !d.is_empty() => pydict_to_json(py, d)?,
-        _ => serde_json::Value::Object(serde_json::Map::new()),
-    };
+    ffi_guard_rs::ffi_guard!("serialize_audit_event", py, {
+        let meta_val = match metadata {
+            Some(d) if !d.is_empty() => pydict_to_json(py, d)?,
+            _ => serde_json::Value::Object(serde_json::Map::new()),
+        };
 
-    let event = AuditEvent {
-        timestamp,
-        event_type,
-        event_id,
-        source: AuditSource {
-            session_id,
-            client_ip,
-            user_id,
-        },
-        target: AuditTarget {
-            backend,
-            method,
-            capability_name,
-            original_name,
-        },
-        outcome: AuditOutcome {
-            status,
-            latency_ms,
-            error,
-            error_type,
-        },
-        metadata: meta_val,
-    };
+        let event = AuditEvent {
+            timestamp,
+            event_type,
+            event_id,
+            source: AuditSource {
+                session_id,
+                client_ip,
+                user_id,
+            },
+            target: AuditTarget {
+                backend,
+                method,
+                capability_name,
+                original_name,
+            },
+            outcome: AuditOutcome {
+                status,
+                latency_ms,
+                error,
+                error_type,
+            },
+            metadata: meta_val,
+        };
 
-    serde_json::to_string(&event).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-            "audit serialization failed: {e}"
-        ))
+        serde_json::to_string(&event).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "audit serialization failed: {e}"
+            ))
+        })
     })
 }
 
@@ -139,16 +141,20 @@ fn serialize_audit_event(
 /// for audit dict events.
 #[pyfunction]
 fn serialize_audit_dict(py: Python<'_>, data: &Bound<'_, PyDict>) -> PyResult<String> {
-    let val = pydict_to_json(py, data)?;
-    serde_json::to_string(&val).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("dict serialization failed: {e}"))
+    ffi_guard_rs::ffi_guard!("serialize_audit_dict", py, {
+        let val = pydict_to_json(py, data)?;
+        serde_json::to_string(&val).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "dict serialization failed: {e}"
+            ))
+        })
     })
 }
 
 #[pymodule]
-mod audit_rs {
-    #[pymodule_export]
-    use super::serialize_audit_dict;
-    #[pymodule_export]
-    use super::serialize_audit_event;
+fn audit_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+    m.add_function(wrap_pyfunction!(serialize_audit_event, m)?)?;
+    m.add_function(wrap_pyfunction!(serialize_audit_dict, m)?)?;
+    Ok(())
 }
