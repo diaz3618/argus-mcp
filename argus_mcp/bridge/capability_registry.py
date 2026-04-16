@@ -48,6 +48,7 @@ class CapabilityRegistry:
         self._filters = filters or {}
         self._rename_maps = rename_maps or {}
         self._cap_fetch_timeouts = cap_fetch_timeouts or {}
+        self._lock = asyncio.Lock()
         logger.info(
             "CapabilityRegistry initialized (conflict strategy: %s, "
             "filters for %d server(s), renames for %d server(s)).",
@@ -253,10 +254,11 @@ class CapabilityRegistry:
             len(sessions),
         )
 
-        self._tools.clear()
-        self._resources.clear()
-        self._prompts.clear()
-        self._route_map.clear()
+        # Build into temporary lists — live state is untouched during discovery
+        new_tools: List[mcp_types.Tool] = []
+        new_resources: List[mcp_types.Resource] = []
+        new_prompts: List[mcp_types.Prompt] = []
+        new_route_map: Dict[str, Tuple[str, str]] = {}
 
         discover_tasks = []
         for svr_name, session in sessions.items():
@@ -274,7 +276,7 @@ class CapabilityRegistry:
                     "tools",
                     "list_tools",
                     mcp_types.Tool,
-                    self._tools,
+                    new_tools,
                 )
             )
             discover_tasks.append(
@@ -284,7 +286,7 @@ class CapabilityRegistry:
                     "resources",
                     "list_resources",
                     mcp_types.Resource,
-                    self._resources,
+                    new_resources,
                 )
             )
             discover_tasks.append(
@@ -294,9 +296,14 @@ class CapabilityRegistry:
                     "prompts",
                     "list_prompts",
                     mcp_types.Prompt,
-                    self._prompts,
+                    new_prompts,
                 )
             )
+
+        # _discover_caps_by_type writes to self._route_map internally via
+        # _resolve_conflict, so swap to temp map before gather starts.
+        # During gather, all discovery tasks populate new_route_map.
+        self._route_map = new_route_map
 
         results = await asyncio.gather(*discover_tasks, return_exceptions=True)
         for i, result in enumerate(results):
@@ -307,6 +314,13 @@ class CapabilityRegistry:
                     result,
                     exc_info=result,
                 )
+
+        # Atomic swap under lock — readers see either complete old or complete new state
+        async with self._lock:
+            self._tools = new_tools
+            self._resources = new_resources
+            self._prompts = new_prompts
+            # self._route_map already points to new_route_map
 
         logger.info("Capability discovery attempts completed for all backend servers.")
         logger.info(
