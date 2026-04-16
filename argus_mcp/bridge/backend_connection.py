@@ -323,6 +323,7 @@ async def connect_backend(
     discovered_auth: Dict[str, Dict[str, Any]],
     progress_cb: Optional[Callable[..., None]],
     auth_providers: Optional[Dict[str, Any]] = None,
+    lock: Optional[asyncio.Lock] = None,
 ) -> None:
     """Inner connection logic (spawn transport + MCP init).
 
@@ -378,16 +379,24 @@ async def connect_backend(
             f"[{svr_name}] MCP initialization timed out after {init_timeout}s{suffix}"
         ) from None
 
-    sessions[svr_name] = session
+    if lock is not None:
+        async with lock:
+            sessions[svr_name] = session
+            try:
+                record.transition(BackendPhase.READY, "Connection established")
+            except ValueError:
+                pass
+    else:
+        sessions[svr_name] = session
+        try:
+            record.transition(BackendPhase.READY, "Connection established")
+        except ValueError:
+            pass
     logger.info(
         "\u2705 MCP connection initialized for server '%s' (%s).",
         svr_name,
         svr_type,
     )
-    try:
-        record.transition(BackendPhase.READY, "Connection established")
-    except ValueError:
-        pass
     if progress_cb is not None:
         progress_cb(svr_name, "ready")
 
@@ -404,6 +413,7 @@ async def start_backend_svr(
     progress_cb: Optional[Callable[..., None]],
     shutdown_requested: bool,
     auth_providers: Optional[Dict[str, Any]] = None,
+    lock: Optional[asyncio.Lock] = None,
 ) -> bool:
     """Start and initialize a single backend server connection."""
     svr_type = svr_conf.get("type")
@@ -447,6 +457,7 @@ async def start_backend_svr(
                 discovered_auth,
                 progress_cb,
                 auth_providers=auth_providers,
+                lock=lock,
             )
         else:
             await asyncio.wait_for(
@@ -461,6 +472,7 @@ async def start_backend_svr(
                     discovered_auth,
                     progress_cb,
                     auth_providers=auth_providers,
+                    lock=lock,
                 ),
                 timeout=startup_timeout,
             )

@@ -41,6 +41,7 @@ class ClientManager:
         self._discovered_auth: Dict[str, Dict[str, Any]] = {}
         self._auth_discovery_tasks: Dict[str, asyncio.Task[Any]] = {}
         self._auth_providers: Dict[str, Any] = {}
+        self._lock = asyncio.Lock()
         self._refresh_service: Optional[Any] = None
         logger.info("ClientManager initialized.")
 
@@ -78,6 +79,7 @@ class ClientManager:
             progress_cb=self._progress_cb,
             shutdown_requested=self._shutdown_requested,
             auth_providers=self._auth_providers,
+            lock=self._lock,
         )
 
     async def _pre_build_container_image(self, svr_name: str, svr_conf: Dict[str, Any]) -> None:
