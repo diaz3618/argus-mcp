@@ -173,7 +173,7 @@ subprocess (with a log warning).
 
 #### Per-Backend Container Options
 
-Individual backends can customize their container:
+Individual backends can customise their container using the `container:` block:
 
 ```yaml
 backends:
@@ -181,11 +181,31 @@ backends:
     type: stdio
     command: npx
     args: ["-y", "my-mcp-server"]
-    container_isolation: true          # default: inherits global flag
+    container:
+      enabled: true          # set false to disable isolation for this backend
+      network: none          # none | host | bridge (default: none)
+      memory: 512m           # memory limit (default: 512m)
+      cpus: "1"              # CPU quota (default: 1)
+      volumes:               # host:container[:options] mounts
+        - "/tmp/data:/data:ro"
+      user: "65532"          # UID inside container (default: 65532 / nonroot)
     builder_image: "node:22-alpine"    # override base image
     system_deps: ["curl", "jq"]        # additional OS packages
     additional_packages: []            # extra language-level packages
 ```
+
+> **Volume path restriction:** For security, volume host paths must start with
+> one of the prefixes listed in `ARGUS_VOLUME_ALLOWED_PREFIXES` (default:
+> `/tmp:/data:/workspace`). Paths outside these prefixes are rejected at config
+> load time.  To mount a path outside the defaults (e.g. a local repo under
+> `/home`), either extend the allowed list:
+>
+> ```bash
+> ARGUS_VOLUME_ALLOWED_PREFIXES=/tmp:/data:/workspace:/home argus-mcp server
+> ```
+>
+> or set `container.enabled: false` for that backend to skip container isolation
+> entirely.
 
 #### Disabling Container Isolation
 
@@ -207,7 +227,8 @@ Or per-backend:
 ```yaml
 backends:
   my-backend:
-    container_isolation: false
+    container:
+      enabled: false
 ```
 
 #### Pre-Building Images

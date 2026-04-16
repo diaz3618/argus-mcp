@@ -28,7 +28,7 @@ Argus MCP is a central gateway and management platform for the [Model Context Pr
 <tr>
 <td width="50%">
 
-## What can Argus MCP offer?
+## Why use Argus MCP?
 
 - **One endpoint, many backends:** MCP clients connect to one Argus address - Argus aggregates tools, resources, and prompts from all your backend servers.
 - **Stdio isolation:** Run stdio MCP servers in isolated Docker containers, or deploy them on Kubernetes.

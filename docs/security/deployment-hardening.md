@@ -218,6 +218,30 @@ feature_flags:
   build_on_startup: true      # Pre-build images at startup (default: on)
 ```
 
+Per-backend override using the `container:` block:
+
+```yaml
+backends:
+  my-backend:
+    container:
+      enabled: false   # disable isolation for this backend only
+      network: none    # none | host | bridge
+      memory: 512m
+      cpus: "1"
+      volumes:
+        - "/tmp/data:/data:ro"   # host path must be within ARGUS_VOLUME_ALLOWED_PREFIXES
+```
+
+> **Volume security:** Host paths in `container.volumes` must start with a
+> prefix listed in `ARGUS_VOLUME_ALLOWED_PREFIXES` (default:
+> `/tmp:/data:/workspace`). Config load fails if a volume violates this
+> constraint.  Extend the allowed list via environment variable when mounting
+> paths outside the defaults:
+>
+> ```bash
+> ARGUS_VOLUME_ALLOWED_PREFIXES=/tmp:/data:/workspace:/mnt/data argus-mcp server
+> ```
+
 ---
 
 ## 5. Deployment Validation Checklist
