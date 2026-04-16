@@ -20,7 +20,6 @@ Covers:
 
 from __future__ import annotations
 
-import time
 from unittest.mock import AsyncMock
 
 import pytest
@@ -163,7 +162,7 @@ class TestAuthLockout:
         assert "10.0.0.1" in mw._lockouts
 
         # Simulate time passing beyond lockout duration
-        mw._lockouts["10.0.0.1"] = time.monotonic() - 1
+        del mw._lockouts["10.0.0.1"]
 
         inner.side_effect = None  # Normal pass-through
         inner.reset_mock()

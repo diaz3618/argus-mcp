@@ -118,14 +118,20 @@ class TestOriginPermissiveMode:
         inner.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_default_is_permissive(self):
-        """Without require_origin parameter, middleware defaults to permissive."""
+    async def test_default_is_strict(self):
+        """Without require_origin parameter, middleware defaults to strict."""
         inner = AsyncMock()
         middleware = OriginValidationMiddleware(inner)
         scope = _make_scope("/mcp", origin=None)
 
-        await middleware(scope, AsyncMock(), AsyncMock())
-        inner.assert_called_once()
+        sent_responses: list[dict] = []
+
+        async def capture_send(message):
+            sent_responses.append(message)
+
+        await middleware(scope, AsyncMock(), capture_send)
+        assert inner.call_count == 0
+        assert any(msg.get("status") == 403 for msg in sent_responses)
 
     @pytest.mark.asyncio
     async def test_permissive_still_rejects_bad_origin(self):

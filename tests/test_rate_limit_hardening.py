@@ -185,6 +185,12 @@ class TestOriginStrictDefault:
     def test_wildcard_logs_warning(self, monkeypatch, caplog):
         """When '*' in allowed_origins, verify warning is logged."""
         monkeypatch.setenv("ARGUS_ALLOWED_ORIGINS", "*")
+        # Runtime logging config (logging_config.py) sets propagate=False on
+        # ancestor loggers (argus_mcp, argus_mcp.server), preventing records
+        # from reaching the root logger where caplog's handler lives.  Force
+        # propagation for the duration of this test.
+        for name in ("argus_mcp", "argus_mcp.server", "argus_mcp.server.origin"):
+            monkeypatch.setattr(logging.getLogger(name), "propagate", True)
         with caplog.at_level(logging.WARNING):
             m = OriginValidationMiddleware(app=None)
         assert m._wildcard is True

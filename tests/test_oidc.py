@@ -8,6 +8,7 @@ Covers:
 
 from __future__ import annotations
 
+import socket
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -77,7 +78,13 @@ class TestOIDCDiscovery:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(
+                "argus_mcp.server.auth.oidc.socket.getaddrinfo",
+                return_value=[(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 443))],
+            ),
+        ):
             disco = OIDCDiscovery("https://auth.example.com")
             result = await disco.fetch()
 
@@ -103,7 +110,13 @@ class TestOIDCDiscovery:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(
+                "argus_mcp.server.auth.oidc.socket.getaddrinfo",
+                return_value=[(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 443))],
+            ),
+        ):
             disco = OIDCDiscovery("https://auth.example.com")
             r1 = await disco.fetch()
             r2 = await disco.fetch()
@@ -127,7 +140,13 @@ class TestOIDCDiscovery:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(
+                "argus_mcp.server.auth.oidc.socket.getaddrinfo",
+                return_value=[(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 443))],
+            ),
+        ):
             disco = OIDCDiscovery("https://auth.example.com")
             with pytest.raises(OIDCDiscoveryError):
                 await disco.fetch()
@@ -155,7 +174,13 @@ class TestOIDCDiscovery:
         disco._cached = OIDCConfig(
             issuer="old", jwks_uri="old", authorization_endpoint="", token_endpoint="", raw={}
         )
-        with patch("httpx.AsyncClient", return_value=mock_client):
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(
+                "argus_mcp.server.auth.oidc.socket.getaddrinfo",
+                return_value=[(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 443))],
+            ),
+        ):
             result = await disco.refresh()
         # refresh() should have re-fetched, returning new config
         assert result.issuer == "https://auth.example.com"

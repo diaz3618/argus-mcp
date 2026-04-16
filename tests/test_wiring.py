@@ -247,7 +247,10 @@ class TestLifespanWiring:
 
         mcp_svr, service = self._make_mocks()
 
-        with patch("argus_mcp.server.session.SessionManager.start"):
+        with (
+            patch("argus_mcp.server.session.SessionManager.start"),
+            patch("argus_mcp.server.lifespan._setup_incoming_auth", return_value=(None, None)),
+        ):
             await _attach_to_mcp_server(mcp_svr, service)
 
         vc = mcp_svr.version_checker
@@ -261,7 +264,10 @@ class TestLifespanWiring:
 
         mcp_svr, service = self._make_mocks()
 
-        with patch("argus_mcp.server.session.SessionManager.start"):
+        with (
+            patch("argus_mcp.server.session.SessionManager.start"),
+            patch("argus_mcp.server.lifespan._setup_incoming_auth", return_value=(None, None)),
+        ):
             await _attach_to_mcp_server(mcp_svr, service)
 
         sm = mcp_svr.skill_manager
@@ -274,7 +280,10 @@ class TestLifespanWiring:
 
         mcp_svr, service = self._make_mocks()
 
-        with patch("argus_mcp.server.session.SessionManager.start"):
+        with (
+            patch("argus_mcp.server.session.SessionManager.start"),
+            patch("argus_mcp.server.lifespan._setup_incoming_auth", return_value=(None, None)),
+        ):
             await _attach_to_mcp_server(mcp_svr, service)
 
         assert mcp_svr.telemetry_enabled is False
@@ -318,7 +327,10 @@ class TestLifespanWiring:
 
         mcp_svr, service = self._make_mocks()
 
-        with patch("argus_mcp.server.session.SessionManager.start"):
+        with (
+            patch("argus_mcp.server.session.SessionManager.start"),
+            patch("argus_mcp.server.lifespan._setup_incoming_auth", return_value=(None, None)),
+        ):
             await _attach_to_mcp_server(mcp_svr, service)
 
         chain = mcp_svr.middleware_chain

@@ -20,6 +20,9 @@ from argus_mcp.bridge.middleware.authz import AuthorizationError, AuthzMiddlewar
 from argus_mcp.bridge.middleware.chain import RequestContext
 from argus_mcp.bridge.middleware.telemetry import TelemetryMiddleware
 
+# Errors
+from argus_mcp.errors import ConfigurationError
+
 # Secrets
 from argus_mcp.secrets.providers import EnvProvider, FileProvider, create_provider
 from argus_mcp.secrets.resolver import (
@@ -142,9 +145,8 @@ class TestLocalTokenProvider:
 
 class TestAuthProviderRegistry:
     def test_from_config_none(self):
-        reg = AuthProviderRegistry.from_config(None)
-        user = asyncio.run(reg.authenticate(None))
-        assert user.is_anonymous
+        with pytest.raises(ConfigurationError, match="Auth provider config is required"):
+            AuthProviderRegistry.from_config(None)
 
     def test_from_config_anonymous(self):
         reg = AuthProviderRegistry.from_config({"type": "anonymous"})
@@ -157,7 +159,7 @@ class TestAuthProviderRegistry:
         assert user.provider == "local"
 
     def test_from_config_local_missing_token(self):
-        with pytest.raises(ValueError, match="token"):
+        with pytest.raises(ConfigurationError, match="token"):
             AuthProviderRegistry.from_config({"type": "local"})
 
     def test_from_config_jwt(self):
@@ -170,7 +172,7 @@ class TestAuthProviderRegistry:
         assert reg is not None
 
     def test_from_config_unknown(self):
-        with pytest.raises(ValueError, match="Unknown"):
+        with pytest.raises(ConfigurationError, match="Unknown"):
             AuthProviderRegistry.from_config({"type": "magic"})
 
 
@@ -179,7 +181,7 @@ class TestAuthProviderRegistry:
 
 class TestAuthMiddleware:
     def test_injects_user(self):
-        reg = AuthProviderRegistry.from_config(None)
+        reg = AuthProviderRegistry.from_config({"type": "anonymous"})
         mw = AuthMiddleware(reg)
         ctx = RequestContext(capability_name="test_tool", mcp_method="call_tool")
 

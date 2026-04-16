@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+from argus_mcp.errors import ConfigurationError
 from argus_mcp.server.auth.jwt import JWTConfig, JWTValidator
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,7 @@ class AuthProviderRegistry:
             }
         """
         if not config:
-            raise ValueError(
+            raise ConfigurationError(
                 "Auth provider config is required — pass explicit type: 'anonymous' to disable auth"
             )
 
@@ -133,7 +134,7 @@ class AuthProviderRegistry:
         if auth_type == "local":
             token = config.get("token", "")
             if not token:
-                raise ValueError("Local auth requires 'token' in config")
+                raise ConfigurationError("Local auth requires 'token' in config")
             return cls(LocalTokenProvider(token))
 
         if auth_type in ("jwt", "oidc"):
@@ -143,7 +144,9 @@ class AuthProviderRegistry:
             # For OIDC: auto-discover jwks_uri from issuer if not provided
             if auth_type == "oidc" and not jwks_uri:
                 if not issuer:
-                    raise ValueError("OIDC auth requires 'issuer' in config for auto-discovery")
+                    raise ConfigurationError(
+                        "OIDC auth requires 'issuer' in config for auto-discovery"
+                    )
                 logger.info("OIDC: will auto-discover JWKS URI from issuer %r", issuer)
                 # Point to the well-known endpoint; JWTValidator fetches JWKS
                 # at runtime from the discovered jwks_uri.
@@ -158,7 +161,7 @@ class AuthProviderRegistry:
             validator = JWTValidator(jwt_config)
             return cls(JWTAuthProvider(validator))
 
-        raise ValueError(f"Unknown incoming auth type: {auth_type!r}")
+        raise ConfigurationError(f"Unknown incoming auth type: {auth_type!r}")
 
 
 class AuthenticationError(Exception):

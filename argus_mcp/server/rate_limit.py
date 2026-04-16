@@ -44,8 +44,12 @@ class RateLimitMiddleware:
                 except ValueError:
                     logger.warning("Ignoring invalid trusted_proxies entry: %s", entry)
         # Per-IP request timestamps for sliding window (TTL auto-evicts stale IPs)
+        # ME-01: Use 2x window TTL to prevent premature eviction of timestamps
+        # near the sliding-window boundary.  The in-window pruning in
+        # _check_rate_limit() handles the actual enforcement; the TTL here
+        # is purely for memory reclamation of stale IPs.
         self._request_log: TTLCache = TTLCache(
-            maxsize=10000, ttl=self._config.default.window_seconds
+            maxsize=10000, ttl=self._config.default.window_seconds * 2
         )
         # Per-IP auth-failure timestamps (TTL matches auth lockout window)
         self._auth_failure_log: TTLCache = TTLCache(
@@ -132,7 +136,9 @@ class RateLimitMiddleware:
         self._auth_failure_log[ip] = timestamps
 
         if len(timestamps) >= self._config.auth_lockout_threshold:
-            self._lockouts[ip] = now + self._config.auth_lockout_duration_seconds
+            # ME-03: TTLCache auto-evicts after auth_lockout_duration_seconds;
+            # the stored value is unused — _is_locked_out() checks presence only.
+            self._lockouts[ip] = True
             self._auth_failure_log.pop(ip, None)
             logger.warning(
                 "Auth lockout applied to %s for %ds after %d failures",

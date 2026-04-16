@@ -25,11 +25,11 @@ from argus_mcp.server.auth.providers import (
 
 class TestAuthProviderFailsafe:
     def test_from_config_none_raises(self):
-        with pytest.raises(ValueError, match="Auth provider config is required"):
+        with pytest.raises(ConfigurationError, match="Auth provider config is required"):
             AuthProviderRegistry.from_config(None)
 
     def test_from_config_empty_dict_raises(self):
-        with pytest.raises(ValueError, match="Auth provider config is required"):
+        with pytest.raises(ConfigurationError, match="Auth provider config is required"):
             AuthProviderRegistry.from_config({})
 
     def test_from_config_explicit_anonymous_works(self):
@@ -45,6 +45,11 @@ class TestAuthProviderFailsafe:
 
         with pytest.raises(ConfigurationError, match="Auth configuration is required"):
             _setup_incoming_auth(None)
+
+    def test_from_config_unknown_type_raises(self):
+        """LO-02: Unknown auth type must raise ConfigurationError, not pass silently."""
+        with pytest.raises(ConfigurationError, match="Unknown incoming auth type"):
+            AuthProviderRegistry.from_config({"type": "kerberos"})
 
 
 # ── AUTH-05: OIDC SSRF guard ─────────────────────────────────────────

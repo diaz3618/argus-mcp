@@ -83,6 +83,12 @@ class OriginValidationMiddleware:
       response (SEC-13).
 
     Non-MCP paths (e.g. ``/manage/…``) are never checked.
+
+    .. note:: **ME-02 — Init-only environment variable**
+
+       The ``ARGUS_ALLOWED_ORIGINS`` environment variable is read **once** at
+       middleware construction time (i.e. server startup).  Changes to the
+       variable after startup have no effect until the server is restarted.
     """
 
     def __init__(
