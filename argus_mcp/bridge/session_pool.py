@@ -142,12 +142,16 @@ class SessionPool:
                 pass
             self._reaper_task = None
 
+        to_close: list[tuple[SessionKey, PoolEntry]] = []
         async with self._lock:
             for key, entries in self._pool.items():
                 for entry in entries:
-                    await self._close_entry(key, entry)
+                    to_close.append((key, entry))
             self._pool.clear()
             self._circuit_breakers.clear()
+
+        for key, entry in to_close:
+            await self._close_entry(key, entry)
 
         logger.info("SessionPool stopped — all sessions closed.")
 
@@ -191,11 +195,11 @@ class SessionPool:
 
         if failed:
             cb.record_failure()
-            await self._close_entry(key, entry)
             async with self._lock:
                 entries = self._pool.get(key, [])
                 if entry in entries:
                     entries.remove(entry)
+            await self._close_entry(key, entry)
             return
 
         cb.record_success()
@@ -215,21 +219,26 @@ class SessionPool:
         entry is evicted.
         """
         entry = PoolEntry(session=session, stack=stack)
+        evicted: list[PoolEntry] = []
 
         async with self._lock:
             entries = self._pool.setdefault(key, [])
 
-            # Evict oldest idle entry when at capacity.
+            # Collect oldest idle entries for eviction when at capacity.
             while len(entries) >= self._per_key_max:
                 idle = [e for e in entries if not e.in_use]
                 if not idle:
                     break
                 oldest = min(idle, key=lambda e: e.last_used)
                 entries.remove(oldest)
-                await self._close_entry(key, oldest)
-                logger.debug("SessionPool: evicted oldest idle session for %s.", key)
+                evicted.append(oldest)
 
             entries.append(entry)
+
+        # Close evicted entries outside the lock to avoid deadlock.
+        for old_entry in evicted:
+            await self._close_entry(key, old_entry)
+            logger.debug("SessionPool: evicted oldest idle session for %s.", key)
 
         logger.debug(
             "SessionPool: added session for %s (pool size: %d).",
