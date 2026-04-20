@@ -116,6 +116,7 @@ test = [
     "pytest>=9.0.0",
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=7.1.0",
+    "pytest-repeat>=0.9.3",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.5.0",
     "hypothesis>=6.100.0",
@@ -250,6 +251,7 @@ markers = [
     "security: security-focused tests (auth, token scope, negative)",
     "e2e: end-to-end tests requiring full stack",
     "stress: stress / load tests (concurrent, rapid-fire)",
+    "concurrency: concurrency stress tests (50x repeat, per-test timeout)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:anyio",
