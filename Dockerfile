@@ -21,7 +21,7 @@
 
 # ── Stage 1: Rust Builder ──────────────────────────────────
 # nosemgrep: docker-user-root (builder stage is discarded)
-FROM rust:1.94-slim AS rust-builder
+FROM rust:1.95-slim AS rust-builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3-dev python3-pip && \
