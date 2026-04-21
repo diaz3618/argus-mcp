@@ -42,6 +42,7 @@ from argus_mcp.bridge.container.labels import default_labels
 from argus_mcp.bridge.container.network import effective_network
 from argus_mcp.bridge.container.runtime import RuntimeFactory
 from argus_mcp.bridge.container.templates.models import CONTAINER_HOME
+from argus_mcp.config.schema_backends import DANGEROUS_DOCKER_FLAGS
 from argus_mcp.constants import EXIT_STACK_CLOSE_TIMEOUT
 
 logger = logging.getLogger(__name__)
@@ -493,9 +494,18 @@ def _build_create_args(
         for key, value in sorted(env.items()):
             args.extend(["-e", f"{key}={value}"])
 
-    # Extra raw arguments from per-backend config
+    # Extra raw arguments from per-backend config — guarded against
+    # dangerous Docker flags that would bypass the security baseline
+    # (CNTR-02 / SEC-08).
     if extra_args:
-        args.extend(extra_args)
+        for flag in extra_args:
+            bare = flag.lstrip("-").split("=")[0]
+            if flag in DANGEROUS_DOCKER_FLAGS or f"--{bare}" in DANGEROUS_DOCKER_FLAGS:
+                raise RuntimeError(
+                    f"Dangerous Docker flag '{flag}' rejected in extra_args. "
+                    f"Blocked flags: {sorted(DANGEROUS_DOCKER_FLAGS)}"
+                )
+            args.append(flag)
 
     # Image and runtime args
     args.append(image_tag)
