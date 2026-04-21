@@ -569,7 +569,17 @@ class RuntimeFactory:
 
     @classmethod
     def reset(cls) -> None:
-        """Reset the singleton (for testing)."""
+        """Reset the singleton (for testing).
+
+        Guarded against accidental invocation in production: raises
+        ``RuntimeError`` unless the ``ARGUS_TEST_MODE`` environment
+        variable is set to ``"1"``. See finding CNTR-03.
+        """
+        if os.environ.get("ARGUS_TEST_MODE") != "1":
+            raise RuntimeError(
+                "RuntimeFactory.reset() is only allowed in test mode. "
+                "Set ARGUS_TEST_MODE=1 to enable."
+            )
         cls._instance = None
         cls._registry.clear()
 

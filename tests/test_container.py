@@ -265,10 +265,12 @@ class TestRuntimeFactory:
     """Factory auto-detection and explicit override."""
 
     def setup_method(self) -> None:
-        RuntimeFactory.reset()
+        with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
+            RuntimeFactory.reset()
 
     def teardown_method(self) -> None:
-        RuntimeFactory.reset()
+        with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
+            RuntimeFactory.reset()
 
     @patch("shutil.which", side_effect=lambda cmd: "/usr/bin/docker" if cmd == "docker" else None)
     def test_detect_docker_on_path(self, mock_which) -> None:
@@ -313,7 +315,8 @@ class TestRuntimeFactory:
     def test_reset_clears_cache(self, mock_which) -> None:
         factory = RuntimeFactory.get()
         rt1 = factory.detect()
-        RuntimeFactory.reset()
+        with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
+            RuntimeFactory.reset()
         rt2 = RuntimeFactory.get().detect()
         assert rt1 is not rt2
 
@@ -916,10 +919,12 @@ class TestWrapBackend:
     @pytest.fixture(autouse=True)
     def _reset_health_cache(self):
         """Reset the RuntimeFactory singleton and container tracking between tests."""
-        RuntimeFactory.get().reset()
+        with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
+            RuntimeFactory.get().reset()
         _active_containers.clear()
         yield
-        RuntimeFactory.get().reset()
+        with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
+            RuntimeFactory.get().reset()
         _active_containers.clear()
 
     @pytest.fixture(autouse=True)

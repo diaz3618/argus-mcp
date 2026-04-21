@@ -84,7 +84,12 @@ def build_chain(
             _mw: Any = mw,
             _next: Any = next_handler,
         ) -> Any:
-            return await _mw(ctx, _next)
+            result = await _mw(ctx, _next)
+            assert result is not None, (
+                f"Middleware {type(_mw).__name__!r} returned None; "
+                "middleware must return a response or raise."
+            )
+            return result
 
         chain = _wrap
     final: Callable[[RequestContext], Awaitable[Any]] = chain
