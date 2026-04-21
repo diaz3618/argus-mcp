@@ -43,6 +43,9 @@ class ClientManager:
         self._auth_providers: Dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._refresh_service: Optional[Any] = None
+        # Per-instance container tracking (replaces the previous module-level
+        # ``_active_containers`` global; threaded through bc/tf helpers).
+        self._active_containers: Dict[str, Tuple[str, str]] = {}
         logger.info("ClientManager initialized.")
 
     def cancel_startup(self) -> None:
@@ -80,11 +83,17 @@ class ClientManager:
             shutdown_requested=self._shutdown_requested,
             auth_providers=self._auth_providers,
             lock=self._lock,
+            active_containers=self._active_containers,
         )
 
     async def _pre_build_container_image(self, svr_name: str, svr_conf: Dict[str, Any]) -> None:
         """Pre-build the container image for a stdio backend."""
-        await bc.pre_build_container_image(svr_name, svr_conf, self._progress_cb)
+        await bc.pre_build_container_image(
+            svr_name,
+            svr_conf,
+            self._progress_cb,
+            active_containers=self._active_containers,
+        )
 
     async def start_all(
         self,
@@ -216,7 +225,7 @@ class ClientManager:
         try:
             from argus_mcp.bridge.container.wrapper import cleanup_all_containers
 
-            await cleanup_all_containers()
+            await cleanup_all_containers(self._active_containers)
         except Exception:  # noqa: BLE001
             logger.debug("Container cleanup during shutdown failed.", exc_info=True)
 
@@ -270,7 +279,7 @@ class ClientManager:
         try:
             from argus_mcp.bridge.container.wrapper import cleanup_container
 
-            await cleanup_container(name)
+            await cleanup_container(name, self._active_containers)
         except Exception:  # noqa: BLE001
             logger.debug(
                 "Container cleanup for '%s' failed.",

@@ -103,6 +103,8 @@ async def init_streamablehttp(
 async def resolve_stdio_params(
     svr_name: str,
     svr_conf: Dict[str, Any],
+    *,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> Tuple[StdioServerParameters, bool]:
     """Resolve stdio parameters, using pre-built or inline container wrapping."""
     stdio_params = svr_conf.get("params")
@@ -150,6 +152,7 @@ async def resolve_stdio_params(
         build_env=container_cfg.get("build_env"),
         source_ref=container_cfg.get("source_ref"),
         dockerfile=container_cfg.get("dockerfile"),
+        active_containers=active_containers,
     )
 
 
@@ -224,10 +227,13 @@ async def create_transport_session(
     *,
     auth: Optional[httpx.Auth] = None,
     manage_subproc: Any = None,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> ClientSession:
     """Dispatch to the correct transport initializer and return the session."""
     if svr_type == "stdio":
-        stdio_params, _isolated = await resolve_stdio_params(svr_name, svr_conf)
+        stdio_params, _isolated = await resolve_stdio_params(
+            svr_name, svr_conf, active_containers=active_containers
+        )
         if not _isolated:
             stdio_params = apply_network_env(svr_name, svr_conf, stdio_params)
         _, session = await init_stdio(

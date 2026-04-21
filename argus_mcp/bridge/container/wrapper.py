@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Callable, Dict, List, Optional, Tuple
 
@@ -51,8 +52,9 @@ _DEFAULT_CAP_DROP = ["ALL"]
 _DEFAULT_MEMORY = "512m"
 _DEFAULT_CPUS = "1"
 
-#: Maps ``svr_name`` → ``(container_runtime, container_id)`` for cleanup.
-_active_containers: Dict[str, Tuple[str, str]] = {}
+#: CNTR-01: env-var values matching this pattern look like secrets/tokens.
+#: When detected, a warning naming only the key (never the value) is emitted.
+_SECRET_PATTERN = re.compile(r"^[A-Za-z0-9+/]{32,}={0,2}$")
 
 _MEM_SUFFIXES = {"k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
 
@@ -128,6 +130,7 @@ async def wrap_backend(
     dockerfile: Optional[str] = None,
     create_timeout: float = 120.0,
     line_callback: Optional[Callable[[str], None]] = None,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> Tuple[StdioServerParameters, bool]:
     """Wrap a stdio backend in a container if possible.
 
@@ -183,6 +186,9 @@ async def wrap_backend(
             svr_name,
         )
         return params, False
+
+    if active_containers is None:
+        active_containers = {}
 
     env_val = os.environ.get("ARGUS_CONTAINER_ISOLATION", "").strip().lower()
     if env_val in ("0", "false", "no", "off", "disabled"):
@@ -272,11 +278,11 @@ async def wrap_backend(
 
     # Clean up any existing container for this backend (e.g. from a
     # previous failed attempt) before creating a new one.
-    if svr_name in _active_containers:
-        await cleanup_container(svr_name)
+    if svr_name in active_containers:
+        await cleanup_container(svr_name, active_containers)
 
     # Also remove any leftover Docker container with the same --name from a
-    # previous server session (not tracked in _active_containers).
+    # previous server session (not tracked in ``active_containers``).
     await _remove_stale_named_container(container_runtime, svr_name)
 
     net_mode = effective_network(network)
@@ -328,7 +334,7 @@ async def wrap_backend(
         return params, False
 
     # Track for cleanup
-    _active_containers[svr_name] = (container_runtime, container_id)
+    active_containers[svr_name] = (container_runtime, container_id)
 
     logger.info(
         "[%s] Container isolation: pre-created %s "
@@ -489,9 +495,16 @@ def _build_create_args(
             args.extend(["--label", f"{key}={value}"])
 
     # Environment variables — passed via -e flags so they're inside
-    # the container.
+    # the container.  CNTR-01: warn (key-only, value never logged) when a
+    # value looks like a secret / base64 token.
     if env:
         for key, value in sorted(env.items()):
+            if _SECRET_PATTERN.match(str(value)):
+                logger.warning(
+                    "Env var '%s' passed to container may contain a secret "
+                    "(value matches base64/token pattern); value not logged.",
+                    key,
+                )
             args.extend(["-e", f"{key}={value}"])
 
     # Extra raw arguments from per-backend config — guarded against
@@ -574,8 +587,8 @@ async def _remove_stale_named_container(runtime: str, name: str) -> None:
     """Remove a leftover Docker container by *name* if it exists.
 
     This handles containers left behind from a previous server session
-    that are not tracked in ``_active_containers``.  Safe to call even
-    when no container with the given name exists.
+    that are not tracked in any ``active_containers`` dict.  Safe to call
+    even when no container with the given name exists.
 
     Uses ``docker rm -f`` with a generous timeout.  If the first attempt
     times out (can happen under Docker daemon load), a second attempt is
@@ -613,12 +626,16 @@ async def _remove_stale_named_container(runtime: str, name: str) -> None:
             return  # non-timeout error — no point retrying
 
 
-async def cleanup_container(svr_name: str) -> None:
+async def cleanup_container(
+    svr_name: str,
+    active_containers: Dict[str, Tuple[str, str]],
+) -> None:
     """Remove a pre-created container for the given backend.
 
-    Safe to call even if no container exists for *svr_name*.
+    Safe to call even if no container exists for *svr_name* in
+    *active_containers*.
     """
-    entry = _active_containers.pop(svr_name, None)
+    entry = active_containers.pop(svr_name, None)
     if entry is None:
         return
 
@@ -642,30 +659,36 @@ async def cleanup_container(svr_name: str) -> None:
         )
 
 
-async def cleanup_all_containers() -> None:
-    """Remove **all** tracked pre-created containers.
+async def cleanup_all_containers(
+    active_containers: Dict[str, Tuple[str, str]],
+) -> None:
+    """Remove **all** containers tracked in *active_containers*.
 
     Called during server shutdown to ensure no orphan containers remain.
     """
-    names = list(_active_containers.keys())
+    names = list(active_containers.keys())
     if not names:
         return
     logger.info("Cleaning up %d tracked container(s)…", len(names))
     for name in names:
-        await cleanup_container(name)
+        await cleanup_container(name, active_containers)
 
 
 @asynccontextmanager
-async def container_cleanup_context(svr_name: str) -> AsyncIterator[None]:
+async def container_cleanup_context(
+    svr_name: str,
+    active_containers: Dict[str, Tuple[str, str]],
+) -> AsyncIterator[None]:
     """Async context manager that cleans up the container on exit.
 
     Usage::
 
-        async with container_cleanup_context("my-backend"):
+        active: Dict[str, Tuple[str, str]] = {}
+        async with container_cleanup_context("my-backend", active):
             # … use the container …
         # container is removed here
     """
     try:
         yield
     finally:
-        await cleanup_container(svr_name)
+        await cleanup_container(svr_name, active_containers)

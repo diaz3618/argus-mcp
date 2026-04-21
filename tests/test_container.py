@@ -900,7 +900,7 @@ class TestNetworkPolicy:
 
 # wrapper.py
 
-from argus_mcp.bridge.container.wrapper import _active_containers, wrap_backend
+from argus_mcp.bridge.container.wrapper import wrap_backend
 
 
 class TestWrapBackend:
@@ -918,14 +918,12 @@ class TestWrapBackend:
 
     @pytest.fixture(autouse=True)
     def _reset_health_cache(self):
-        """Reset the RuntimeFactory singleton and container tracking between tests."""
+        """Reset the RuntimeFactory singleton between tests."""
         with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
             RuntimeFactory.get().reset()
-        _active_containers.clear()
         yield
         with patch.dict(os.environ, {"ARGUS_TEST_MODE": "1"}):
             RuntimeFactory.get().reset()
-        _active_containers.clear()
 
     @pytest.fixture(autouse=True)
     def _disable_go_adapter(self):
@@ -1111,7 +1109,8 @@ class TestWrapBackend:
                 return_value=self._FAKE_CID,
             ) as mock_create,
         ):
-            wrapped, isolated = await wrap_backend("test", params)
+            active: dict = {}
+            wrapped, isolated = await wrap_backend("test", params, active_containers=active)
 
         assert isolated is True
         # Returned params use 'start -ai' for stdio attach
@@ -1143,7 +1142,7 @@ class TestWrapBackend:
         assert "no-new-privileges" in so_values
         assert "label=disable" in so_values
         # Container is tracked
-        assert "test" in _active_containers
+        assert "test" in active
 
     @pytest.mark.asyncio
     async def test_network_override(self, monkeypatch):
@@ -1218,11 +1217,12 @@ class TestWrapBackend:
                 return_value=None,
             ),
         ):
-            wrapped, isolated = await wrap_backend("test", params)
+            active: dict = {}
+            wrapped, isolated = await wrap_backend("test", params, active_containers=active)
 
         assert not isolated
         assert wrapped.command == "uvx"
-        assert "test" not in _active_containers
+        assert "test" not in active
 
     @pytest.mark.asyncio
     async def test_volumes_and_extra_args(self, monkeypatch):
@@ -1369,23 +1369,22 @@ class TestCreateContainer:
 class TestCleanupContainer:
     """Tests for cleanup_container and cleanup_all_containers."""
 
-    @pytest.fixture(autouse=True)
-    def _reset(self):
-        _active_containers.clear()
-        yield
-        _active_containers.clear()
+    @pytest.fixture
+    def active(self):
+        """Per-test active_containers dict."""
+        return {}
 
     @pytest.mark.asyncio
-    async def test_cleanup_no_container(self):
+    async def test_cleanup_no_container(self, active):
         from argus_mcp.bridge.container.wrapper import cleanup_container
 
-        await cleanup_container("nonexistent")  # should not raise
+        await cleanup_container("nonexistent", active)  # should not raise
 
     @pytest.mark.asyncio
-    async def test_cleanup_tracked_container(self):
+    async def test_cleanup_tracked_container(self, active):
         from argus_mcp.bridge.container.wrapper import cleanup_container
 
-        _active_containers["test-svr"] = ("docker", "abc123def456")
+        active["test-svr"] = ("docker", "abc123def456")
 
         fake_proc = MagicMock()
         fake_proc.wait = AsyncMock(return_value=0)
@@ -1394,29 +1393,29 @@ class TestCleanupContainer:
             new_callable=AsyncMock,
             return_value=fake_proc,
         ):
-            await cleanup_container("test-svr")
-        assert "test-svr" not in _active_containers
+            await cleanup_container("test-svr", active)
+        assert "test-svr" not in active
 
     @pytest.mark.asyncio
-    async def test_cleanup_handles_exception(self):
+    async def test_cleanup_handles_exception(self, active):
         from argus_mcp.bridge.container.wrapper import cleanup_container
 
-        _active_containers["test-svr"] = ("docker", "abc123def456")
+        active["test-svr"] = ("docker", "abc123def456")
 
         with patch(
             "asyncio.create_subprocess_exec",
             new_callable=AsyncMock,
             side_effect=Exception("fail"),
         ):
-            await cleanup_container("test-svr")
-        assert "test-svr" not in _active_containers
+            await cleanup_container("test-svr", active)
+        assert "test-svr" not in active
 
     @pytest.mark.asyncio
-    async def test_cleanup_all(self):
+    async def test_cleanup_all(self, active):
         from argus_mcp.bridge.container.wrapper import cleanup_all_containers
 
-        _active_containers["svr1"] = ("docker", "cid1")
-        _active_containers["svr2"] = ("docker", "cid2")
+        active["svr1"] = ("docker", "cid1")
+        active["svr2"] = ("docker", "cid2")
 
         fake_proc = MagicMock()
         fake_proc.wait = AsyncMock(return_value=0)
@@ -1425,14 +1424,14 @@ class TestCleanupContainer:
             new_callable=AsyncMock,
             return_value=fake_proc,
         ):
-            await cleanup_all_containers()
-        assert len(_active_containers) == 0
+            await cleanup_all_containers(active)
+        assert len(active) == 0
 
     @pytest.mark.asyncio
-    async def test_container_cleanup_context(self):
+    async def test_container_cleanup_context(self, active):
         from argus_mcp.bridge.container.wrapper import container_cleanup_context
 
-        _active_containers["ctx-svr"] = ("docker", "cid-ctx")
+        active["ctx-svr"] = ("docker", "cid-ctx")
 
         fake_proc = MagicMock()
         fake_proc.wait = AsyncMock(return_value=0)
@@ -1441,9 +1440,9 @@ class TestCleanupContainer:
             new_callable=AsyncMock,
             return_value=fake_proc,
         ):
-            async with container_cleanup_context("ctx-svr"):
-                assert "ctx-svr" in _active_containers
-        assert "ctx-svr" not in _active_containers
+            async with container_cleanup_context("ctx-svr", active):
+                assert "ctx-svr" in active
+        assert "ctx-svr" not in active
 
 
 # schema_backends.py ContainerConfig

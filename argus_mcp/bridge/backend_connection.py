@@ -232,6 +232,8 @@ async def pre_build_container_image(
     svr_name: str,
     svr_conf: Dict[str, Any],
     progress_cb: Optional[Callable[..., None]],
+    *,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> None:
     """Pre-build the container image for a stdio backend.
 
@@ -286,6 +288,7 @@ async def pre_build_container_image(
         source_ref=container_cfg.get("source_ref"),
         dockerfile=container_cfg.get("dockerfile"),
         line_callback=_build_line_cb,
+        active_containers=active_containers,
     )
 
     svr_conf["_prebuild_params"] = wrapped_params
@@ -324,6 +327,7 @@ async def connect_backend(
     progress_cb: Optional[Callable[..., None]],
     auth_providers: Optional[Dict[str, Any]] = None,
     lock: Optional[asyncio.Lock] = None,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> None:
     """Inner connection logic (spawn transport + MCP init).
 
@@ -363,6 +367,7 @@ async def connect_backend(
         devnull,
         manage_subproc=_manage_subproc,
         auth=auth,
+        active_containers=active_containers,
     )
 
     if svr_type == "stdio":
@@ -414,6 +419,7 @@ async def start_backend_svr(
     shutdown_requested: bool,
     auth_providers: Optional[Dict[str, Any]] = None,
     lock: Optional[asyncio.Lock] = None,
+    active_containers: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> bool:
     """Start and initialize a single backend server connection."""
     svr_type = svr_conf.get("type")
@@ -437,7 +443,12 @@ async def start_backend_svr(
     # Pre-build container image (outside startup timeout)
     if svr_type == "stdio" and "_prebuild_params" not in svr_conf:
         try:
-            await pre_build_container_image(svr_name, svr_conf, progress_cb)
+            await pre_build_container_image(
+                svr_name,
+                svr_conf,
+                progress_cb,
+                active_containers=active_containers,
+            )
         except Exception as exc:  # noqa: BLE001
             msg = f"Container image pre-build failed: {exc}"
             logger.error("[%s] %s", svr_name, msg, exc_info=True)
@@ -458,6 +469,7 @@ async def start_backend_svr(
                 progress_cb,
                 auth_providers=auth_providers,
                 lock=lock,
+                active_containers=active_containers,
             )
         else:
             await asyncio.wait_for(
@@ -473,6 +485,7 @@ async def start_backend_svr(
                     progress_cb,
                     auth_providers=auth_providers,
                     lock=lock,
+                    active_containers=active_containers,
                 ),
                 timeout=startup_timeout,
             )
