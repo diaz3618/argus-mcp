@@ -239,7 +239,7 @@ jobs:
         run: docker load -i /tmp/image.tar
 
       - name: Run Trivy vulnerability + secret scanner (SARIF)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.image-tag }}
           scanners: vuln,secret
@@ -250,7 +250,7 @@ jobs:
           trivyignores: .trivyignore
 
       - name: Run Trivy CI gate (fail on CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.image-tag }}
           scanners: vuln,secret
