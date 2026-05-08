@@ -61,11 +61,13 @@ Argus MCP has a server/client architecture:
 | `argus-mcp secret` | Manage encrypted secrets (set, get, list, delete) |
 | `argus-mcp clean` | Remove containers and images created by Argus MCP |
 
+> **Short alias:** `amcp` is a convenience alias for `argus-mcp` (e.g. `amcp server`).
+
 **Companion packages:**
 
 | Package | Entry Point | Description |
 |---------|-------------|-------------|
-| `argus-cli` | `argus` | Client CLI with 20 command groups and an interactive REPL for managing a running server |
+| `argus-cli` | `argus` / `argus-cli` / `argcli` | Client CLI with 20 command groups and an interactive REPL for managing a running server |
 | `argus-cli` | `argus-tui` | Alternative TUI launcher from the client package |
 | `argusd` | `argusd` | Go sidecar daemon for Docker container and Kubernetes pod management (Unix Domain Socket API) |
 

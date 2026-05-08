@@ -56,6 +56,7 @@ dev = [
 [project.scripts]
 argus = "argus_cli.main:app"
 argus-cli = "argus_cli.main:app"
+argcli = "argus_cli.main:app"
 argus-tui = "argus_cli.tui:launch"
 
 [project.urls]

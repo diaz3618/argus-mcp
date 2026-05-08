@@ -42,6 +42,7 @@ Verify:
 
 ```bash
 argus-mcp --help
+amcp --help   # short alias
 ```
 
 #### argus-cli (client)
@@ -64,6 +65,7 @@ Verify:
 
 ```bash
 argus --help
+argcli --help   # short alias
 ```
 
 #### argusd (Go daemon)

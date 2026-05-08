@@ -26,6 +26,13 @@ argus-mcp [-h] {server,stop,status,tui,secret,build,clean} ...
 ### Entry Point
 
 Installed as the `argus-mcp` console script (defined in `pyproject.toml`).
+The short alias `amcp` is also registered and works identically:
+
+```bash
+argus-mcp server
+amcp server   # short alias
+```
+
 Also invocable as a Python module:
 
 ```bash
@@ -85,11 +92,13 @@ See [REPL Guide](repl.md) for REPL details.
 
 ### Entry Points
 
-Installed as two console scripts (defined in `packages/argus_cli/pyproject.toml`):
+Installed as console scripts (defined in `packages/argus_cli/pyproject.toml`):
 
 | Script | Description |
 |--------|-------------|
 | `argus` | CLI and REPL (Typer) |
+| `argus-cli` | Full name alias for `argus` |
+| `argcli` | Short alias for `argus` |
 | `argus-tui` | Launch the TUI directly |
 
 ### Usage Examples
