@@ -1463,6 +1463,7 @@ class TestCmdBuild:
         args = argparse.Namespace(config="my.yaml")
         mock_params = MagicMock()
         mock_params.command = "test-server"
+        mock_wrap = AsyncMock(return_value=(MagicMock(), True))
         with (
             patch("argus_mcp.cli._build.setup_logging"),
             patch(
@@ -1478,12 +1479,15 @@ class TestCmdBuild:
             patch("mcp.StdioServerParameters", new=type(mock_params)),
             patch(
                 "argus_mcp.bridge.container.wrap_backend",
-                new=AsyncMock(return_value=(MagicMock(), True)),
+                new=mock_wrap,
             ),
         ):
             _cmd_build(args)
         out = capsys.readouterr().out
         assert "OK" in out or "Done" in out
+        mock_wrap.assert_awaited_once()
+        assert mock_wrap.await_args.kwargs["svr_name"] == "tool1"
+        assert "name" not in mock_wrap.await_args.kwargs
 
     def test_build_failure(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Failed build prints FAILED and exits."""

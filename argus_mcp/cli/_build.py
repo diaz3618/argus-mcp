@@ -117,7 +117,7 @@ def _cmd_build(args: argparse.Namespace) -> None:
                 (conf.get("network") or {}).get("network_mode")
             )
             return {
-                "name": name,
+                "svr_name": name,
                 "params": params,
                 "enabled": container_cfg.get("enabled", True),
                 "runtime_override": container_cfg.get("runtime"),
