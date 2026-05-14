@@ -75,7 +75,7 @@ jobs:
       # and generates identical tags for BOTH registries.
       - name: Extract metadata (tags + labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.IMAGE_DOCKERHUB }}
@@ -189,7 +189,7 @@ jobs:
 
       - name: Extract metadata (tags + labels)
         id: meta-dhi
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.IMAGE_DOCKERHUB_DHI }}
