@@ -170,7 +170,7 @@ jobs:
         run: python scripts/ci_inject_go.py --os ${{ matrix.go_os }} --arch ${{ matrix.go_arch }}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23
+        uses: pypa/cibuildwheel@v3.4
         with:
           output-dir: wheelhouse
         env:
