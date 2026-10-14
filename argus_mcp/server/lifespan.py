@@ -216,15 +216,18 @@ async def _build_middleware_stack(
     auth_mode: str,
     full_cfg: Any,
     telemetry_enabled: bool,
+    mcp_server: Any = None,
 ) -> tuple[Any, Any]:
     """Build the middleware chain. Returns ``(chain, plugin_manager)``."""
     from argus_mcp.bridge.middleware import (
         AuditMiddleware,
+        OptimizerMiddleware,
         RecoveryMiddleware,
         RoutingMiddleware,
         build_chain,
     )
     from argus_mcp.bridge.middleware.telemetry import TelemetryMiddleware
+    from argus_mcp.server.state import get_state
 
     middlewares: list = []
     if auth_registry is not None:
@@ -255,6 +258,11 @@ async def _build_middleware_stack(
     if telemetry_enabled:
         middlewares.append(TelemetryMiddleware())
     middlewares.append(AuditMiddleware(audit_logger=audit_logger))
+
+    # Resolve optimizer meta-tools (find_tool) locally, just before routing.
+    # The index is attached after the chain is built, so resolve the state
+    # lazily per request.
+    middlewares.append(OptimizerMiddleware(lambda: get_state(mcp_server)))
 
     routing = RoutingMiddleware(service.registry, service.manager)
     chain = build_chain(middlewares=middlewares, handler=routing)
@@ -358,6 +366,7 @@ async def _attach_to_mcp_server(
         auth_mode,
         full_cfg,
         telemetry_enabled,
+        mcp_server=mcp_svr_instance,
     )
     mcp_svr_instance.middleware_chain = chain
 
